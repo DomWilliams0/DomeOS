@@ -1,38 +1,34 @@
-to_print:
-	db 'Alright lad',0
+# bios offset
+org 0x7c00
 
-	; offset
-	org 0x7c00
+# declare strings
+nice_string:
+	db 'Wow, nice string',0
+notsonice_string:
+	db 'Did your mum allocate it?',0
+separator_string:
+	db '.  ',0
 
-	; counter in cx
-	mov		cx, 0
+# init stack
+mov 	bp,	0x8000
+mov		sp,	bp
 
-printer:
-	; put char addr in bx
-	mov		bx,	to_print
-	add		bx,	cx
+# print them
+mov 	ax,	nice_string
+call 	print_string
 
-	; put char in al
-	mov		al,	[bx]
+mov 	ax,	separator_string
+call 	print_string
 
-	; reached end
-	test	al,	al
-	jz		end
+mov 	ax,	notsonice_string
+call 	print_string
 
-	; print char and increment
-	mov		ah,	0x0e
-	int		0x10
-	inc		cx
-	jmp		printer
+# infinite loop
+jmp 	$
 
-end:
-	; print underscore
-	mov		al, '_'
-	int		0x10
+%include "print_string.asm"
 
-	; loop 5eva
-	jmp		$
+# padding and magic bios number
+times 	510-($-$$) db 0
+dw		0xaa55
 
-	; pad to 512 and add magic BIOS marker
-	times	510-($-$$) db 0
-	dw 		0xaa55
