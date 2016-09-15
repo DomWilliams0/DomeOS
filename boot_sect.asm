@@ -1,34 +1,35 @@
-# bios offset
-org 0x7c00
-
-# declare strings
+; declare strings
 nice_string:
-	db 'Wow, nice string',0
+	db 'Wow, nice string', 0
 notsonice_string:
-	db 'Did your mum allocate it?',0
+	db 'Did your mum allocate it?', 0
 separator_string:
-	db '.  ',0
+	db '.  ', 0
 
-# init stack
-mov 	bp,	0x8000
-mov		sp,	bp
+main:
+	; bios offset
+	org 0x7c00
 
-# print them
-mov 	ax,	nice_string
-call 	print_string
+	; init stack
+	mov     bp, 0x8000
+	mov     sp, bp
 
-mov 	ax,	separator_string
-call 	print_string
+	; print them
+	mov     ax, nice_string
+	call    print_string
 
-mov 	ax,	notsonice_string
-call 	print_string
+	mov     ax, separator_string
+	call    print_string
 
-# infinite loop
-jmp 	$
+	mov     ax, notsonice_string
+	call    print_string
 
-%include "print_string.asm"
+	; infinite loop
+	jmp     $
 
-# padding and magic bios number
-times 	510-($-$$) db 0
-dw		0xaa55
+	%include "print_string.asm"
+
+	; padding and magic bios number
+	times   510-($-$$) db 0
+	dw      0xaa55
 
