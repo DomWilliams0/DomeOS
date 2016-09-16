@@ -1,20 +1,11 @@
 print_string:
     ; save registers
     push    bx
-    push    cx
-    push    dx
 
-    ; counter in cx
-    mov     cx, 0
-
-    ; string in dx
-    mov     dx, ax
+    ; current string position in bx
+    mov     bx, ax
 
 print_loop:
-    ; put char addr in bx
-    mov     bx, dx
-    add     bx, cx
-
     ; put char in al
     mov     al, [bx]
 
@@ -25,12 +16,10 @@ print_loop:
     ; print char and increment
     mov     ah, 0x0e
     int     0x10
-    inc     cx
+    inc     bx
     jmp     print_loop
 
 loop_end:
     ; restore registers and return
-    pop     dx
-    pop     cx
     pop     bx
     ret
