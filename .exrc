@@ -16,3 +16,6 @@ function AssemblySettings()
     set shiftwidth=4
     set syntax=nasm
 endfunction
+
+" make and run
+nnoremap <F4> :silent make build-run<CR>
