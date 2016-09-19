@@ -17,9 +17,9 @@ CHECKSUM    equ -(MAGIC + MB_FLAGS)
 ; multiboot header
 section .multiboot
 align   4
-	dd MAGIC
-	dd MB_FLAGS
-	dd CHECKSUM
+    dd MAGIC
+    dd MB_FLAGS
+    dd CHECKSUM
 
 
 ; allocate petit stack of 16KiB

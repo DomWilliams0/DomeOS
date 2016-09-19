@@ -1,10 +1,10 @@
-SOURCES		= $(wildcard kernel/*.c)
-HEADERS		= $(wildcard kernel/*.h)
+SOURCES     = $(wildcard kernel/*.c)
+HEADERS     = $(wildcard kernel/*.h)
 
-KERNEL_BIN	= kernel.bin
-OBJ			= ${SOURCES:.c=.o}
+KERNEL_BIN  = kernel.bin
+OBJ         = ${SOURCES:.c=.o}
 
-RUN_CMD=qemu-system-x86_64 -kernel ${KERNEL_BIN}
+RUN_CMD     = qemu-system-x86_64 -kernel ${KERNEL_BIN}
 
 # default
 all: kernel.bin
