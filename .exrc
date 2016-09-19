@@ -8,7 +8,7 @@ set shiftwidth=4
 autocmd BufNewFile,BufRead *.asm call AssemblySettings()
 
 " auto format on save
-autocmd BufWritePost *.asm :silent %s:^\s\{4}:\t:g
+autocmd BufWritePost *.asm :silent %s:^\s\{4}:\t:ge
 
 function AssemblySettings()
     set expandtab
