@@ -1,10 +1,10 @@
-SOURCES     = $(wildcard kernel/*.c kernel/util/*.c)
-HEADERS     = $(wildcard kernel/*.h kernel/util/*.h)
+SOURCES     = $(shell find kernel -type f -name '*.c')
+HEADERS     = $(shell find kernel -type f -name '*.h')
 
 KERNEL_BIN  = kernel.bin
 OBJ         = ${SOURCES:.c=.o}
 
-RUN_CMD     = qemu-system-x86_64 -kernel ${KERNEL_BIN}
+RUN_CMD     = qemu-system-x86_64 -kernel ${KERNEL_BIN} -monitor stdio
 
 # default
 all: kernel.bin
