@@ -1,51 +1,88 @@
 #include "util/util.h"
+#include "util/string.h"
+
 #include "screen.h"
 
-
-RESULT write_char(int x, int y, char c, screen_colour colour)
+struct
 {
-    RESULT result = RESULT_SUCCESS;
+    int cursor_x;
+    int cursor_y;
 
-	// TODO asserts possible?
-	// assert x >= 0 && x < SCREEN_WIDTH;
-	// assert y >= 0 && y < SCREEN_HEIGHT;
+    screen_colour fg;
+    screen_colour bg;
 
-	int index = x + (y * SCREEN_WIDTH);
-	screen_char coloured = colour_char(c, colour);
+} state;
 
-	*(SCREEN_VIDEO_MEM + index) = coloured;
-
-    return result;
+static screen_char get_colour(char c)
+{
+    return colour_char(c, create_colour(state.fg, state.bg));
 }
 
-RESULT write_string(int x, int y, char *s, screen_colour colour)
+void screen_init(screen_colour fg, screen_colour bg)
 {
-    RESULT result = RESULT_SUCCESS;
+    state.cursor_x  = 0;
+    state.cursor_y  = 0;
 
-	int index = x + (y * SCREEN_WIDTH);
+    state.fg        = fg;
+    state.bg        = bg;
 
+    screen_clear();
+}
+
+
+void screen_clear()
+{
+    screen_char c = get_colour(' ');
+
+    size_t n = SCREEN_WIDTH * SCREEN_HEIGHT;
+    while (n--)
+        *(SCREEN_VIDEO_MEM + n) = c;
+}
+
+void screen_scroll_down()
+{
+    int row = 1;
+    for (; row < SCREEN_HEIGHT; ++row)
+    {
+        int dst_index = (row - 1) * SCREEN_WIDTH;
+        int src_index = row * SCREEN_WIDTH;
+        memcpy(SCREEN_VIDEO_MEM + dst_index, SCREEN_VIDEO_MEM + src_index, SCREEN_WIDTH); 
+    }
+
+    screen_char blank = get_colour(' ');
+    screen_char *last_line = SCREEN_VIDEO_MEM + (SCREEN_WIDTH * (SCREEN_HEIGHT - 1));
+    for (int col = 0; col < SCREEN_WIDTH; ++col)
+    {
+        *(last_line + col) = blank;
+    }
+
+    state.cursor_y -= 1;
+}
+
+void screen_write_char(char c)
+{
+	int index = state.cursor_x + (state.cursor_y * SCREEN_WIDTH);
+	*(SCREEN_VIDEO_MEM + index) = get_colour(c);
+
+    state.cursor_x += 1;
+    if (state.cursor_x >= SCREEN_WIDTH)
+    {
+        state.cursor_x = 0;
+        state.cursor_y += 1;
+
+        if (state.cursor_y >= SCREEN_HEIGHT)
+        {
+            screen_scroll_down();
+        }
+    }
+}
+
+void screen_write_string(char *s)
+{
 	char *c = s;
 	while (*c != '\0')
 	{
-		screen_char coloured = colour_char(*c, colour);
-		*(SCREEN_VIDEO_MEM + index) = coloured;
-		++index;
+        screen_write_char(*c);
 		++c;
 	}
-
-    return result;
-}
-
-RESULT clear_screen(char c, screen_colour colour)
-{
-	RESULT result = RESULT_SUCCESS;
-
-	unsigned int len = (SCREEN_WIDTH) * (SCREEN_HEIGHT);
-	screen_char coloured = colour_char(c, colour);
-	for (unsigned int i = 0; i < len; ++i)
-	{
-		*(SCREEN_VIDEO_MEM + i) = coloured;
-	}
-
-	return result;
 }

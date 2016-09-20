@@ -2,16 +2,12 @@
 
 void kernel_main()
 {
-	// clear screen
-	screen_colour colour = create_colour(SCREEN_COLOUR_LIGHT_GREY, SCREEN_COLOUR_BLACK);
-	clear_screen(' ', colour);
+    screen_init(SCREEN_COLOUR_WHITE, SCREEN_COLOUR_BLACK);
 
-	// test strings
-    char *test_string = "Test string";
-    enum screen_colour_primitive bg = SCREEN_COLOUR_BLACK;
-    for (int y = 0, x = 0, fg = SCREEN_COLOUR_BLUE; y < SCREEN_HEIGHT; ++y, x += 11, ++fg)
+    char *test_string = "This is a line of text that fills up a row exactly, what are the chances ?!!!!!!";
+    for (int i = 0; i < 26; ++i)
     {
-        screen_colour sc = create_colour(fg % SCREEN_COLOUR_WHITE, bg);
-	    write_string(x, y, test_string, sc);
+        test_string[0] = '1' + i;
+        screen_write_string(test_string);
     }
 }

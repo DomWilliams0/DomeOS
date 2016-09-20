@@ -9,5 +9,5 @@ void memcpy(void *dst, void *src, size_t n)
 void memset(void *s, int c, size_t n)
 {
     while (n--)
-        *(char *)s++ = c;
+        *(int *)s++ = c;
 }

@@ -48,10 +48,14 @@ static inline screen_char colour_char(char c, screen_colour colour)
 }
 
 // screen operations
-RESULT write_char(int x, int y, char c, screen_colour colour);
+void screen_init(screen_colour fg, screen_colour bg);
 
-RESULT write_string(int x, int y, char *s, screen_colour colour);
+void screen_clear();
 
-RESULT clear_screen(char c, screen_colour colour);
+void screen_scroll_down();
+
+void screen_write_char(char c);
+
+void screen_write_string(char *s);
 
 #endif
