@@ -11,7 +11,7 @@ all: kernel.bin
 
 # building
 kernel.bin: boot/multiboot.o ${OBJ}
-	i686-elf-gcc -T kernel/linker.ld -ffreestanding -O2 -nostdlib -lgcc -o ${KERNEL_BIN} $^
+	i686-elf-gcc -T kernel/linker.ld -ffreestanding -O2 -nostdlib -lgcc -g -o ${KERNEL_BIN} $^
 
 %.o: %.c ${HEADERS}
 	i686-elf-gcc -ffreestanding -c -O2 -Wall -Wextra -o $@ $< 
@@ -32,3 +32,5 @@ run:
 build-run: kernel.bin
 	${RUN_CMD}
 
+debug:
+	${RUN_CMD} -s -S

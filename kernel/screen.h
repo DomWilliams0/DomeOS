@@ -5,9 +5,9 @@
 
 #include "util/err.h"
 
-#define SCREEN_VIDEO_MEM    0xb8000
-#define SCREEN_WIDTH        25
-#define SCREEN_HEIGHT       80
+#define SCREEN_VIDEO_MEM    (screen_char *)0xb8000
+#define SCREEN_WIDTH        80
+#define SCREEN_HEIGHT       25
 
 #define SCREEN_PORT_CTRL    0x3D4
 #define SCREEN_PORT_DATA    0x3D5
@@ -52,5 +52,6 @@ RESULT write_char(int x, int y, char c, screen_colour colour);
 
 RESULT write_string(int x, int y, char *s, screen_colour colour);
 
+RESULT clear_screen(char c, screen_colour colour);
 
 #endif
