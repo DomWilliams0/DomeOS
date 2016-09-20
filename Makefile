@@ -1,5 +1,5 @@
-SOURCES     = $(wildcard kernel/*.c)
-HEADERS     = $(wildcard kernel/*.h)
+SOURCES     = $(wildcard kernel/*.c kernel/util/*.c)
+HEADERS     = $(wildcard kernel/*.h kernel/util/*.h)
 
 KERNEL_BIN  = kernel.bin
 OBJ         = ${SOURCES:.c=.o}
