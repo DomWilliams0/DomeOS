@@ -16,7 +16,7 @@ struct gdt_entry_desc
 
 };
 
-struct gdt_entry_repr gdt_entries[GDT_ENTRY_COUNT];
+struct gdt_entry_repr gdt_entries[GDT_ENTRY_COUNT] = { 0 };
 struct gdt_descriptor gdt_descriptor;
 
 static void register_entry(int index, struct gdt_entry_desc *desc)
@@ -44,13 +44,8 @@ static void register_entry(int index, struct gdt_entry_desc *desc)
 
 void gdt_init()
 {
-    struct gdt_entry_desc entry_null,
-                          entry_code,
+    struct gdt_entry_desc entry_code,
                           entry_data;
-
-    // null entry
-    entry_null = (struct gdt_entry_desc) { 0 };
-
 
     // code segment
     entry_code = (struct gdt_entry_desc)
@@ -85,7 +80,7 @@ void gdt_init()
 
 
     // register in table
-    register_entry(0, &entry_null);
+    // 0 is already null
     register_entry(1, &entry_code);
     register_entry(2, &entry_data);
 

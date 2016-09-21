@@ -53,7 +53,6 @@ flush_far_jump:
 
 ; entry point
 global _start:function (_start.end - _start)
-
 _start:
 
 ; setup stack
