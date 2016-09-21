@@ -57,7 +57,7 @@ void gdt_init()
         .priv     = 0, // ring 0
         .exec     = 1, // code
         .dir_conf = 0, // not conforming
-        .rw       = 0, // not readable
+        .rw       = 1, // readable
         .gran     = 1, // 4k pages
         .size     = 1  // 32 bit
     };
@@ -73,7 +73,7 @@ void gdt_init()
         .priv     = 0, // ring 0
         .exec     = 0, // data
         .dir_conf = 0, // expand downwards
-        .rw       = 0, // not writable
+        .rw       = 1, // writable
         .gran     = 1, // 4k pages
         .size     = 1  // 32 bit
     };
