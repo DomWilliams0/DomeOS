@@ -8,10 +8,10 @@
 // low level bit representation
 struct gdt_entry_repr
 {
-    // bottom 16 bytes of limit
+    // bottom 16 bits of limit
     uint32_t limit_low:  16;
 
-    // bottom 24 bytes of limit
+    // bottom 24 bits of limit
     uint32_t base_low:   24;
 
     // access byte
