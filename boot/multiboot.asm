@@ -51,6 +51,13 @@ gdt_flush:
 flush_far_jump:
 	ret
 
+; idt flushing
+global  idt_flush
+extern  idt_descriptor
+idt_flush:
+    lidt    [idt_descriptor]
+    ret
+
 ; entry point
 global  _start:function (_start.end - _start)
 _start:

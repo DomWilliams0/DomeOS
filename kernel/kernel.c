@@ -1,10 +1,12 @@
 #include "screen.h"
 #include "gdt.h"
+#include "idt.h"
 
 void kernel_main()
 {
-    // create gdt
+    // init descriptor tables
     gdt_init();
+    idt_init();
 
     screen_init(SCREEN_COLOUR_WHITE, SCREEN_COLOUR_BLACK);
 
