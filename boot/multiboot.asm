@@ -31,7 +31,11 @@ stack_top:
 
 section .text
 
+; gdt and idt
 %include "descriptor_tables.asm"
+
+; interrupt service routines
+%include "isr.asm"
 
 ; entry point
 global  _start:function (_start.end - _start)
