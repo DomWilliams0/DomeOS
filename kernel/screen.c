@@ -61,11 +61,28 @@ void screen_scroll_down()
 
 void screen_write_char(char c)
 {
-	int index = state.cursor_x + (state.cursor_y * SCREEN_WIDTH);
-	*(SCREEN_VIDEO_MEM + index) = get_colour(c);
+    // TODO bool
+    int new_line = 0;
+    int visible_char = 1;
 
-    state.cursor_x += 1;
-    if (state.cursor_x >= SCREEN_WIDTH)
+    // special char
+    if (c == '\n')
+    {
+        new_line = 1;
+        visible_char = 0;
+    }
+
+    // print char
+    if (visible_char)
+    {
+	    int index = state.cursor_x + (state.cursor_y * SCREEN_WIDTH);
+	    *(SCREEN_VIDEO_MEM + index) = get_colour(c);
+
+        state.cursor_x += 1;
+    }
+
+    // new line
+    if (new_line || state.cursor_x >= SCREEN_WIDTH)
     {
         state.cursor_x = 0;
         state.cursor_y += 1;
