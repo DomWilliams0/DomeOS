@@ -36,6 +36,10 @@ static void clock_handler(struct stack_context *context)
     {
         screen_write_string("A second!");
     }
+    else
+    {
+        screen_write_char('.');
+    }
 
 }
 
