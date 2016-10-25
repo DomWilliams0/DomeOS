@@ -27,7 +27,8 @@ kernel.bin: ${BOOT_DIR}/multiboot.o ${OBJ}
 	${NASM_CMD}
 
 clean:
-	rm -fr *.bin *.o kernel/*.o boot/*.o
+	find . -name "*.o" -delete
+	rm -f *.bin
 
 # running
 run:
