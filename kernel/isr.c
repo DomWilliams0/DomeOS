@@ -1,4 +1,4 @@
-#include "screen.h"
+#include "util/io.h"
 #include "isr.h"
 
 char *exceptions[] =
@@ -41,9 +41,9 @@ void fault_handler(struct stack_context *context)
 {
     if (context->int_id < 32)
     {
-        screen_write_string("Exception: ");
-        screen_write_string(exceptions[context->int_id]);
-        screen_write_string(" (err:ERROR_CODE_HERE)\nHalting.");
+        writes("Exception: ");
+        writes(exceptions[context->int_id]);
+        puts(" (err:ERROR_CODE_HERE)\nHalting.");
         while(1){}
     }
 }

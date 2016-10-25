@@ -1,6 +1,5 @@
 #include "util/io.h"
 #include "util/util.h"
-#include "screen.h"
 #include "isr.h"
 #include "irq.h"
 #include "clock.h"
@@ -50,11 +49,11 @@ static void clock_handler(struct stack_context *context)
 
     if (++ticks % CLOCK_HERTZ == 0)
     {
-        screen_write_string("A second!");
+        puts("A second!");
     }
     else
     {
-        screen_write_char('.');
+        putc('.');
     }
 
 }
