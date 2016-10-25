@@ -1,5 +1,9 @@
 %define isr_count 32
+%define irq_count 16
 
+; declaration/definition macros
+
+; isr
 %macro declare_isr 1
 	global isr%1
 %endmacro
@@ -8,9 +12,27 @@
 	isr%1:
 %endmacro
 
+; irq
+%macro declare_irq 1
+	global irq%1
+%endmacro
+
+%macro define_irq 1
+	irq%1:
+%endmacro
+
+; declarations of symbols
+; isrs
 %assign i 0
 %rep isr_count
 	declare_isr i
+%assign i i+1
+%endrep
+
+; irqs
+%assign i 0
+%rep irq_count
+	declare_irq i
 %assign i i+1
 %endrep
 
@@ -48,8 +70,33 @@ define_isr i
 %assign i i+1
 %endrep
 
+; define irqs
+%assign i 0
+%rep irq_count
+
+define_irq i
+	cli
+	push byte 0
+	push byte i
+	jmp irq_stub
+%assign i i+1
+%endrep
+
+; common stub
 extern fault_handler
-isr_stub:
+extern irq_handler
+
+%macro define_stub 1
+
+%ifidn %1,irq
+%define stub_name    irq_stub
+%define stub_handler irq_handler
+%else
+%define stub_name    isr_stub
+%define stub_handler fault_handler
+%endif
+
+stub_name:
 	; push all registers to stack
 	pusha
 	push	ds
@@ -68,8 +115,8 @@ isr_stub:
 	mov     eax, esp
 	push    eax
 
-	; "call" fault handler, preserving eip
-	mov     eax, fault_handler
+	; "call" handler, preserving eip
+	mov     eax, stub_handler
 	call    eax
 
 	; pop registers back off stack
@@ -85,3 +132,7 @@ isr_stub:
 
 	; pop the rest and return
 	iret
+%endmacro
+
+define_stub irq
+define_stub isr

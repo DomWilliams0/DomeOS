@@ -1,12 +1,14 @@
 #include "screen.h"
 #include "gdt.h"
 #include "idt.h"
+#include "isr.h"
 
 void kernel_main()
 {
     // init descriptor tables
     gdt_init();
     idt_init();
+    enable_interrupts();
 
     screen_init(SCREEN_COLOUR_WHITE, SCREEN_COLOUR_BLACK);
 

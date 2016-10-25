@@ -22,7 +22,7 @@ struct stack_context
     uint32_t ecx;
     uint32_t eax;
 
-    // pushed by isr label
+    // pushed by specific label
     uint32_t int_id;
     uint32_t err;
 
@@ -35,5 +35,7 @@ struct stack_context
 };
 
 void fault_handler(struct stack_context *context);
+
+void enable_interrupts();
 
 #endif

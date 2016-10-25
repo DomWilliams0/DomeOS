@@ -1,26 +1,28 @@
 #include "idt.h"
+#include "isr.h"
+#include "irq.h"
 
 struct idt_entry_repr idt_entries[IDT_ENTRY_COUNT] = { 0 };
 struct idt_descriptor idt_descriptor;
 
 static void register_entry(int index, void (*handler)(void))
 {
-    struct idt_entry_repr entry = {
-        .base_low         = (uint32_t) (handler) & 0xFFFF,
-        .base_high        = ((uint32_t) (handler) >> 16) & 0xFFFF,
-
+    static struct idt_entry_repr common_entry = {
         .rpl              = 0,   // ring 0
-        .ring             = 0,   // ring 0
+        .ring             = 0,
 
         .ti               = 0,   // gdt
-        .descriptor_index = 1,   // code segment,
+        .descriptor_index = 1,   // code segment
         .zero             = 0,   // okie dokie
         .gate_type        = 0xE, // 32 bit interrupt gate
         .storage_segment  = 0,   // interrupt gate
         .present          = 1    // used
     };
 
-    idt_entries[index] = entry;
+    common_entry.base_low  = (uint32_t) (handler) & 0xFFFF;
+    common_entry.base_high = ((uint32_t) (handler) >> 16) & 0xFFFF;
+
+    idt_entries[index] = common_entry;
 }
 
 static void register_all_entries()
@@ -57,11 +59,31 @@ static void register_all_entries()
     register_entry(29, isr29);
     register_entry(30, isr30);
     register_entry(31, isr31);
+
+    register_entry(32, irq0);
+    register_entry(33, irq1);
+    register_entry(34, irq2);
+    register_entry(35, irq3);
+    register_entry(36, irq4);
+    register_entry(37, irq5);
+    register_entry(38, irq6);
+    register_entry(39, irq7);
+    register_entry(40, irq8);
+    register_entry(41, irq9);
+    register_entry(42, irq10);
+    register_entry(43, irq11);
+    register_entry(44, irq12);
+    register_entry(45, irq13);
+    register_entry(46, irq14);
+    register_entry(47, irq15);
 }
 
 void idt_init()
 {
-    // register isrs
+    // shift irqs to avoid collisions
+    irq_remap();
+
+    // register isrs and irqs
     register_all_entries();
 
 	// set descriptor pointer
@@ -71,5 +93,4 @@ void idt_init()
 	// replace existing idt with the new one
 	idt_flush();
 }
-
 

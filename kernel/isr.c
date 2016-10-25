@@ -48,3 +48,7 @@ void fault_handler(struct stack_context *context)
     }
 }
 
+void enable_interrupts()
+{
+    __asm__ __volatile__ ("sti");
+}
