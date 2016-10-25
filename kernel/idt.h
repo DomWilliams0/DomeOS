@@ -14,32 +14,32 @@ struct idt_entry_repr
     // selector
 
     // requested privilege level
-    uint8_t rpl:               2;
+    uint32_t rpl:              2;
 
     // table index
     // gdt: 0
     // ldt: 1
-    uint8_t ti:                1;
+    uint32_t ti:               1;
 
     // descriptor index in selected table
-    uint16_t descriptor_index: 13;
+    uint32_t descriptor_index: 13;
 
     // if you say so
-    uint16_t zero:             8;
+    uint32_t zero:             8;
 
     // flags byte
 
     // 1110 for 32 bit interrupt gates
-    uint8_t gate_type:         4;
+    uint32_t gate_type:        4;
 
     // zero for interrupt gates
-    uint8_t storage_segment:   1;
+    uint32_t storage_segment:  1;
 
     // ring 0 - 3
-    uint8_t ring:              2;
+    uint32_t ring:             2;
 
     // present/used
-    uint8_t present:           1;
+    uint32_t present:          1;
 
     // upper 16 bits of base
     uint32_t base_high:        16;
