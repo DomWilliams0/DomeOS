@@ -71,10 +71,11 @@ define_isr i
 %endrep
 
 ; define irqs
-%assign i 0
+%assign i 32
 %rep irq_count
 
-define_irq i
+%assign irq_i i-32
+define_irq irq_i
 	cli
 	push byte 0
 	push byte i
