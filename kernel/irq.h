@@ -5,11 +5,11 @@
 
 #define IRQ_HANDLER_COUNT 16
 
-#define PIC_MASTER_COMMAND 0x20
-#define PIC_MASTER_DATA    PIC_MASTER_COMMAND + 1
-#define PIC_SLAVE_COMMAND  0xA0
-#define PIC_SLAVE_DATA     PIC_SLAVE_COMMAND + 1
-#define PIC_SUCCESS_CODE   0x20
+#define PIC_MASTER_COMMAND   0x20
+#define PIC_MASTER_DATA      0x21
+#define PIC_SLAVE_COMMAND    0xA0
+#define PIC_SLAVE_DATA       0xA1
+#define PIC_END_OF_INTERRUPT 0x20
 
 struct stack_context;
 typedef void (*irq_handler_func)(struct stack_context *);

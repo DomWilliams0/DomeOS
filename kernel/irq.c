@@ -40,9 +40,9 @@ void irq_handler(struct stack_context *context)
     // confirm success with slave controller, if necessary
     if (context->int_id >= 40)
     {
-        io_write_port(PIC_SLAVE_COMMAND, PIC_SUCCESS_CODE);
+        io_write_port(PIC_SLAVE_COMMAND, PIC_END_OF_INTERRUPT);
     }
 
     // confirm success with master controller
-    io_write_port(PIC_MASTER_COMMAND, PIC_SUCCESS_CODE);
+    io_write_port(PIC_MASTER_COMMAND, PIC_END_OF_INTERRUPT);
 }
