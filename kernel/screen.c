@@ -23,8 +23,8 @@ void screen_init(screen_colour fg, screen_colour bg)
     state.cursor_x  = 0;
     state.cursor_y  = 0;
 
-    state.fg        = fg;
-    state.bg        = bg;
+    state.fg = fg;
+    state.bg = bg;
 
     screen_clear();
 }
@@ -41,20 +41,15 @@ void screen_clear()
 
 void screen_scroll_down()
 {
-    int row = 1;
-    for (; row < SCREEN_HEIGHT; ++row)
-    {
-        int dst_index = (row - 1) * SCREEN_WIDTH;
-        int src_index = row * SCREEN_WIDTH;
-        kmemcpy(SCREEN_VIDEO_MEM + dst_index, SCREEN_VIDEO_MEM + src_index, SCREEN_WIDTH); 
-    }
+	int used_rows = state.cursor_y - SCREEN_HEIGHT + 1;
+	int effective_height = SCREEN_HEIGHT - used_rows;
 
+	// move all rows up
+    kwmemcpy(SCREEN_VIDEO_MEM, SCREEN_VIDEO_MEM + SCREEN_WIDTH, SCREEN_WIDTH * effective_height);
+
+	// clear bottom row
     screen_char blank = get_colour(' ');
-    screen_char *last_line = SCREEN_VIDEO_MEM + (SCREEN_WIDTH * (SCREEN_HEIGHT - 1));
-    for (int col = 0; col < SCREEN_WIDTH; ++col)
-    {
-        *(last_line + col) = blank;
-    }
+    kwmemset(SCREEN_VIDEO_MEM + effective_height * SCREEN_WIDTH, blank, SCREEN_WIDTH);
 
     state.cursor_y -= 1;
 }
