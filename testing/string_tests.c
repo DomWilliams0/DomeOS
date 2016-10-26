@@ -1,17 +1,21 @@
 #include "testing.h"
 
-static void test_memcpy()
+TEST_BEGIN(memcpy)
 {
-	TEST(memcpy_std, 8-2 == 6);
+	ASSERT(memcpy_std, 8-2 == 6);
+	ASSERT(memcpy_std, 8-2 == 6);
+	ASSERT(memcpy_std, 4-2 == 6);
+	ASSERT(memcpy_std, 8-2 == 6);
+	ASSERT(memcpy_std, 8-2 == 6);
 }
 
-static void test_memset()
+TEST_BEGIN(memset)
 {
-	TEST(memset_std, 4/2 == 2);
+	ASSERT(memset_std, 4/2 == 2);
 }
 
 void test_strings()
 {
-	test_memcpy();
-	test_memset();
+	TEST_SUITE(memcpy);
+	TEST_SUITE(memset);
 }

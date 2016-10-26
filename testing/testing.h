@@ -2,14 +2,16 @@
 #define __KERNEL_TESTING_H__
 
 extern int printf(const char *, ...);
+extern int puts(const char *);
 extern void exit(int);
 
-#define TEST(name, assertion) TEST_WRAPPER(name, assertion, __FILE__, __LINE__)
-#define TEST_WRAPPER(name, assertion, filename, lineno)\
+#define ASSERT(name, assertion) ASSERT_WRAPPER(name, assertion, __FILE__, __LINE__)
+#define ASSERT_WRAPPER(name, assertion, filename, lineno)\
+	*count += 1;\
 	if (!(assertion))\
 	{\
 		printf("[FAIL] %s (%s) %s:%d\n", #name, #assertion, filename, lineno);\
-		exit(1);\
+		*err += 1;\
 	}\
 	else\
 	{\
@@ -17,5 +19,18 @@ extern void exit(int);
 	}
 
 #endif
+
+#define TEST_BEGIN(suite_name)\
+	static void test_ ## suite_name(int *count, int *err)
+
+
+#define TEST_SUITE(name)\
+{\
+	int count = 0;\
+	int err = 0;\
+	test_ ## name(&count, &err);\
+	printf("[SUITE %s] %s passed %d/%d tests\n", err == 0 ? "PASS" : "FAIL", #name, count - err, count);\
+	puts("===================");\
+}
 
 void test_strings();
