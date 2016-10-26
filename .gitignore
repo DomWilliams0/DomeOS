@@ -1,5 +1,4 @@
-*.bin
-kernel_tests
-*.o
+bin/
+obj/
 .exrc
 .ycm_extra_conf.py*

@@ -1,23 +1,37 @@
-TEST_SOURCES   = $(shell find . -type f -name '*.c')
-TEST_OBJ       = ${TEST_SOURCES:.c=.o}
+TEST_DIR = tests/
+OBJ_DIR  = obj/
+BIN_DIR  = bin/
+KSRC_DIR = ../src
 
-KERNEL_SOURCES = $(shell find ../src -type f -name '*.c')
-KERNEL_OBJ     = ${KERNEL_SOURCES:.c=.o}
+BIN_NAME = tests
+BIN_PATH = ${BIN_DIR}/${BIN_NAME}
 
-TESTS_BIN      = tests.bin
-CC_CMD = gcc -O0 -Wall -I../include
+K_SRC    = $(shell find ${KSRC_DIR} -type f -name "*.c")
+
+SRC      = $(shell find . -type f -name '*.c')
+OBJ      = $(patsubst %.c, ${OBJ_DIR}/%.o, $(notdir ${SRC} ${K_SRC}))
+
+CC_CMD   = gcc -O0 -Wall -I../include
+
+VPATH = $(shell find ${KSRC_DIR} -type d)
 
 all: run
 
-$(TESTS_BIN): ${TEST_OBJ} ${KERNEL_OBJ}
-	${CC_CMD} -o $@ $^
+.PHONY: create_dirs
 
-%.o: %.c
+create_dirs:
+	@mkdir -p ${OBJ_DIR} ${BIN_DIR}
+
+build_kernel: ;
+
+$(BIN_NAME): create_dirs build_kernel ${OBJ}
+	${CC_CMD} -o ${BIN_PATH} ${OBJ}
+
+$(OBJ_DIR)/%.o: %.c
 	${CC_CMD} -c -o $@ $<
 
-run: ${TESTS_BIN}
-	./${TESTS_BIN}
+run: ${BIN_NAME}
+	./${BIN_PATH}
 
 clean:
-	find . -name "*.o" -delete
-	rm -f ${TESTS_BIN}
+	rm -rfv ${BIN_DIR} ${OBJ_DIR}
