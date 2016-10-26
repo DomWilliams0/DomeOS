@@ -1,49 +1,58 @@
-SRC_DIR    = src/
-INC_DIR    = include/
-BOOT_DIR   = ${SRC_DIR}/boot/
-TEST_DIR   = tests/
+SRC_DIR  = src/
+INC_DIR  = include/
+OBJ_DIR  = obj/
+BIN_DIR  = bin/
 
-SOURCES    = $(shell find ${SRC_DIR} -type f -name '*.c')
-HEADERS    = $(shell find ${INC_DIR} -type f -name '*.h')
+BOOT_DIR = ${SRC_DIR}/boot/
+TEST_DIR = tests/
 
-KERNEL_BIN = kernel.bin
-OBJ        = ${SOURCES:.c=.o}
+SOURCES  = $(shell find ${SRC_DIR} -type f -name '*.c')
+HEADERS  = $(shell find ${INC_DIR} -type f -name '*.h')
+OBJ      = $(patsubst %.c, ${OBJ_DIR}/%.o, $(notdir ${SOURCES})) ${OBJ_DIR}/multiboot.o
 
-RUN_CMD    = qemu-system-x86_64 -kernel ${KERNEL_BIN} -monitor stdio
-NASM_CMD   = nasm $< -felf32 -i ${BOOT_DIR} -o $@
-CC_CMD     = i686-elf-gcc -ffreestanding -O0 -Wall -Wextra -Iinclude
+BIN_NAME = kernel.bin
+BIN_PATH = ${BIN_DIR}/${BIN_NAME}
+
+RUN_CMD  = qemu-system-x86_64 -kernel ${BIN_PATH} -monitor stdio
+NASM_CMD = nasm $< -felf32 -i ${BOOT_DIR} -o $@
+CC_CMD   = i686-elf-gcc -ffreestanding -O0 -Wall -Wextra -Iinclude
+
+VPATH = $(shell find ${SRC_DIR} ${INC_DIR} -type d)
 
 # default
 all: kernel.bin
 
 # building
-kernel.bin: ${BOOT_DIR}/multiboot.o ${OBJ}
-	${CC_CMD} -Tlinker.ld -nostdlib -lgcc -g -o ${KERNEL_BIN} $^
+.PHONY: create_dirs
+
+create_dirs:
+	@mkdir -p ${OBJ_DIR} ${BIN_DIR}
+
+$(BIN_NAME): create_dirs ${OBJ}
+	${CC_CMD} -Tlinker.ld -nostdlib -lgcc -g -o ${BIN_PATH} ${OBJ}
 
 .PHONY: tests
 
 tests:
 	make -C ${TEST_DIR} run
 
-%.o: %.c
+$(OBJ_DIR)/%.o: %.c
 	${CC_CMD} -c -o $@ $<
 
-%.o: %.asm
+$(OBJ_DIR)/%.o: ${BOOT_DIR}/%.asm
 	${NASM_CMD}
 
 %.bin: %.asm
 	${NASM_CMD}
 
 clean:
-	find ${SRC_DIR} -name "*.o" -delete
-	rm -f ${KERNEL_BIN}
-	make -C ${TEST_DIR} clean
+	rm -rfv ${BIN_DIR} ${OBJ_DIR}
 
 # running
 run:
 	${RUN_CMD}
 
-build-run: kernel.bin
+build-run: ${BIN_NAME}
 	${RUN_CMD}
 
 debug:
