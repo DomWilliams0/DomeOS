@@ -49,11 +49,11 @@ static void clock_handler(struct stack_context *context)
 
     if (++ticks % CLOCK_HERTZ == 0)
     {
-        puts("A second!");
+        kputs("A second!");
     }
     else
     {
-        putc('.');
+        kputc('.');
     }
 
 }

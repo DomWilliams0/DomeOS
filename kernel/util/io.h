@@ -8,10 +8,10 @@ port_data io_read_port(io_port port);
 
 void io_write_port(io_port port, port_data data);
 
-void putc(char c);
+void kputc(char c);
 
-void puts(char *s);
+void kputs(char *s);
 
-void writes(char *s);
+void kwrites(char *s);
 
 #endif

@@ -34,7 +34,7 @@ void screen_clear()
 {
     screen_char c = get_colour(' ');
 
-    size_t n = SCREEN_WIDTH * SCREEN_HEIGHT;
+    ksize_t n = SCREEN_WIDTH * SCREEN_HEIGHT;
     while (n--)
         *(SCREEN_VIDEO_MEM + n) = c;
 }
@@ -46,7 +46,7 @@ void screen_scroll_down()
     {
         int dst_index = (row - 1) * SCREEN_WIDTH;
         int src_index = row * SCREEN_WIDTH;
-        memcpy(SCREEN_VIDEO_MEM + dst_index, SCREEN_VIDEO_MEM + src_index, SCREEN_WIDTH); 
+        kmemcpy(SCREEN_VIDEO_MEM + dst_index, SCREEN_VIDEO_MEM + src_index, SCREEN_WIDTH); 
     }
 
     screen_char blank = get_colour(' ');

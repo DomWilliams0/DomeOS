@@ -41,9 +41,9 @@ void fault_handler(struct stack_context *context)
 {
     if (context->int_id < 32)
     {
-        writes("Exception: ");
-        writes(exceptions[context->int_id]);
-        puts(" (err:ERROR_CODE_HERE)\nHalting.");
+        kwrites("Exception: ");
+        kwrites(exceptions[context->int_id]);
+        kputs(" (err:ERROR_CODE_HERE)\nHalting.");
         while(1){}
     }
 }
