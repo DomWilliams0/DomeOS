@@ -1,27 +1,30 @@
-SOURCES      = $(shell find ${KERNEL_DIR} -type f -name '*.c')
-HEADERS      = $(shell find ${KERNEL_DIR} -type f -name '*.h')
+SRC_DIR    = src/
+INC_DIR    = include/
+BOOT_DIR   = ${SRC_DIR}/boot/
+TEST_DIR   = tests/
 
-BOOT_DIR     = boot/
-KERNEL_DIR   = kernel/
+SOURCES    = $(shell find ${SRC_DIR} -type f -name '*.c')
+HEADERS    = $(shell find ${INC_DIR} -type f -name '*.h')
 
-KERNEL_BIN   = kernel.bin
-OBJ          = ${SOURCES:.c=.o}
+KERNEL_BIN = kernel.bin
+OBJ        = ${SOURCES:.c=.o}
 
-RUN_CMD      = qemu-system-x86_64 -kernel ${KERNEL_BIN} -monitor stdio
-NASM_CMD     = nasm $< -felf32 -i ${BOOT_DIR} -o $@
+RUN_CMD    = qemu-system-x86_64 -kernel ${KERNEL_BIN} -monitor stdio
+NASM_CMD   = nasm $< -felf32 -i ${BOOT_DIR} -o $@
+CC_CMD     = i686-elf-gcc -ffreestanding -O0 -Wall -Wextra -Iinclude
 
 # default
 all: kernel.bin
 
 # building
 kernel.bin: ${BOOT_DIR}/multiboot.o ${OBJ}
-	i686-elf-gcc -T kernel/linker.ld -ffreestanding -O0 -nostdlib -lgcc -g -o ${KERNEL_BIN} $^
+	${CC_CMD} -Tlinker.ld -nostdlib -lgcc -g -o ${KERNEL_BIN} $^
 
 tests:
-	make -C testing
+	make -C ${TEST_DIR}
 
 %.o: %.c
-	i686-elf-gcc -ffreestanding -c -O0 -Wall -Wextra -o $@ $<
+	${CC_CMD} -c -o $@ $<
 
 %.o: %.asm
 	${NASM_CMD}
@@ -30,9 +33,9 @@ tests:
 	${NASM_CMD}
 
 clean:
-	find . -name "*.o" -delete
+	find ${SRC_DIR} -name "*.o" -delete
 	rm -f ${KERNEL_BIN}
-	make -C testing clean
+	make -C ${TEST_DIR} clean
 
 # running
 run:
@@ -42,7 +45,7 @@ build-run: kernel.bin
 	${RUN_CMD}
 
 tests-run:
-	make -C testing run
+	make -C ${TEST_DIR} run
 
 debug:
 	${RUN_CMD} -s -S

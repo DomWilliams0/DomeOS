@@ -1,5 +1,5 @@
-#include "../screen.h"
-#include "io.h"
+#include "screen.h"
+#include "util/io.h"
 
 char io_read_port(io_port port)
 {

@@ -1,5 +1,5 @@
-#ifndef __KERNEL_TESTING_H__
-#define __KERNEL_TESTING_H__
+#ifndef __KERNEL_TESTS_H__
+#define __KERNEL_TESTS_H__
 
 extern int printf(const char *, ...);
 extern int puts(const char *);

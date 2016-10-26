@@ -1,5 +1,5 @@
-#include "testing.h"
-#include "../kernel/util/string.h"
+#include "tests.h"
+#include "util/string.h"
 
 TEST_BEGIN(kmemcmp)
 {
@@ -10,7 +10,6 @@ TEST_BEGIN(kmemcmp)
 	ASSERT(different, !kmemcmp(a, b, 4));
 	ASSERT(null, kmemcmp(a, b, 0));
 }
-
 
 TEST_BEGIN(kmemcpy)
 {
