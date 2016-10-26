@@ -22,9 +22,7 @@ all: run
 create_dirs:
 	@mkdir -p ${OBJ_DIR} ${BIN_DIR}
 
-build_kernel: ;
-
-$(BIN_NAME): create_dirs build_kernel ${OBJ}
+$(BIN_NAME): create_dirs ${OBJ}
 	${CC_CMD} -o ${BIN_PATH} ${OBJ}
 
 $(OBJ_DIR)/%.o: %.c
