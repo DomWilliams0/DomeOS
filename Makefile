@@ -20,8 +20,10 @@ all: kernel.bin
 kernel.bin: ${BOOT_DIR}/multiboot.o ${OBJ}
 	${CC_CMD} -Tlinker.ld -nostdlib -lgcc -g -o ${KERNEL_BIN} $^
 
+.PHONY: tests
+
 tests:
-	make -C ${TEST_DIR}
+	make -C ${TEST_DIR} run
 
 %.o: %.c
 	${CC_CMD} -c -o $@ $<
@@ -43,9 +45,6 @@ run:
 
 build-run: kernel.bin
 	${RUN_CMD}
-
-tests-run:
-	make -C ${TEST_DIR} run
 
 debug:
 	${RUN_CMD} -s -S

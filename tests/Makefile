@@ -7,7 +7,7 @@ KERNEL_OBJ     = ${KERNEL_SOURCES:.c=.o}
 TESTS_BIN      = tests.bin
 CC_CMD = gcc -O0 -Wall -I../include
 
-all: $(TESTS_BIN)
+all: run
 
 $(TESTS_BIN): ${TEST_OBJ} ${KERNEL_OBJ}
 	${CC_CMD} -o $@ $^
