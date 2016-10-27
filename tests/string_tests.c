@@ -45,7 +45,6 @@ TEST_BEGIN(kmemset)
 	short wide[] = {1, 2, 3};
 	kwmemset(wide, 10000, 3);
 	ASSERT(wide, wide[2] == 10000);
-	printf("wtf %d\n", wide[2]);
 }
 
 void test_strings()
