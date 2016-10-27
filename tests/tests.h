@@ -34,3 +34,4 @@ extern void exit(int);
 }
 
 void test_strings();
+void test_errors();

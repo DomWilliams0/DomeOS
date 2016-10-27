@@ -2,7 +2,8 @@
 
 int main()
 {
-	test_strings();
+    test_strings();
+    test_errors();
 
 	return 0;
 }
