@@ -1,11 +1,18 @@
 #include "isr.h"
 #include "irq.h"
 #include "util/io.h"
+#include "error.h"
 
 void *irq_handlers[IRQ_HANDLER_COUNT] = { 0 };
 
 void irq_register_handler(uint32_t irq, void (*handler)(struct stack_context *))
 {
+    if (irq >= IRQ_HANDLER_COUNT)
+    {
+        error(ERR_INPUT);
+        return;
+    }
+
     irq_handlers[irq] = handler;
 }
 
