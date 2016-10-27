@@ -40,3 +40,33 @@ int kmemcmp(void *a, void *b, ksize_t n)
 
 	return 1;
 }
+
+void kuxtos(unsigned int ux, char *out, ksize_t *n_written)
+{
+    static char digits[] = "0123456789ABCDEF";
+    const int base = 16;
+
+    ksize_t written = 0;
+    char arr[8]; // max hex char
+
+    unsigned int number = ux;
+    do
+    {
+        arr[written++] = digits[number % base];
+        number /= base;
+    }
+    while (number > 0);
+
+    out[0] = '0';
+    out[1] = 'x';
+
+    for (int i = 0; i < written; ++i)
+        out[2 + i] = arr[written - i - 1];
+
+    // 0x prefix
+    written += 2;
+
+    out[written] = '\0';
+
+    *n_written = written;
+}

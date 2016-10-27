@@ -13,4 +13,7 @@ void kwmemset(void *s, int c, ksize_t n);
 
 int kmemcmp(void *a, void *b, ksize_t n);
 
+// unsigned int to hex string
+void kuxtos(unsigned int ux, char *out, ksize_t *n_written);
+
 #endif
