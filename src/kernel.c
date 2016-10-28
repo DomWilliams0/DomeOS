@@ -3,9 +3,11 @@
 #include "idt.h"
 #include "isr.h"
 #include "clock.h"
+#include "serial.h"
 
 void kernel_main()
 {
+    serial_init();
     gdt_init();
     idt_init();
     clock_init();

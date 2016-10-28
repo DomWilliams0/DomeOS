@@ -13,7 +13,7 @@ OBJ      = $(patsubst %.c, ${OBJ_DIR}/%.o, $(notdir ${SOURCES})) ${OBJ_DIR}/mult
 BIN_NAME = kernel.bin
 BIN_PATH = ${BIN_DIR}/${BIN_NAME}
 
-RUN_CMD  = qemu-system-x86_64 -kernel ${BIN_PATH} -monitor stdio
+RUN_CMD  = qemu-system-x86_64 -kernel ${BIN_PATH} -monitor stdio -serial file:serial.log
 NASM_CMD = nasm $< -felf32 -i ${BOOT_DIR} -o $@
 CC_CMD   = i686-elf-gcc -ffreestanding -O0 -Wall -Wextra -Iinclude
 
