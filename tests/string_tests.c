@@ -50,7 +50,7 @@ TEST_BEGIN(kmemset)
 
 TEST_BEGIN(kuxtos)
 {
-    char buf[16] = { 0 };
+    char buf[MAX_UINT_HEX_STRING] = { 0 };
     ksize_t out = 0;
 
     kuxtos(32, buf, &out);
@@ -71,7 +71,7 @@ TEST_BEGIN(kuxtos)
 
 TEST_BEGIN(kuitos)
 {
-    char buf[16] = { 0 };
+    char buf[MAX_UINT_DEC_STRING] = { 0 };
     ksize_t out = 0;
 
     kuitos(1, buf, &out);
@@ -92,7 +92,7 @@ TEST_BEGIN(kuitos)
 
 TEST_BEGIN(kubtos)
 {
-    char buf[35] = { 0 };
+    char buf[MAX_UINT_BIN_STRING] = { 0 };
     ksize_t out = 0;
 
     kubtos(1, buf, &out);

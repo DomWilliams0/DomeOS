@@ -1,6 +1,14 @@
 #ifndef __KERNEL_STRING_H__
 #define __KERNEL_STRING_H__
 
+#define MAX_UINT_DEC_STRING_DIGITS 10
+#define MAX_UINT_HEX_STRING_DIGITS 8
+#define MAX_UINT_BIN_STRING_DIGITS 32
+
+#define MAX_UINT_DEC_STRING        MAX_UINT_DEC_STRING_DIGITS
+#define MAX_UINT_HEX_STRING        MAX_UINT_HEX_STRING_DIGITS + 2
+#define MAX_UINT_BIN_STRING        MAX_UINT_BIN_STRING_DIGITS + 2
+
 typedef unsigned long ksize_t;
 
 void kmemcpy(void *dst, void *src, ksize_t n);

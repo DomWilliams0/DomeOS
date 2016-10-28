@@ -1,9 +1,5 @@
 #include "util/string.h"
 
-#define MAX_UINT_DEC_STRING 10
-#define MAX_UINT_HEX_STRING 8
-#define MAX_UINT_BIN_STRING 32
-
 #define _UINT_TO_STR(func_name, max_buf_len, base, prefix, prefix_len)\
     void func_name(unsigned int ux, char *out, ksize_t *n_written)\
     {\
@@ -73,6 +69,6 @@ int kmemcmp(void *a, void *b, ksize_t n)
 	return 1;
 }
 
-_UINT_TO_STR(kuxtos, MAX_UINT_HEX_STRING, 16, "0x", 2)
-_UINT_TO_STR(kuitos, MAX_UINT_DEC_STRING, 10, "", 0)
-_UINT_TO_STR(kubtos, MAX_UINT_BIN_STRING, 2, "0b", 2)
+_UINT_TO_STR(kuxtos, MAX_UINT_HEX_STRING_DIGITS, 16, "0x", 2)
+_UINT_TO_STR(kuitos, MAX_UINT_DEC_STRING_DIGITS, 10, "", 0)
+_UINT_TO_STR(kubtos, MAX_UINT_BIN_STRING_DIGITS, 2, "0b", 2)
