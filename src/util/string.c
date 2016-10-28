@@ -60,7 +60,7 @@ void kuxtos(unsigned int ux, char *out, ksize_t *n_written)
     out[0] = '0';
     out[1] = 'x';
 
-    for (int i = 0; i < written; ++i)
+    for (unsigned int i = 0; i < written; ++i)
         out[2 + i] = arr[written - i - 1];
 
     // 0x prefix

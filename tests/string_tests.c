@@ -48,9 +48,29 @@ TEST_BEGIN(kmemset)
 	ASSERT(wide, wide[2] == 10000);
 }
 
+TEST_BEGIN(kuxtos)
+{
+    char buf[16] = { 0 };
+    ksize_t out = 0;
+
+    kuxtos(32, buf, &out);
+    ASSERT(simple, out == 4 && kmemcmp(buf, "0x20", out));
+
+    kuxtos(178298882, buf, &out);
+    ASSERT(harder, out == 9 && kmemcmp(buf, "0xAA0A002", out));
+
+    kuxtos(4294967295, buf, &out);
+    ASSERT(limit, out == 10 && kmemcmp(buf, "0xFFFFFFFF", out));
+
+    kuxtos(0, buf, &out);
+    ASSERT(zero, out == 3 && kmemcmp(buf, "0x0", out));
+}
+
 void test_strings()
 {
 	TEST_SUITE(kmemcmp);
 	TEST_SUITE(kmemcpy);
 	TEST_SUITE(kmemset);
+
+	TEST_SUITE(kuxtos);
 }
