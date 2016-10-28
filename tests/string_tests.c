@@ -4,11 +4,12 @@
 TEST_BEGIN(kmemcmp)
 {
 	char *a = "aaaa";
-	char *b = "bbbb";
+	char *b = "aabb";
 
 	ASSERT(std, kmemcmp(a, a, 4));
 	ASSERT(different, !kmemcmp(a, b, 4));
-	ASSERT(null, kmemcmp(a, b, 0));
+	ASSERT(sub, kmemcmp(a, b, 2));
+	ASSERT(zero, kmemcmp(a, b, 0));
 }
 
 TEST_BEGIN(kmemcpy)

@@ -35,7 +35,7 @@ int kmemcmp(void *a, void *b, ksize_t n)
 	char *c = (char *)a;
 	char *d = (char *)b;
 	while (n--)
-		if (*c != *d)
+		if (*c++ != *d++)
 			return 0;
 
 	return 1;
