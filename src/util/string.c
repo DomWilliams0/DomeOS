@@ -1,5 +1,36 @@
 #include "util/string.h"
 
+#define MAX_UINT_DEC_STRING 10
+#define MAX_UINT_HEX_STRING 8
+
+#define _UINT_TO_STR(func_name, max_buf_len, base, prefix, prefix_len)\
+    void func_name(unsigned int ux, char *out, ksize_t *n_written)\
+    {\
+        char digits[] = "0123456789ABCDEF";\
+        \
+        ksize_t written = 0;\
+        char arr[max_buf_len];\
+        \
+        unsigned int number = ux;\
+        do\
+        {\
+            arr[written++] = digits[number % base];\
+            number /= base;\
+        }\
+        while (number > 0);\
+        \
+        for (unsigned int i = 0; i < written; ++i)\
+            out[prefix_len + i] = arr[written - i - 1];\
+        \
+        for (unsigned int i = 0; i < prefix_len; ++i)\
+            out[i] = prefix[i];\
+        \
+        written += prefix_len;\
+        \
+        out[written] = '\0';\
+        *n_written = written;\
+    }
+
 void kmemcpy(void *dst, void *src, ksize_t n)
 {
 	char *s = (char *)src;
@@ -41,52 +72,5 @@ int kmemcmp(void *a, void *b, ksize_t n)
 	return 1;
 }
 
-void kuxtos(unsigned int ux, char *out, ksize_t *n_written)
-{
-    char digits[] = "0123456789ABCDEF";
-    const int base = 16;
-
-    ksize_t written = 0;
-    char arr[8]; // max hex char
-
-    unsigned int number = ux;
-    do
-    {
-        arr[written++] = digits[number % base];
-        number /= base;
-    }
-    while (number > 0);
-
-    out[0] = '0';
-    out[1] = 'x';
-
-    for (unsigned int i = 0; i < written; ++i)
-        out[2 + i] = arr[written - i - 1];
-
-    // 0x prefix
-    written += 2;
-    out[written] = '\0';
-    *n_written = written;
-}
-
-void kuitos(unsigned int ui, char *out, ksize_t *n_written)
-{
-    const int base = 10;
-
-    ksize_t written = 0;
-    char arr[10]; // max dec char
-
-    unsigned int number = ui;
-    do
-    {
-        arr[written++] = '0' + (number % base);
-        number /= base;
-    }
-    while (number > 0);
-
-    for (unsigned int i = 0; i < written; ++i)
-        out[i] = arr[written - i - 1];
-
-    out[written] = '\0';
-    *n_written = written;
-}
+_UINT_TO_STR(kuxtos, MAX_UINT_HEX_STRING, 16, "0x", 2)
+_UINT_TO_STR(kuitos, MAX_UINT_DEC_STRING, 10, "", 0)
