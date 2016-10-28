@@ -56,14 +56,38 @@ TEST_BEGIN(kuxtos)
     kuxtos(32, buf, &out);
     ASSERT(simple, out == 4 && kmemcmp(buf, "0x20", out));
 
+    kmemset(buf, '\0', out);
     kuxtos(178298882, buf, &out);
     ASSERT(harder, out == 9 && kmemcmp(buf, "0xAA0A002", out));
 
+    kmemset(buf, '\0', out);
     kuxtos(4294967295, buf, &out);
     ASSERT(limit, out == 10 && kmemcmp(buf, "0xFFFFFFFF", out));
 
+    kmemset(buf, '\0', out);
     kuxtos(0, buf, &out);
     ASSERT(zero, out == 3 && kmemcmp(buf, "0x0", out));
+}
+
+TEST_BEGIN(kuitos)
+{
+    char buf[16] = { 0 };
+    ksize_t out = 0;
+
+    kuitos(1, buf, &out);
+    ASSERT(one, out == 1 && kmemcmp(buf, "1", out));
+
+    kmemset(buf, '\0', out);
+    kuitos(12093090, buf, &out);
+    ASSERT(harder, out == 8 && kmemcmp(buf, "12093090", out));
+
+    kmemset(buf, '\0', out);
+    kuitos(4294967295, buf, &out);
+    ASSERT(limit, out == 10 && kmemcmp(buf, "4294967295", out));
+
+    kmemset(buf, '\0', out);
+    kuitos(0, buf, &out);
+    ASSERT(zero, out == 1 && kmemcmp(buf, "0", out));
 }
 
 void test_strings()
@@ -73,4 +97,5 @@ void test_strings()
 	TEST_SUITE(kmemset);
 
 	TEST_SUITE(kuxtos);
+	TEST_SUITE(kuitos);
 }
