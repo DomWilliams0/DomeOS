@@ -90,6 +90,27 @@ TEST_BEGIN(kuitos)
     ASSERT(zero, out == 1 && kmemcmp(buf, "0", out));
 }
 
+TEST_BEGIN(kubtos)
+{
+    char buf[35] = { 0 };
+    ksize_t out = 0;
+
+    kubtos(1, buf, &out);
+    ASSERT(one, out == 3 && kmemcmp(buf, "0b1", out));
+
+    kmemset(buf, '\0', out);
+    kubtos(1234567, buf, &out);
+    ASSERT(harder, out == 23 && kmemcmp(buf, "0b100101101011010000111", out));
+
+    kmemset(buf, '\0', out);
+    kubtos(4294967295, buf, &out);
+    ASSERT(limit, out == 34 && kmemcmp(buf, "0b11111111111111111111111111111111", out));
+
+    kmemset(buf, '\0', out);
+    kubtos(0, buf, &out);
+    ASSERT(zero, out == 3 && kmemcmp(buf, "0b0", out));
+}
+
 void test_strings()
 {
 	TEST_SUITE(kmemcmp);
@@ -98,4 +119,5 @@ void test_strings()
 
 	TEST_SUITE(kuxtos);
 	TEST_SUITE(kuitos);
+	TEST_SUITE(kubtos);
 }

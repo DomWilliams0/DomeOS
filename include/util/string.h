@@ -19,4 +19,7 @@ void kuxtos(unsigned int ux, char *out, ksize_t *n_written);
 // unsigned int to decimal string
 void kuitos(unsigned int ui, char *out, ksize_t *n_written);
 
+// unsigned int to binary string
+void kubtos(unsigned int ub, char *out, ksize_t *n_written);
+
 #endif
