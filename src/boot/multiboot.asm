@@ -46,6 +46,7 @@ mov     esp, stack_top
 
 ; run kernel
 extern  kernel_main
+push    ebx
 call    kernel_main
 
 ; hang on exit

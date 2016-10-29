@@ -5,7 +5,21 @@
 #include "clock.h"
 #include "serial.h"
 
-void kernel_main()
+#include "io.h"
+#include "string.h"
+#include "util.h"
+#include "boot/multiboot.h"
+
+
+// static unsigned long discover_memory(multiboot_info_t *mbinfo, unsigned int magic)
+// {
+//     if (mbinfo->flags & 1)
+//         return mbinfo->mem_upper;
+//
+//     return 0;
+// }
+
+void kernel_main(multiboot_info_t *mbinfo, unsigned int magic)
 {
     serial_init();
     gdt_init();
