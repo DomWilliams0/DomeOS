@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 
-#include "util/err.h"
-
 #define SCREEN_VIDEO_MEM    (screen_char *)0xb8000
 #define SCREEN_WIDTH        80
 #define SCREEN_HEIGHT       25

@@ -1,5 +1,5 @@
-#include "util/io.h"
-#include "util/util.h"
+#include "io.h"
+#include "util.h"
 #include "isr.h"
 #include "irq.h"
 #include "clock.h"

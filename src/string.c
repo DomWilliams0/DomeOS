@@ -1,4 +1,4 @@
-#include "util/string.h"
+#include "string.h"
 
 #define _UINT_TO_STR(func_name, max_buf_len, base, prefix, prefix_len)\
     void func_name(unsigned int ux, char *out, ksize_t *n_written)\

@@ -1,4 +1,4 @@
-#include "util/io.h"
+#include "io.h"
 #include "isr.h"
 
 char *exceptions[] =

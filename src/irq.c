@@ -1,6 +1,6 @@
 #include "isr.h"
 #include "irq.h"
-#include "util/io.h"
+#include "io.h"
 #include "error.h"
 
 void *irq_handlers[IRQ_HANDLER_COUNT] = { 0 };

@@ -1,5 +1,5 @@
 #include "screen.h"
-#include "util/io.h"
+#include "io.h"
 #include "error.h"
 
 char io_read_port(io_port port)

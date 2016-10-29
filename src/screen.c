@@ -1,5 +1,5 @@
-#include "util/util.h"
-#include "util/string.h"
+#include "util.h"
+#include "string.h"
 
 #include "screen.h"
 
