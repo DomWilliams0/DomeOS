@@ -9,7 +9,11 @@
 #define LOG_DEBUG(msg)
 #endif
 
+char* itoa(int value, char* result, int base);
+
 void log(char *prefix, char *message);
+
+void log_raw(char *message);
 
 #endif
 
