@@ -20,11 +20,11 @@ CC_CMD   = i686-elf-gcc -ffreestanding -O0 -Wall -Wextra -Iinclude
 VPATH = $(shell find ${SRC_DIR} ${INC_DIR} -type d)
 
 # default
+.PHONY: all
 all: kernel.bin
 
 # building
 .PHONY: create_dirs
-
 create_dirs:
 	@mkdir -p ${OBJ_DIR} ${BIN_DIR}
 
@@ -32,7 +32,6 @@ $(BIN_NAME): create_dirs ${OBJ}
 	${CC_CMD} -Tlinker.ld -nostdlib -lgcc -g -o ${BIN_PATH} ${OBJ}
 
 .PHONY: tests
-
 tests:
 	make -C ${TEST_DIR} run
 
@@ -45,15 +44,19 @@ $(OBJ_DIR)/%.o: ${BOOT_DIR}/%.asm
 %.bin: %.asm
 	${NASM_CMD}
 
+.PHONY: clean
 clean:
 	rm -rf ${BIN_DIR} ${OBJ_DIR}
 
 # running
-run:
+.PHONY: run-only
+run-only:
 	${RUN_CMD}
 
-build-run: ${BIN_NAME}
+.PHONY: run
+run: ${BIN_NAME}
 	${RUN_CMD}
 
+.PHONY: debug
 debug:
 	${RUN_CMD} -s -S
