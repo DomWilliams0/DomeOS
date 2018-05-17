@@ -1,2 +1,2 @@
 # DomeOS
-A fully functional replacement for Linux
+A toy OS written in C. Restarted in Rust [here](https://github.com/DomWilliams0/domeos-rs).
