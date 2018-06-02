@@ -11,7 +11,7 @@ SECTIONS
 		KEEP(*(.multiboot))
 	}
 
-	.text : AT(ADDR(.text) - KERNEL_VMA)
+	.text : 
 	{
 		_code = .;
 		*(.text)
@@ -20,7 +20,7 @@ SECTIONS
 	}
 
 	/* initialised rw data */
-	.data : AT(ADDR(.data) - KERNEL_VMA)
+	.data : 
 	{
 		_data = .;
 		*(.data)
@@ -28,7 +28,7 @@ SECTIONS
 	}
 
 	/* exception handling frames */
-	.eh_frame : AT(ADDR(.eh_frame) - KERNEL_VMA)
+	.eh_frame :
 	{
 		_ehframe = .;
 		*(.eh_frame)
@@ -36,7 +36,7 @@ SECTIONS
 	}
 
 	/* uninitialised rw data and stack */
-	.bss : AT(ADDR(.bss) - KERNEL_VMA)
+	.bss : 
 	{
 		_bss = .;
 		*(.bss)

@@ -19,7 +19,7 @@ OBJ         = $(OBJ_C) $(OBJ_ASM)
 KERNEL = $(BIN_DIR)/kernel.bin
 ISO = $(BIN_DIR)/domeos.iso
 
-RUN_CMD  = qemu-system-x86_64 -cdrom $(ISO) -monitor stdio -d cpu_reset -D qemu-logfile
+RUN_CMD  = qemu-system-x86_64 -cdrom $(ISO) -monitor stdio -d cpu_reset,int -D qemu-logfile
 NASM_CMD = nasm $< -felf64 -i $(BOOT_DIR)/ -o $@
 
 CFLAGS = -ffreestanding -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -O0 -Wall -Wextra -Iinclude
@@ -49,7 +49,7 @@ $(GRUB_CFG):
 	echo -e "set timeout=0\nset default=0\nmenuentry \"domeos\" {\nmultiboot2 /boot/$(notdir $(KERNEL))\nboot\n}" > $@
 
 $(ISO): $(KERNEL) $(GRUB_CFG)
-	mv $(KERNEL) $(GRUB_DIR)/../
+	cp $(KERNEL) $(GRUB_DIR)/../
 	grub-mkrescue -o $@ $(ISO_DIR)
 
 # phonies

@@ -1,39 +1,106 @@
 global _start
 extern kernel_main
+extern long_mode
 
 global KERNEL_VMA
 KERNEL_VMA equ 0x100000 ; 1MiB
 
 section .bss
 align 4096
+bss_start:
+
+; page tables
+p4_table:
+	resb 4096
+p3_table:
+	resb 4096
+p2_table:
+	resb 4096
 
 ; allocate petit stack of 16KiB
 stack_bottom:
 	resb 16384
 stack_top:
 
+bss_end:
+
+section .rodata
+gdt64:
+	dq 0
+.cs: equ $ - gdt64
+	dq (1<<43) | (1<<44) | (1<<47) | (1<<53)	; code, data not needed
+												; flags set: descriptor type, present, exec, 64 bit
+.ptr:
+	dw $ - gdt64 - 1							; length of gdt
+	dq gdt64
 
 section .text
 bits	 32
 
 ; entry point
-global _start:function(_start.end - _start)
 _start:
 
 	; setup stack
 	mov esp, stack_top
 
-	; jump into kernel
-	; call kernel_main
+	; paging
+	call init_page_tables
+	call enable_paging
 
-	; print pretty message instead
-	mov dword [0xb8000], 0x2b451a4e
-	mov dword [0xb8004], 0x4d543e41
-	mov dword [0xb8008], 0x5f4f
+	lgdt [gdt64.ptr]
+	jmp gdt64.cs:long_mode
 
-	; loop
-	cli
-	jmp $
 
+init_page_tables:
+	; 0b11 = present and writable bits
+
+	; first P4 -> p3
+	mov eax, p3_table
+	or eax, 0b11
+	mov [p4_table], eax
+
+	; first P3 -> p2
+	mov eax, p2_table
+	or eax, 0b11
+	mov [p3_table], eax
+
+	; map all p2 entries to 2MiB entries
+	mov ecx, 0
+
+.loop:
+	mov eax, 0x200000	; 2MiB
+	mul ecx
+	or eax, 0b10000011 ; present + w + huge
+	mov [p2_table + ecx * 8], eax
+
+	inc ecx
+	cmp ecx, 512
+	jne .loop
+
+	ret
+
+enable_paging:
+
+	; put p4 in cr3
+	mov eax, p4_table
+	mov cr3, eax
+
+	; pae (bit 5)
+	mov eax, cr4
+	or eax, 1 << 5
+	mov cr4, eax
+
+	; long bit in EFER
+	mov ecx, 0xC0000080
+	rdmsr
+	or eax, 1 << 8
+	wrmsr
+
+	; paging bit
+	mov eax, cr0
+	or eax, 1 << 31
+	mov cr0, eax
+
+	ret
 
 ; vim: ft=nasm
