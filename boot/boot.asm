@@ -1,6 +1,9 @@
 global _start
 extern kernel_main
 
+global KERNEL_VMA
+KERNEL_VMA equ 0x100000 ; 1MiB
+
 section .bss
 align 4096
 
@@ -21,7 +24,12 @@ _start:
 	mov esp, stack_top
 
 	; jump into kernel
-	call kernel_main
+	; call kernel_main
+
+	; print pretty message instead
+	mov dword [0xb8000], 0x2b451a4e
+	mov dword [0xb8004], 0x4d543e41
+	mov dword [0xb8008], 0x5f4f
 
 	; loop
 	cli

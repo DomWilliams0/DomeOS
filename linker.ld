@@ -3,32 +3,49 @@ ENTRY(_start)
 
 SECTIONS
 {
-    /* start sections at 1 MiB */
-    . = 1M;
+	/* start at arbitrary address */
+	. = KERNEL_VMA;
 
-    /* multiboot header */
-    .text BLOCK(4K) : ALIGN(4K)
-    {
-        *(.multiboot)
-        *(.text)
-    }
+	.boot : 
+	{
+		KEEP(*(.multiboot))
+	}
 
-    /* read only */
-    .rodata BLOCK(4K) : ALIGN(4K)
-    {
-        *(.rodata)
-    }
+	.text : AT(ADDR(.text) - KERNEL_VMA)
+	{
+		_code = .;
+		*(.text)
+		*(.rodata)
+		. = ALIGN(4096);
+	}
 
-    /* initialised rw data */
-    .data BLOCK(4K) : ALIGN(4K)
-    {
-        *(.data)
-    }
+	/* initialised rw data */
+	.data : AT(ADDR(.data) - KERNEL_VMA)
+	{
+		_data = .;
+		*(.data)
+		. = ALIGN(4096);
+	}
 
-    /* uninitialised rw data and stack */
-    .bss BLOCK(4K) : ALIGN(4K)
-    {
-        *(COMMON)
-        *(.bss)
-    }
+	/* exception handling frames */
+	.eh_frame : AT(ADDR(.eh_frame) - KERNEL_VMA)
+	{
+		_ehframe = .;
+		*(.eh_frame)
+		. = ALIGN(4096);
+	}
+
+	/* uninitialised rw data and stack */
+	.bss : AT(ADDR(.bss) - KERNEL_VMA)
+	{
+		_bss = .;
+		*(.bss)
+		*(COMMON)
+		. = ALIGN(4096);
+	}
+
+	/DISCARD/ :
+	{
+		*(.comment)
+	}
 }

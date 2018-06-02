@@ -20,8 +20,12 @@ KERNEL = $(BIN_DIR)/kernel.bin
 ISO = $(BIN_DIR)/domeos.iso
 
 RUN_CMD  = qemu-system-x86_64 -cdrom $(ISO) -monitor stdio -d cpu_reset -D qemu-logfile
-NASM_CMD = nasm $< -felf32 -i $(BOOT_DIR)/ -o $@
-CC_CMD   = i686-elf-gcc -ffreestanding -O0 -Wall -Wextra -Iinclude
+NASM_CMD = nasm $< -felf64 -i $(BOOT_DIR)/ -o $@
+
+CFLAGS = -ffreestanding -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -O0 -Wall -Wextra -Iinclude
+CC = x86_64-elf-gcc
+LD = x86_64-elf-ld
+LDFLAGS = -n --gc-sections -Tlinker.ld -g
 
 VPATH = $(shell find $(SRC_DIR) $(INC_DIR) -type d)
 
@@ -31,10 +35,10 @@ all: $(ISO)
 
 # building
 $(KERNEL): $(OBJ)
-	$(CC_CMD) -Tlinker.ld -nostdlib -lgcc -g -o $@ $^
+	$(LD) $(LDFLAGS) -o $@ $^
 
 $(OBJ_DIR)/%.o: %.c | build_dirs
-	$(CC_CMD) -c -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(OBJ_DIR)/%.o: $(BOOT_DIR)/%.asm | build_dirs
 	$(NASM_CMD)
@@ -63,7 +67,7 @@ run-only:
 	$(RUN_CMD)
 
 .PHONY: run
-run: $(BIN_NAME)
+run: $(ISO)
 	$(RUN_CMD)
 
 .PHONY: debug
