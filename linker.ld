@@ -6,12 +6,12 @@ SECTIONS
 	/* start at arbitrary address */
 	. = KERNEL_VMA;
 
-	.boot : 
+	.boot :
 	{
 		KEEP(*(.multiboot))
 	}
 
-	.text : 
+	.text :
 	{
 		_code = .;
 		*(.text)
@@ -20,7 +20,7 @@ SECTIONS
 	}
 
 	/* initialised rw data */
-	.data : 
+	.data :
 	{
 		_data = .;
 		*(.data)
@@ -36,7 +36,7 @@ SECTIONS
 	}
 
 	/* uninitialised rw data and stack */
-	.bss : 
+	.bss :
 	{
 		_bss = .;
 		*(.bss)
