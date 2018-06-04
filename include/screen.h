@@ -56,4 +56,7 @@ void screen_write_char(char c);
 
 void screen_write_string(char *s);
 
+// for printf
+inline int putchar(char c) { screen_write_char(c); return 0; }
+
 #endif
