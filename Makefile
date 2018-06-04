@@ -22,7 +22,7 @@ ISO = $(BIN_DIR)/domeos.iso
 RUN_CMD  = qemu-system-x86_64 -cdrom $(ISO) -monitor stdio -d cpu_reset,int -D qemu-logfile
 NASM_CMD = nasm $< -felf64 -i $(BOOT_DIR)/ -o $@
 
-CFLAGS = -ffreestanding -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -O0 -Wall -Wextra -Iinclude
+CFLAGS = -ffreestanding -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -O0 -Wall -Wextra -Iinclude -g
 CC = x86_64-elf-gcc
 LD = x86_64-elf-ld
 LDFLAGS = -n --gc-sections -Tlinker.ld -g
