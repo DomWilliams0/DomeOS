@@ -1,6 +1,7 @@
 global _start
 extern kernel_main
 extern long_mode
+extern gdt64_flush
 
 global KERNEL_VMA
 KERNEL_VMA equ 0x100000 ; 1MiB
@@ -23,9 +24,6 @@ stack_bottom:
 stack_top:
 
 bss_end:
-
-section .rodata
-%include "descriptor_tables.asm"
 
 section .text
 bits	 32

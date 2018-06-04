@@ -1,4 +1,5 @@
 extern gdt64
+extern kernel_main
 global long_mode
 
 [BITS 64]
@@ -14,7 +15,7 @@ long_mode:
 	mov ss, ax
 
 	; jump into kernel
-	; call kernel_main
+	call kernel_main
 
 	; print pretty message instead
 	mov dword [0xb8000], 0x2b451a4e
