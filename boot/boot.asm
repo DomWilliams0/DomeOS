@@ -25,14 +25,7 @@ stack_top:
 bss_end:
 
 section .rodata
-gdt64:
-	dq 0
-.cs: equ $ - gdt64
-	dq (1<<43) | (1<<44) | (1<<47) | (1<<53)	; code, data not needed
-												; flags set: descriptor type, present, exec, 64 bit
-.ptr:
-	dw $ - gdt64 - 1							; length of gdt
-	dq gdt64
+%include "descriptor_tables.asm"
 
 section .text
 bits	 32
@@ -47,9 +40,7 @@ _start:
 	call init_page_tables
 	call enable_paging
 
-	lgdt [gdt64.ptr]
-	jmp gdt64.cs:long_mode
-
+	call gdt64_flush
 
 init_page_tables:
 	; 0b11 = present and writable bits
