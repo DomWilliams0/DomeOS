@@ -47,6 +47,8 @@ void kernel_main(int multiboot_magic, void *multiboot_header)
 	screen_init(SCREEN_COLOUR_LIGHT_GREEN, SCREEN_COLOUR_DARK_GREY);
 	printf("Booting\n");
 
+	paging_init_from_multiboot(multiboot_magic, multiboot_header);
+
 	idt_init();
 	enable_interrupts();
 
