@@ -21,10 +21,14 @@ void screen_init(screen_colour fg, screen_colour bg)
 	state.cursor_x  = 0;
 	state.cursor_y  = 0;
 
-	state.fg = fg;
-	state.bg = bg;
+	screen_set_colours(fg, bg);
 
 	screen_clear();
+}
+
+void screen_set_colours(screen_colour fg, screen_colour bg) {
+	state.fg = fg;
+	state.bg = bg;
 }
 
 
@@ -96,3 +100,5 @@ void screen_write_string(char *s)
 		++c;
 	}
 }
+
+int putchar(char c) { screen_write_char(c); return 0; }

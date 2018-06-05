@@ -48,6 +48,8 @@ static inline screen_char colour_char(char c, screen_colour colour)
 // screen operations
 void screen_init(screen_colour fg, screen_colour bg);
 
+void screen_set_colours(screen_colour fg, screen_colour bg);
+
 void screen_clear();
 
 void screen_scroll_down();
@@ -57,6 +59,6 @@ void screen_write_char(char c);
 void screen_write_string(char *s);
 
 // for printf
-inline int putchar(char c) { screen_write_char(c); return 0; }
+int putchar(char c);
 
 #endif

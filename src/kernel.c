@@ -2,10 +2,12 @@
 #include "idt.h"
 #include "screen.h"
 
+#include "printf.h"
+
 void kernel_main()
 {
 	screen_init(SCREEN_COLOUR_LIGHT_GREEN, SCREEN_COLOUR_DARK_GREY);
-	screen_write_string("hullo there");
+	printf("hullo there lad");
 
 	idt_init();
 	enable_interrupts();
