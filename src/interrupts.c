@@ -59,14 +59,34 @@ static void log_registers(struct intr_context *ctx) {
 			"\n%s: 0x%x"
 			"  %s: 0x%x"
 			"  %s: 0x%x"
+			"  %s: 0x%x"
 			"\n"
 			, "rax", ctx->rax, "rbx", ctx->rbx, "rcx", ctx->rcx
-			, "rdx", ctx->rdx, "rsi", ctx->rsi, "rbp", ctx->rbp
-			, "r8", ctx->r8, "r9", ctx->r9, "r10", ctx->r10
-			, "r11", ctx->r11, "r12", ctx->r12, "r13", ctx->r13
-			, "r14", ctx->r14, "r15", ctx->r15, "rip", ctx->rip
-			, "rflags", ctx->rflags, "rsp", ctx->rsp, "ss", ctx->ss
+			, "rdx", ctx->rdx, "rsi", ctx->rsi, "rdi", ctx->rdi
+			,"rbp", ctx->rbp , "r8", ctx->r8, "r9", ctx->r9
+			,"r10", ctx->r10 , "r11", ctx->r11, "r12", ctx->r12
+			,"r13", ctx->r13 , "r14", ctx->r14, "r15", ctx->r15
+			,"rip", ctx->rip , "rflags", ctx->rflags, "rsp", ctx->rsp
+			,"ss", ctx->ss
 			);
+}
+
+static void log_exception(int int_no, int err) {
+	switch (int_no) {
+		case 13: {
+					 struct {
+						 int external: 1;
+						 int tbl: 2;
+						 int selector: 13;
+					 }__attribute__((packed)) *selector = (void *)&err;
+					 printf("external=%d, tbl=%d, selector=0x%x\n", selector->external, selector->tbl, selector->selector);
+				 }
+
+
+
+		default: break;
+	}
+
 }
 
 
@@ -78,7 +98,9 @@ void fault_handler(struct intr_context *ctx)
 	{
 	  printf("\n=======\n");
 	  screen_set_colours(SCREEN_COLOUR_WHITE, SCREEN_COLOUR_RED);
-	  printf("Unhandled exception %d: %s\nHalting\n", ctx->int_no, exceptions[ctx->int_no]);
+	  printf("Unhandled exception %d: %s\nError code: %d\n", ctx->int_no, exceptions[ctx->int_no], ctx->err_code);
+	  log_exception(ctx->int_no, ctx->err_code);
+	  printf("Halting\n");
 	  log_registers(ctx);
 
 	  disable_interrupts();
