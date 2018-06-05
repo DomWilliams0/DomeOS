@@ -129,12 +129,15 @@ stub_name:
 	; call handler
 	call stub_handler
 
+	swapgs
+
 	; restore registers
 	pop rax
 	pop rbx
 	pop rcx
 	pop rdx
 	pop rsi
+	pop rdi
 	pop rbp
 	pop r8
 	pop r9
@@ -144,6 +147,9 @@ stub_name:
 	pop r13
 	pop r14
 	pop r15
+
+	; pop error code and int no
+	add rsp, 16
 
 	iretq
 %endmacro

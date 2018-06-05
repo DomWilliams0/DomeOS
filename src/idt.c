@@ -1,4 +1,5 @@
 #include "idt.h"
+#include "irq.h"
 
 extern void isr0();
 extern void isr1();
@@ -110,7 +111,6 @@ static void register_all_entries()
 	register_entry(30, isr30);
 	register_entry(31, isr31);
 
-	/*
 	register_entry(32, irq0);
 	register_entry(33, irq1);
 	register_entry(34, irq2);
@@ -127,14 +127,12 @@ static void register_all_entries()
 	register_entry(45, irq13);
 	register_entry(46, irq14);
 	register_entry(47, irq15);
-	*/
 }
 
 void idt_init()
 {
-	// TODO enable irqs
 	// shift irqs to avoid collisions
-	// irq_remap();
+	irq_remap();
 
 	// register isrs and irqs
 	register_all_entries();
@@ -146,6 +144,3 @@ void idt_init()
 	// replace existing idt with the new one
 	idt_flush();
 }
-
-
-

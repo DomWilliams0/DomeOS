@@ -108,10 +108,6 @@ void fault_handler(struct intr_context *ctx)
   }
 }
 
-void irq_handler(struct intr_context *ctx) {
-
-}
-
 void enable_interrupts() {
 	__asm__ __volatile__ ("sti");
 }
