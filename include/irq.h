@@ -2,7 +2,7 @@
 #define DOMEOS_IRQ_H
 
 #include <stdint.h>
-#include "interrupts.h"
+#include "kernel.h"
 
 #define IRQ_HANDLER_COUNT 16
 

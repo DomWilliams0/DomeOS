@@ -117,7 +117,6 @@ stub_name:
 	push rbx
 	push rax
 
-	; 21*8 = sizeof intr_context
 	lea rdi, [rsp]
 
 	; TODO store segment descriptors only if 32 bit must be supported

@@ -34,6 +34,10 @@ _start:
 	; setup stack
 	mov esp, stack_top
 
+	; multiboot parameters, for kernel_main
+	mov edi, eax
+	mov esi, ebx
+
 	; paging
 	call init_page_tables
 	call enable_paging

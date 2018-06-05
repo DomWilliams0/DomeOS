@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "interrupts.h"
+#include "kernel.h"
 #include "screen.h"
 #include "printf.h"
 
@@ -40,37 +41,6 @@ static char *exceptions[] =
 	"Reserved",                    // 31
 };
 
-static void log_registers(struct intr_context *ctx) {
-	printf("%s: 0x%x"
-			"  %s: 0x%x"
-			"  %s: 0x%x"
-			"\n%s: 0x%x"
-			"  %s: 0x%x"
-			"  %s: 0x%x"
-			"  %s: 0x%x"
-			"\n%s: 0x%x"
-			"  %s: 0x%x"
-			"  %s: 0x%x"
-			"  %s: 0x%x"
-			"\n%s: 0x%x"
-			"  %s: 0x%x"
-			"  %s: 0x%x"
-			"  %s: 0x%x"
-			"\n%s: 0x%x"
-			"  %s: 0x%x"
-			"  %s: 0x%x"
-			"  %s: 0x%x"
-			"\n"
-			, "rax", ctx->rax, "rbx", ctx->rbx, "rcx", ctx->rcx
-			, "rdx", ctx->rdx, "rsi", ctx->rsi, "rdi", ctx->rdi
-			,"rbp", ctx->rbp , "r8", ctx->r8, "r9", ctx->r9
-			,"r10", ctx->r10 , "r11", ctx->r11, "r12", ctx->r12
-			,"r13", ctx->r13 , "r14", ctx->r14, "r15", ctx->r15
-			,"rip", ctx->rip , "rflags", ctx->rflags, "rsp", ctx->rsp
-			,"ss", ctx->ss
-			);
-}
-
 static void log_exception(int int_no, int err) {
 	switch (int_no) {
 		case 13: {
@@ -96,16 +66,16 @@ void fault_handler(struct intr_context *ctx)
 {
 	if (ctx->int_no < 32)
 	{
-	  printf("\n=======\n");
-	  screen_set_colours(SCREEN_COLOUR_WHITE, SCREEN_COLOUR_RED);
-	  printf("Unhandled exception %d: %s\nError code: %d\n", ctx->int_no, exceptions[ctx->int_no], ctx->err_code);
-	  log_exception(ctx->int_no, ctx->err_code);
-	  printf("Halting\n");
-	  log_registers(ctx);
+		// TODO generalise this error logging and use in kernel.c too
+		printf("\n=======\n");
+		screen_set_colours(SCREEN_COLOUR_WHITE, SCREEN_COLOUR_RED);
+		printf("Unhandled exception %d: %s\nError code: %d\n", ctx->int_no, exceptions[ctx->int_no], ctx->err_code);
+		log_exception(ctx->int_no, ctx->err_code);
+		printf("Halting\n");
 
-	  disable_interrupts();
-	  while(1);
-  }
+		log_registers(ctx);
+		halt();
+	}
 }
 
 void enable_interrupts() {

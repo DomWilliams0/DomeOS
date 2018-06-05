@@ -15,13 +15,11 @@ long_mode:
 	mov ss, ax
 
 	; jump into kernel
+	;mov rsi, rbx
 	call kernel_main
 
-	; print pretty message instead
-	mov dword [0xb8000], 0x2b451a4e
-	mov dword [0xb8004], 0x4d543e41
-	mov dword [0xb8008], 0x5f4f
-
-	hlt
+	; loop forever
+	cli
+	jmp $
 
 ; vim: ft=nasm
