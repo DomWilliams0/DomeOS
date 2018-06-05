@@ -117,6 +117,9 @@ stub_name:
 	push rbx
 	push rax
 
+	; 21*8 = sizeof intr_context
+	lea rdi, [rsp + (21*8)]
+
 	; TODO store segment descriptors only if 32 bit must be supported
 
 	; swap user and kernel gs registers

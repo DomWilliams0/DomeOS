@@ -43,20 +43,20 @@ static char *exceptions[] =
 
 // log and never return
 // TODO print all registers
-void fault_handler(struct intr_context ctx)
+void fault_handler(struct intr_context *ctx)
 {
-	if (ctx.int_no < 32)
+	if (ctx->int_no < 32)
 	{
 	  printf("\n=======\n");
 	  screen_set_colours(SCREEN_COLOUR_WHITE, SCREEN_COLOUR_RED);
-	  printf("Unhandled exception %d: %s\nHalting\n", ctx.int_no, exceptions[ctx.int_no]);
+	  printf("Unhandled exception %d: %s\nHalting\n", ctx->int_no, exceptions[ctx->int_no]);
 
 	  disable_interrupts();
 	  while(1);
   }
 }
 
-void irq_handler(struct intr_context ctx) {
+void irq_handler(struct intr_context *ctx) {
 
 }
 

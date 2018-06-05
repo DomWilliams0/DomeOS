@@ -31,9 +31,9 @@ struct intr_context {
 	uint64_t ss;
 };
 
-void fault_handler(struct intr_context ctx);
+void fault_handler(struct intr_context *ctx);
 
-void irq_handler(struct intr_context ctx);
+void irq_handler(struct intr_context *ctx);
 
 void enable_interrupts();
 
