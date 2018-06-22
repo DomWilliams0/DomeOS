@@ -1,8 +1,7 @@
-#include "multiboot2.h"
 #include "interrupts.h"
 #include "idt.h"
 #include "screen.h"
-#include "paging.h"
+#include "multiboot.h"
 
 #include "printf.h"
 
@@ -42,12 +41,18 @@ void log_registers(struct intr_context *ctx) {
 			);
 }
 
+
+
 void kernel_main(int multiboot_magic, void *multiboot_header)
 {
 	screen_init(SCREEN_COLOUR_LIGHT_GREEN, SCREEN_COLOUR_DARK_GREY);
 	printf("Booting\n");
 
-	paging_init_from_multiboot(multiboot_magic, multiboot_header);
+	if (parse_multiboot(multiboot_magic, multiboot_header) != 0) {
+		printf("Failed to parse multiboot header, halting\n");
+		halt();
+		return;
+	}
 
 	idt_init();
 	enable_interrupts();
