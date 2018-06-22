@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-struct intr_context {
+struct intr_context
+{
 	uint64_t rax;
 	uint64_t rbx;
 	uint64_t rcx;

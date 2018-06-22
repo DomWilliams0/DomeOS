@@ -5,12 +5,14 @@
 
 #include "printf.h"
 
-void halt() {
+void halt()
+{
 	disable_interrupts();
 	while(1);
 }
 
-void log_registers(struct intr_context *ctx) {
+void log_registers(struct intr_context *ctx)
+{
 	printf("%s: 0x%x"
 			"  %s: 0x%x"
 			"  %s: 0x%x"
