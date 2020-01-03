@@ -50,15 +50,23 @@ void kernel_main(int multiboot_magic, void *multiboot_header)
 	screen_init(SCREEN_COLOUR_LIGHT_GREEN, SCREEN_COLOUR_DARK_GREY);
 	printf("Booting\n");
 
+    (void) multiboot_magic;
+    (void) multiboot_header;
+/* TODO
 	if (parse_multiboot(multiboot_magic, multiboot_header) != 0) {
 		printf("Failed to parse multiboot header, halting\n");
 		halt();
 		return;
 	}
+*/
 
 	idt_init();
 	enable_interrupts();
 
+	printf("nothing to do, hanging\n");
+
 	// hang forever
-	while (1);
+	while (1) {
+        __asm__ __volatile__ ("hlt");
+	}
 }
