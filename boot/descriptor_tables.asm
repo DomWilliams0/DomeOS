@@ -1,7 +1,6 @@
 extern long_mode
 global gdt64_flush
 extern idt_descriptor
-global idt_flush
 
 [bits 32]
 gdt64:
@@ -17,10 +16,5 @@ gdt64_flush:
 	cld
 	lgdt [gdt64.ptr]
 	jmp gdt64.cs:long_mode
-
-[bits 64]
-idt_flush:
-	lidt    [idt_descriptor]
-	ret
 
 ; vim: ft=nasm

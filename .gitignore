@@ -2,7 +2,6 @@
 .ycm_extra_conf.py*
 serial.log
 qemu-logfile
-CMakeLists.txt
 cmake-build-*
 
 # Created by .ignore support plugin (hsz.mobi)
