@@ -14,6 +14,7 @@ use log::error;
 use crate::irq::disable_interrupts;
 
 mod clock;
+mod exception;
 mod idt;
 mod io;
 mod irq;

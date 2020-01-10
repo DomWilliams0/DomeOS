@@ -2,6 +2,8 @@ use core::fmt::{Debug, Error, Formatter};
 
 use log::*;
 
+use core::convert::TryFrom;
+use crate::exception::Exception;
 use crate::io::Port;
 
 const PIC_MASTER_COMMAND: Port = Port(0x20);
@@ -108,11 +110,8 @@ unsafe fn eoi(irq: usize) {
 #[no_mangle]
 pub extern "C" fn fault_handler(ctx: *const InterruptContext) {
     let ctx: &InterruptContext = unsafe { (&*ctx) };
-    if ctx.int_no < 32 {
-        panic!(
-            "Unhandled exception {}: {} (error code: {})\n{:?}",
-            ctx.int_no, EXCEPTION_STRS[ctx.int_no as usize], ctx.err_code, ctx,
-        );
+    if let Ok(exc) = Exception::try_from(ctx) {
+        panic!("Unhandled exception {:?})\n{:?}", exc, ctx);
     }
 }
 
@@ -128,68 +127,33 @@ pub fn disable_interrupts() {
 
 #[repr(C)]
 pub struct InterruptContext {
-    rax: u64,
-    rbx: u64,
-    rcx: u64,
-    rdx: u64,
-    rsi: u64,
-    rdi: u64,
-    rbp: u64,
+    pub rax: u64,
+    pub rbx: u64,
+    pub rcx: u64,
+    pub rdx: u64,
+    pub rsi: u64,
+    pub rdi: u64,
+    pub rbp: u64,
 
-    r8: u64,
-    r9: u64,
-    r10: u64,
-    r11: u64,
-    r12: u64,
-    r13: u64,
-    r14: u64,
-    r15: u64,
+    pub r8: u64,
+    pub r9: u64,
+    pub r10: u64,
+    pub r11: u64,
+    pub r12: u64,
+    pub r13: u64,
+    pub r14: u64,
+    pub r15: u64,
 
-    int_no: u64,
-    err_code: u64,
+    pub int_no: u64,
+    pub err_code: u64,
 
     // pushed by CPU
-    rip: u64,
-    cs: u64,
-    rflags: u64,
-    rsp: u64,
-    ss: u64,
+    pub rip: u64,
+    pub cs: u64,
+    pub rflags: u64,
+    pub rsp: u64,
+    pub ss: u64,
 }
-
-const EXCEPTION_STRS: [&'static str; 32] = [
-    "Division By Zero",            // 00
-    "Debug",                       // 01
-    "Non Maskable Interrupt",      // 02
-    "Breakpoint",                  // 03
-    "Into Detected Overflow",      // 04
-    "Out of Bounds",               // 05
-    "Invalid Opcode",              // 06
-    "No Coprocessor",              // 07
-    "Double Fault",                // 08
-    "Coprocessor Segment Overrun", // 09
-    "Bad TSS",                     // 10
-    "Segment Not Present",         // 11
-    "Stack Fault",                 // 12
-    "General Protection Fault",    // 13
-    "Page Fault",                  // 14
-    "Unknown Interrupt",           // 15
-    "Coprocessor Fault",           // 16
-    "Alignment Check",             // 17
-    "Machine Check",               // 18
-    "Reserved",                    // 19
-    "Reserved",                    // 20
-    "Reserved",                    // 21
-    "Reserved",                    // 22
-    "Reserved",                    // 23
-    "Reserved",                    // 24
-    "Reserved",                    // 25
-    "Reserved",                    // 26
-    "Reserved",                    // 27
-    "Reserved",                    // 28
-    "Reserved",                    // 29
-    "Reserved",                    // 30
-    "Reserved",                    // 31
-];
 
 impl Debug for InterruptContext {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
