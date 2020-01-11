@@ -9,7 +9,7 @@ use core::ffi::c_void;
 use core::fmt::Write;
 use core::panic::PanicInfo;
 
-use log::{error, LevelFilter};
+use log::*;
 
 use crate::irq::disable_interrupts;
 
@@ -18,6 +18,7 @@ mod exception;
 mod idt;
 mod io;
 mod irq;
+mod memory;
 mod multiboot;
 mod serial;
 mod start;
@@ -42,6 +43,7 @@ pub extern "C" fn kernel_main(magic: u32, multiboot: *mut c_void) -> ! {
 }
 
 pub fn hang() -> ! {
+    warn!("hanging forever");
     unsafe {
         disable_interrupts();
 

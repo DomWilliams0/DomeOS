@@ -5,6 +5,7 @@ use bitfield::BitRange;
 use enumflags2::BitFlags;
 
 use crate::irq::InterruptContext;
+use crate::memory::VirtualAddress;
 
 #[allow(non_camel_case_types, dead_code)]
 #[derive(Debug)]
@@ -34,16 +35,6 @@ pub enum Exception {
     VirtualizationException,
     SecurityException,
     Reserved,
-}
-
-// TODO move somewhere else
-#[repr(transparent)]
-pub struct VirtualAddress(u64);
-
-impl Debug for VirtualAddress {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "VirtualAddress({:#x})", self.0)
-    }
 }
 
 #[derive(BitFlags, Copy, Clone, Eq, PartialEq, Debug)]
