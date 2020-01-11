@@ -2,9 +2,7 @@ global _start
 extern kernel_main
 extern long_mode
 extern gdt64_flush
-
-global KERNEL_VMA
-KERNEL_VMA equ 0x100000 ; 1MiB
+extern KERNEL_VMA
 
 section .bss
 align 4096
