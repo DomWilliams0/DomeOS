@@ -56,7 +56,7 @@ const TICKS_PER_SECOND: u64 = 120;
 static mut TICKS: u64 = 0;
 
 extern "C" fn on_clock(_ctx: *const irq::InterruptContext) {
-     unsafe {
+    unsafe {
         TICKS += 1;
     };
 }

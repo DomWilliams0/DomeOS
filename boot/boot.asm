@@ -2,7 +2,6 @@ global _start
 extern kernel_main
 extern long_mode
 extern gdt64_flush
-extern KERNEL_VMA
 
 section .bss
 align 4096
@@ -14,6 +13,8 @@ p4_table:
 p3_table:
 	resb 4096
 p2_table:
+	resb 4096
+p1_table:
 	resb 4096
 
 ; allocate petit stack of 16KiB
@@ -94,9 +95,9 @@ enable_paging:
 	or eax, 1 << 8
 	wrmsr
 
-	; paging bit
+	; paging bit and write-protect
 	mov eax, cr0
-	or eax, 1 << 31
+	or eax, 1 << 31 | 1 << 16
 	mov cr0, eax
 
 	ret

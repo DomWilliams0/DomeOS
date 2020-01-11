@@ -1,4 +1,4 @@
-use crate::multiboot;
+use crate::{memory, multiboot};
 
 use log::*;
 
@@ -34,9 +34,11 @@ fn parse_multiboot(multiboot: &multiboot::multiboot_info) {
 
     multiboot::print_commandline(multiboot);
 
-    for memory_region in MemoryRegions::new(multiboot) {
+    for memory_region in MemoryRegions::new(multiboot).available() {
         info!("{:?}", memory_region);
     }
+
+    info!("current table is {:#?}", memory::PageTable::load());
 }
 
 fn breakpoint() {

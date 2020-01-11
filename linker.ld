@@ -3,8 +3,8 @@ ENTRY(_start)
 
 SECTIONS
 {
-	/* start at arbitrary address */
-	. = KERNEL_VMA;
+	/* start sections at 1MB */
+	. = 0x100000;
 
 	.boot :
 	{
@@ -48,4 +48,6 @@ SECTIONS
 	{
 		*(.comment)
 	}
+
+	KERNEL_END = .;
 }

@@ -24,10 +24,6 @@ mod serial;
 mod start;
 mod vga;
 
-/// Kernel will be mapped at this physical address (1MB)
-#[no_mangle]
-pub static KERNEL_VMA: u64 = 0x100000;
-
 #[no_mangle]
 pub extern "C" fn kernel_main(magic: u32, multiboot: *mut c_void) -> ! {
     serial::init(LevelFilter::Trace); // TODO configure this

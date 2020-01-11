@@ -6,7 +6,7 @@ use crate::multiboot::memory_map::MemoryRegionType::{Acpi, Available, Defective,
                                                      PreserveOnHibernation, Reserved};
 use crate::multiboot::{multiboot_info, multiboot_memory_map_t, multiboot_mmap_entry};
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum MemoryRegionType {
     Available,
     Acpi,
@@ -38,7 +38,7 @@ impl Debug for MemoryRegion {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(
             f,
-            "MemoryRegion({:?}, len={}, type={:?})",
+            "MemoryRegion({:?}, len={:#x}, type={:?})",
             self.base_addr, self.length, self.region_type
         )
     }
@@ -69,6 +69,10 @@ impl MemoryRegions {
             current: start,
             end,
         }
+    }
+
+    pub fn available(self) -> impl Iterator<Item = MemoryRegion> {
+        self.filter(|region| region.region_type == MemoryRegionType::Available)
     }
 }
 
