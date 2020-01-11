@@ -26,9 +26,10 @@ file(GENERATE
      }")
 
 add_custom_command(OUTPUT ${ISO_BIN}
-                   COMMENT Creating ISO with grub
+                   COMMENT "Creating ISO with grub"
                    COMMAND ${CMAKE_COMMAND} -E make_directory ${GRUB_DIR}
                    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${PROJECT_NAME}> ${GRUB_DIR}/../
+                   COMMAND ${CMAKE_COMMAND} -E remove -f ${ISO_BIN}
                    COMMAND grub-mkrescue -o ${ISO_BIN} ${ISO_DIR}
                    BYPRODUCTS ${GRUB_DIR} ${ISO_DIR}
                    DEPENDS ${GRUB_CFG} ${PROJECT_NAME})
@@ -36,7 +37,7 @@ add_custom_command(OUTPUT ${ISO_BIN}
 add_custom_target(iso DEPENDS ${ISO_BIN})
 
 add_custom_target(run
-                  COMMENT Running qemu
+                  COMMENT "Running qemu"
                   COMMAND qemu-system-x86_64 -cdrom ${ISO_BIN} -monitor stdio -serial file:serial.log
                           -d cpu_reset,int -D qemu-logfile -no-reboot
                   BYPRODUCTS serial.log qemu-logfile
