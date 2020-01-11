@@ -1,12 +1,10 @@
 use core::ops::{BitAnd, Shr};
 use core::time::Duration;
 
-use log::*;
 use modular_bitfield::prelude::*;
 
 use crate::io::Port;
 use crate::irq;
-use crate::{print, println};
 
 const PIT_CHANNEL0_DATA: Port = Port(0x40);
 // const PIT_CHANNEL2_DATA: Port = Port(0x42);
@@ -58,18 +56,9 @@ const TICKS_PER_SECOND: u64 = 120;
 static mut TICKS: u64 = 0;
 
 extern "C" fn on_clock(_ctx: *const irq::InterruptContext) {
-    let ticks = unsafe {
+     unsafe {
         TICKS += 1;
-        TICKS
     };
-
-    // TODO no vga in interrupts! - temporary
-    if ticks % TICKS_PER_SECOND == 0 {
-        println!(" there's a second #{}", ticks / TICKS_PER_SECOND);
-        info!("a second passed");
-    } else {
-        print!(".");
-    }
 }
 
 pub fn init() {

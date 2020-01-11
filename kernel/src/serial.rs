@@ -7,6 +7,8 @@ use spin::Mutex;
 
 use crate::clock;
 use crate::io::Port;
+use crate::serial::LogMode::SerialOnly;
+use crate::vga;
 
 static mut COM1: SerialPort = SerialPort {
     port: Port(0x3F8),
@@ -114,7 +116,10 @@ pub fn init(log_level: LevelFilter) {
 
         // init logger
         let logger = SERIAL_LOGGER.get_mut();
-        *logger = LockedSerialLogger(Mutex::new(SerialLogger { level: log_level }));
+        *logger = LockedSerialLogger(Mutex::new(SerialLogger {
+            level: log_level,
+            mode: SerialOnly,
+        }));
 
         // safety: interrupts are disabled at this point, so can use racy variant
         log::set_logger_racy(logger).unwrap();
@@ -133,8 +138,15 @@ impl Write for SerialPort {
 
 static mut SERIAL_LOGGER: MaybeUninit<LockedSerialLogger> = MaybeUninit::uninit();
 
+#[derive(Eq, PartialEq)]
+pub enum LogMode {
+    SerialOnly,
+    SerialAndVga,
+}
+
 struct SerialLogger {
     level: LevelFilter,
+    mode: LogMode,
 }
 
 struct LockedSerialLogger(Mutex<SerialLogger>);
@@ -147,19 +159,31 @@ impl Log for LockedSerialLogger {
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            let _ = self.0.lock();
+            let logger = self.0.lock();
+
+            // serial always
             unsafe {
-                let time = clock::since_boot();
                 COM1.write_fmt(format_args!(
                     "[{:.08} {} {}] {}\n",
-                    time.as_secs_f64(),
+                    clock::since_boot().as_secs_f64(),
                     record.target(),
                     record.level(),
                     record.args()
                 )).unwrap();
             }
+
+            // vga sometimes
+            if logger.mode == LogMode::SerialAndVga && vga::is_initialized() {
+                vga::_raw_print(format_args!("[{}] {}\n", record.level(), record.args()));
+            }
         }
     }
 
     fn flush(&self) {}
+}
+
+pub fn set_log_mode(mode: LogMode) {
+    let mut log = unsafe { SERIAL_LOGGER.get_mut().0.lock() };
+
+    log.mode = mode;
 }

@@ -6,7 +6,7 @@ pub struct VirtualAddress(pub u64);
 
 impl Debug for VirtualAddress {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "VirtualAddress({:#x})", self.0)
+        write!(f, "VirtualAddress({:#010x})", self.0)
     }
 }
 
@@ -15,6 +15,6 @@ pub struct PhysicalAddress(pub u64);
 
 impl Debug for PhysicalAddress {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "PhysicalAddress({:#x})", self.0)
+        write!(f, "PhysicalAddress({:#010x})", self.0)
     }
 }

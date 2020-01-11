@@ -1,16 +1,17 @@
-use crate::{multiboot};
+use crate::multiboot;
 
 use log::*;
 
 use bitfield::Bit;
 use crate::irq::enable_interrupts;
-use crate::multiboot::{MemoryRegions};
+use crate::multiboot::MemoryRegions;
+use crate::serial::LogMode;
 use crate::vga::{self, Color};
-use crate::{clock, idt};
-use crate::{print, println};
+use crate::{clock, idt, serial};
 
 pub fn start(multiboot: &multiboot::multiboot_info) -> ! {
-    vga::init(Color::LightGreen, Color::DarkGray);
+    vga::init(Color::LightGreen, Color::Black);
+    serial::set_log_mode(LogMode::SerialAndVga);
 
     idt::init();
     clock::init();
@@ -18,19 +19,15 @@ pub fn start(multiboot: &multiboot::multiboot_info) -> ! {
 
     parse_multiboot(multiboot);
 
-    println!(
-        "a line that is very long and most certainly wraps when it gets to the edge of the screen"
-    );
-
     loop {}
 }
 
 fn parse_multiboot(multiboot: &multiboot::multiboot_info) {
-    println!("multiboot flags: {:#b}", multiboot.flags);
+    debug!("multiboot flags: {:#b}", multiboot.flags);
 
     if multiboot.flags.bit(0) {
-        println!(
-            "mem {:#x} -> {:#x}",
+        debug!(
+            "memory range: {}KiB -> {}KiB",
             multiboot.mem_lower, multiboot.mem_upper
         );
     }
@@ -38,7 +35,7 @@ fn parse_multiboot(multiboot: &multiboot::multiboot_info) {
     multiboot::print_commandline(multiboot);
 
     for memory_region in MemoryRegions::new(multiboot) {
-        info!("memory region: {:#?}", memory_region);
+        info!("{:?}", memory_region);
     }
 }
 

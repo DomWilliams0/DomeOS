@@ -31,7 +31,7 @@ mod ctypes {
 mod generated;
 mod memory_map;
 
-pub use memory_map::{MemoryRegion, MemoryRegions, MemoryRegionType};
+pub use memory_map::{MemoryRegion, MemoryRegionType, MemoryRegions};
 
 pub fn parse(magic: u32, multiboot: *mut c_void) -> Result<*mut multiboot_info, &'static str> {
     match (magic, multiboot) {

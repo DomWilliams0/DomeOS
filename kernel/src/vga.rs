@@ -228,3 +228,11 @@ impl fmt::Write for Screen {
         Ok(())
     }
 }
+
+pub fn set_colors<FG, BG>(fg: FG, bg: BG)
+where
+    FG: Into<Option<Color>>,
+    BG: Into<Option<Color>>,
+{
+    get().set_colors(fg, bg)
+}

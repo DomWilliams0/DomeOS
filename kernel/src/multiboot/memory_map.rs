@@ -1,9 +1,10 @@
+use bitfield::fmt::{Error, Formatter};
+use bitfield::Bit;
+use core::fmt::Debug;
 use crate::memory::PhysicalAddress;
 use crate::multiboot::memory_map::MemoryRegionType::{Acpi, Available, Defective,
                                                      PreserveOnHibernation, Reserved};
 use crate::multiboot::{multiboot_info, multiboot_memory_map_t, multiboot_mmap_entry};
-use log::*;
-use bitfield::Bit;
 
 #[derive(Debug)]
 pub enum MemoryRegionType {
@@ -26,11 +27,21 @@ impl From<u32> for MemoryRegionType {
     }
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct MemoryRegion {
     pub base_addr: PhysicalAddress,
     pub length: u64,
     pub region_type: MemoryRegionType,
+}
+
+impl Debug for MemoryRegion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(
+            f,
+            "MemoryRegion({:?}, len={}, type={:?})",
+            self.base_addr, self.length, self.region_type
+        )
+    }
 }
 
 impl From<&multiboot_memory_map_t> for MemoryRegion {
