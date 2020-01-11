@@ -22,7 +22,10 @@ pub enum Exception {
     InvalidTss,
     SegmentNotPresent,
     StackSegmentFault,
-    GeneralProtectionFault,
+    GeneralProtectionFault {
+        rip: VirtualAddress,
+        segment: Option<u64>,
+    },
     PageFault(PageFaultFlags, VirtualAddress),
     x87FloatingPointException,
     AlignmentCheck,
@@ -113,7 +116,17 @@ impl TryFrom<&InterruptContext> for Exception {
             10 => unimplemented!("Exception::InvalidTss"),
             11 => unimplemented!("Exception::SegmentNotPresent"),
             12 => unimplemented!("Exception::StackSegmentFault"),
-            13 => unimplemented!("Exception::GeneralProtectionFault"),
+            13 => {
+                let segment = if value.err_code == 0 {
+                    None
+                } else {
+                    Some(value.err_code)
+                };
+                Exception::GeneralProtectionFault {
+                    rip: VirtualAddress(value.rip),
+                    segment,
+                }
+            }
             14 => {
                 let bits: u8 = value.err_code.bit_range(5, 0);
                 let flags = BitFlags::from_bits(bits).unwrap();
