@@ -9,7 +9,7 @@ use core::ffi::c_void;
 use core::fmt::Write;
 use core::panic::PanicInfo;
 
-use log::error;
+use log::{error, LevelFilter};
 
 use crate::irq::disable_interrupts;
 
@@ -18,6 +18,7 @@ mod exception;
 mod idt;
 mod io;
 mod irq;
+mod multiboot;
 mod serial;
 mod start;
 mod vga;
@@ -27,8 +28,17 @@ mod vga;
 pub static KERNEL_VMA: u64 = 0x100000;
 
 #[no_mangle]
-pub extern "C" fn kernel_main(magic: i32, multiboot: *mut c_void) -> ! {
-    start::kernel_main(magic, multiboot)
+pub extern "C" fn kernel_main(magic: u32, multiboot: *mut c_void) -> ! {
+    serial::init(LevelFilter::Trace); // TODO configure this
+
+    match multiboot::parse(magic, multiboot) {
+        Ok(multiboot) => {
+            // Safety: parse succeeded
+            let multiboot = unsafe { &*multiboot };
+            start::start(multiboot)
+        }
+        Err(e) => panic!("failed to boot: {}", e),
+    }
 }
 
 pub fn hang() -> ! {
@@ -41,7 +51,6 @@ pub fn hang() -> ! {
     }
 }
 
-// TODO dump regs
 #[panic_handler]
 fn panic(panic_info: &PanicInfo) -> ! {
     if vga::is_initialized() {
@@ -56,6 +65,8 @@ fn panic(panic_info: &PanicInfo) -> ! {
 
     // log to serial
     error!("panic occurred: {:?}", panic_info);
+
+    // TODO dump regs
 
     hang();
 }

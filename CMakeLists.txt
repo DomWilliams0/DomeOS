@@ -21,7 +21,7 @@ file(GENERATE
      set timeout=0
      set default=0
      menuentry \"domeos\" {
-         multiboot2 /boot/$<TARGET_FILE_BASE_NAME:${PROJECT_NAME}>
+         multiboot /boot/$<TARGET_FILE_BASE_NAME:${PROJECT_NAME}>
          boot
      }")
 

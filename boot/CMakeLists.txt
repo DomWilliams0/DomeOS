@@ -6,7 +6,8 @@ set(SRCS boot.asm
     descriptor_tables.asm
     isr.asm
     long_mode.asm
-    multiboot2.asm)
+    multiboot.asm
+    multiboot.h)
 set(CMAKE_ASM_NASM_OBJECT_FORMAT elf64 PARENT_SCOPE)
 set(CMAKE_ASM_NASM_LINK_EXECUTABLE "ld <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>" PARENT_SCOPE)
 

@@ -32,14 +32,21 @@ _start:
 	; setup stack
 	mov esp, stack_top
 
-	; multiboot parameters, for kernel_main
-	mov edi, eax
-	mov esi, ebx
+	; TODO reset EFLAGS?
+
+	; multiboot parameters, preserved for kernel entrypoint
+	push eax
+	push ebx
 
 	; paging
 	call init_page_tables
 	call enable_paging
 
+	; pop multiboot params
+	pop esi
+	pop edi
+
+	; init and jump to long mode
 	call gdt64_flush
 
 init_page_tables:

@@ -15,7 +15,6 @@ long_mode:
 	mov ss, ax
 
 	; jump into kernel
-	;mov rsi, rbx
 	call kernel_main
 
 	; loop forever

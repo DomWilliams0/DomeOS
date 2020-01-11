@@ -1,15 +1,16 @@
-use core::ffi::c_void;
+use crate::multiboot;
 
 use log::*;
 
 use crate::irq::enable_interrupts;
 use crate::vga::{self, Color};
-use crate::{clock, idt, serial};
+use crate::{clock, idt};
 use crate::{print, println};
 
-pub fn kernel_main(_magic: i32, _multiboot: *mut c_void) -> ! {
-    serial::init(LevelFilter::Trace); // TODO configure this
+pub fn start(multiboot: &multiboot::multiboot_info) -> ! {
     vga::init(Color::LightGreen, Color::DarkGray);
+
+    // TODO parse multiboot
 
     idt::init();
     clock::init();
