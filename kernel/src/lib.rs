@@ -55,7 +55,7 @@ fn panic(panic_info: &PanicInfo) -> ! {
         vga::set_error_colors();
         if let Some(msg) = panic_info.message() {
             let mut screen = vga::get();
-            write!(screen, "panic occurred: {}", msg).unwrap();
+            write!(screen, "panic occurred: {}\n", msg).unwrap();
         } else {
             println!("panic occurred: {:?}", panic_info);
         }
