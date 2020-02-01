@@ -4,8 +4,8 @@ use log::*;
 
 use bitfield::Bit;
 use crate::irq::enable_interrupts;
-use crate::memory::PhysicalAddress;
-use crate::multiboot::{MemoryRegionType, MemoryRegions};
+
+use crate::multiboot::MemoryRegions;
 use crate::serial::LogMode;
 use crate::vga::{self, Color};
 use crate::{clock, idt, serial};
@@ -35,7 +35,7 @@ fn parse_multiboot(multiboot: &multiboot::multiboot_info) {
 
     multiboot::print_commandline(multiboot);
 
-    memory::walk_active_page_hierarchy();
+    // memory::walk_active_page_hierarchy();
 
     memory::remap_kernel();
 

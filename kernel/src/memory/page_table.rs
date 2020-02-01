@@ -1,9 +1,10 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
+use core::ops::{Index, IndexMut};
 
 use bitfield::BitRange;
 use core::marker::PhantomData;
 use crate::memory::page_table::hierarchy::{P3, P4, PageTableHierarchy};
-use crate::memory::{PhysicalAddress, VirtualAddress};
+use crate::memory::PhysicalAddress;
 use enumflags2::BitFlags;
 use modular_bitfield::{bitfield, prelude::*, FromBits};
 
@@ -91,7 +92,7 @@ impl Debug for PageTableFlags {
 }
 
 #[bitfield]
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 struct CommonEntry {
     flags: PageTableFlags,
 
@@ -125,11 +126,16 @@ impl CommonEntry {
     pub fn huge_pages(&self) -> bool {
         self.flags().0.contains(PageTableFlag::PageSize)
     }
+
+    pub fn set_present(&mut self, present: bool) {
+        todo!()
+    }
 }
 
 impl Debug for CommonEntry {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        write!(f, "{:?} {:?}", self.address(), self.flags())
+        let this = PhysicalAddress(&self as *const _ as u64);
+        write!(f, "[{:?} -> {:?} {:?}]", this, self.address(), self.flags())
     }
 }
 
@@ -159,116 +165,259 @@ impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
     }
 }
 
-pub fn load_current() -> P4<'static> {
-    let addr = pml4().0 as *mut PageTable<'static, P3<'static>>;
-    let table = unsafe { &*addr };
-    P4::PML4T(table)
+impl<'p, P: PageTableHierarchy<'p>> Index<u16> for PageTable<'p, P> {
+    type Output = CommonEntry;
+
+    fn index(&self, index: u16) -> &Self::Output {
+        debug_assert!(
+            index < 512,
+            "Table index out of range, must be < 512 but is {}",
+            index
+        );
+        &self.entries[index as usize]
+    }
 }
 
-fn pml4() -> PhysicalAddress {
+impl<'p, P: PageTableHierarchy<'p>> IndexMut<u16> for PageTable<'p, P> {
+    fn index_mut(&mut self, index: u16) -> &mut Self::Output {
+        debug_assert!(
+            index < 512,
+            "Table index out of range, must be < 512 but is {}",
+            index
+        );
+        &mut self.entries[index as usize]
+    }
+}
+
+fn cr3() -> u64 {
     let value: u64;
     unsafe {
         asm!("mov %cr3, $0" : "=r" (value));
     }
+    value
+}
 
-    let addr: u64 = value.bit_range(51, 12);
-    PhysicalAddress::from_4096_aligned(addr)
+pub fn pml4() -> P4<'static> {
+    let addr = cr3().bit_range(51, 12);
+    let ptr = PhysicalAddress::from_4096_aligned(addr);
+    let table = ptr.0 as *mut PageTable<'static, P3<'static>>;
+    P4::PML4T(unsafe { &mut *table })
+}
+
+pub fn set_pml4(p4: P4<'static>) {
+    let P4::PML4T(table) = p4;
+    let ptr = PhysicalAddress(table as *const PageTable<'static, P3<'static>> as u64);
+
+    let mut cr3 = cr3();
+    cr3.set_bit_range(51, 12, ptr.to_4096_aligned());
+
+    unsafe {
+        asm!("mov $0, %cr3" :: "r" (cr3) : "memory");
+    }
 }
 
 pub mod hierarchy {
-    use crate::memory::page_table::{load_current, CommonEntry, PageTable, PAGE_TABLE_ENTRY_COUNT};
-    use crate::memory::PhysicalAddress;
-    use log::*;
+    use core::marker::PhantomData;
+    use crate::memory::page_table::{CommonEntry, PageTable};
+    use crate::memory::{PhysicalAddress, VirtualAddress};
+
+    #[derive(Debug)]
+    pub enum ResolveResult<'p, P: PageTableHierarchy<'p>> {
+        AnotherLevel {
+            next_level: P,
+            src_entry: &'p mut CommonEntry,
+            _phantom: &'p PhantomData<P>,
+        },
+        PhysicalFrame(Frame),
+    }
+
+    /// Helper to construct `AnotherFrame` variant without faffing around with PhantomData
+    impl<'p, P: PageTableHierarchy<'p>> ResolveResult<'p, P> {
+        fn another_level(entry: &'p mut CommonEntry) -> Self {
+            let table_ptr: &mut PageTable<'p, P::NextLevel> = unsafe { entry.address().cast_mut() };
+
+            ResolveResult::AnotherLevel {
+                next_level: P::with_table(table_ptr),
+                src_entry: entry,
+                _phantom: &PhantomData,
+            }
+        }
+
+        pub fn unwrap_next_level(self) -> (P, &'p mut CommonEntry) {
+            match self {
+                ResolveResult::AnotherLevel {
+                    next_level,
+                    src_entry,
+                    ..
+                } => (next_level, src_entry),
+                _ => panic!("expected AnotherLevel variant"),
+            }
+        }
+    }
 
     pub trait PageTableHierarchy<'p> {
-        fn entry(e: &CommonEntry) -> Self;
+        type NextLevel: PageTableHierarchy<'p>;
+        fn current(e: &'p mut CommonEntry) -> ResolveResult<'p, Self::NextLevel>;
+        fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> Self;
+
+        fn traverse(self, addr: VirtualAddress) -> ResolveResult<'p, Self::NextLevel>;
     }
 
+    #[derive(Debug)]
     pub enum P4<'p> {
-        PML4T(&'p PageTable<'p, P3<'p>>),
+        PML4T(&'p mut PageTable<'p, P3<'p>>),
     }
 
+    #[derive(Debug)]
     pub enum P3<'p> {
-        PDPT(&'p PageTable<'p, P2<'p>>),
+        PDPT(&'p mut PageTable<'p, P2<'p>>),
     }
 
+    #[derive(Debug)]
     pub enum P2<'p> {
-        PDT(&'p PageTable<'p, P1<'p>>),
+        PDT(&'p mut PageTable<'p, P1<'p>>),
         Huge1GPage(Frame),
     }
 
+    #[derive(Debug)]
     pub enum P1<'p> {
-        PT(&'p PageTable<'p, Frame>),
+        PT(&'p mut PageTable<'p, Frame>),
         Huge2MPage(Frame),
     }
 
+    #[derive(Debug)]
     pub struct Frame(PhysicalAddress);
 
     impl<'p> PageTableHierarchy<'p> for P4<'p> {
-        fn entry(e: &CommonEntry) -> Self {
-            let table = unsafe { e.address().cast() };
-            Self::PML4T(table)
+        type NextLevel = P3<'p>;
+
+        fn current(e: &'p mut CommonEntry) -> ResolveResult<'p, Self::NextLevel> {
+            ResolveResult::another_level(e)
+        }
+
+        fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> Self {
+            P4::PML4T(table)
+        }
+
+        fn traverse(self, addr: VirtualAddress) -> ResolveResult<'p, Self::NextLevel> {
+            let P4::PML4T(table) = self;
+            let entry = &mut table[addr.pml4t_offset()];
+            Self::current(entry)
         }
     }
 
     impl<'p> PageTableHierarchy<'p> for P3<'p> {
-        fn entry(e: &CommonEntry) -> Self {
-            let table = unsafe { e.address().cast() };
-            Self::PDPT(table)
+        type NextLevel = P2<'p>;
+
+        fn current(e: &'p mut CommonEntry) -> ResolveResult<'p, Self::NextLevel> {
+            ResolveResult::another_level(e)
+        }
+
+        fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> Self {
+            P3::PDPT(table)
+        }
+
+        fn traverse(self, addr: VirtualAddress) -> ResolveResult<'p, Self::NextLevel> {
+            let P3::PDPT(table) = self;
+            let entry = &mut table[addr.pdp_offset()];
+            Self::current(entry)
         }
     }
 
     impl<'p> PageTableHierarchy<'p> for P2<'p> {
-        fn entry(e: &CommonEntry) -> Self {
+        type NextLevel = P1<'p>;
+
+        fn current(e: &'p mut CommonEntry) -> ResolveResult<'p, Self::NextLevel> {
             if e.huge_pages() {
-                Self::Huge1GPage(Frame(e.address()))
+                ResolveResult::PhysicalFrame(Frame(e.address()))
             } else {
-                let table = unsafe { e.address().cast() };
-                Self::PDT(table)
+                ResolveResult::another_level(e)
+            }
+        }
+
+        fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> Self {
+            P2::PDT(table)
+        }
+
+        fn traverse(self, addr: VirtualAddress) -> ResolveResult<'p, Self::NextLevel> {
+            match self {
+                P2::PDT(table) => {
+                    let entry = &mut table[addr.pd_offset()];
+                    Self::current(entry)
+                }
+                P2::Huge1GPage(frame) => ResolveResult::PhysicalFrame(frame),
             }
         }
     }
 
     impl<'p> PageTableHierarchy<'p> for P1<'p> {
-        fn entry(e: &CommonEntry) -> Self {
+        type NextLevel = Frame;
+
+        fn current(e: &'p mut CommonEntry) -> ResolveResult<'p, Self::NextLevel> {
             if e.huge_pages() {
-                Self::Huge2MPage(Frame(e.address()))
+                ResolveResult::PhysicalFrame(Frame(e.address()))
             } else {
-                let table = unsafe { e.address().cast() };
-                Self::PT(table)
+                ResolveResult::another_level(e)
+            }
+        }
+
+        fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> Self {
+            P1::PT(table)
+        }
+
+        fn traverse(self, addr: VirtualAddress) -> ResolveResult<'p, Self::NextLevel> {
+            match self {
+                P1::PT(table) => {
+                    let entry = &mut table[addr.pt_offset()];
+                    Self::current(entry)
+                }
+                P1::Huge2MPage(frame) => ResolveResult::PhysicalFrame(frame),
             }
         }
     }
 
     impl<'p> PageTableHierarchy<'p> for Frame {
-        fn entry(e: &CommonEntry) -> Self {
-            Self(e.address())
+        type NextLevel = Self;
+
+        fn current(e: &'p mut CommonEntry) -> ResolveResult<'p, Self::NextLevel> {
+            ResolveResult::PhysicalFrame(Frame(e.address()))
+        }
+
+        fn with_table(_: &'p mut PageTable<'p, Self::NextLevel>) -> Self {
+            // makes no logical sense
+            unreachable!("Already reached the bottom of the hierarchy")
+        }
+
+        fn traverse(self, _: VirtualAddress) -> ResolveResult<'p, Self::NextLevel> {
+            // TODO correct?
+            ResolveResult::PhysicalFrame(self)
         }
     }
 
     pub fn walk_active_page_hierarchy() {
         assert_eq!(core::mem::size_of::<CommonEntry>(), 8);
+        // TODO
 
-        let P4::PML4T(table) = load_current();
-        for (i, e) in table.present_entries() {
-            info!("pml4e #{}: {:#?}", i, e);
-
-            let P3::PDPT(table) = P3::entry(e);
-            for (i, e) in table.present_entries() {
-                info!("  pdpe #{}: {:#?}", i, e);
-
-                if let P2::PDT(table) = P2::entry(e) {
-                    for (i, e) in table.present_entries() {
-                        info!("    pde #{}: {:#?}", i, e);
-
-                        if let P1::PT(table) = P1::entry(e) {
-                            for (i, e) in table.present_entries() {
-                                info!("      pte #{}: {:#?}", i, e);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        //        let P4::PML4T(table) = pml4();
+        //        for (i, e) in table.present_entries() {
+        //            info!("pml4e #{}: {:#?}", i, e);
+        //
+        //            let P3::PDPT(table) = P3::traverse(e);
+        //            for (i, e) in table.present_entries() {
+        //                info!("  pdpe #{}: {:#?}", i, e);
+        //
+        //                if let P2::PDT(table) = P2::traverse(e) {
+        //                    for (i, e) in table.present_entries() {
+        //                        info!("    pde #{}: {:#?}", i, e);
+        //
+        //                        if let P1::PT(table) = P1::traverse(e) {
+        //                            for (i, e) in table.present_entries() {
+        //                                info!("      pte #{}: {:#?}", i, e);
+        //                            }
+        //                        }
+        //                    }
+        //                }
+        //            }
+        //        }
     }
 }
