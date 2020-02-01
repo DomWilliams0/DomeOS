@@ -1,6 +1,8 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
 
 use bitfield::BitRange;
+use core::marker::PhantomData;
+use crate::memory::page_table::hierarchy::{P3, P4, PageTableHierarchy};
 use crate::memory::{PhysicalAddress, VirtualAddress};
 use enumflags2::BitFlags;
 use modular_bitfield::{bitfield, prelude::*, FromBits};
@@ -135,31 +137,32 @@ const PAGE_TABLE_ENTRY_COUNT: usize = 512;
 
 #[derive(Clone)]
 #[repr(C)]
-pub struct PageTable {
+pub struct PageTable<'p, P: PageTableHierarchy<'p>> {
     entries: [CommonEntry; PAGE_TABLE_ENTRY_COUNT],
+    _phantom: &'p PhantomData<P>,
 }
 
-impl Debug for PageTable {
+impl<'p, P: PageTableHierarchy<'p>> Debug for PageTable<'p, P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         let sep = if f.alternate() { "\n    " } else { ", " };
         write!(f, "PageTable(")?;
         for (i, e) in self.present_entries() {
             write!(f, "{}{:03} -> {:?}", sep, i, e)?;
         }
-
         write!(f, "{})", sep)
     }
 }
 
-impl PageTable {
-    pub fn load() -> &'static Self {
-        let addr = pml4().0 as *mut PageTable;
-        unsafe { &*addr }
-    }
-
+impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
     pub fn present_entries(&self) -> impl Iterator<Item = (usize, &CommonEntry)> {
         self.entries.iter().enumerate().filter(|(_, e)| e.present())
     }
+}
+
+pub fn load_current() -> P4<'static> {
+    let addr = pml4().0 as *mut PageTable<'static, P3<'static>>;
+    let table = unsafe { &*addr };
+    P4::PML4T(table)
 }
 
 fn pml4() -> PhysicalAddress {
@@ -173,54 +176,94 @@ fn pml4() -> PhysicalAddress {
 }
 
 pub mod hierarchy {
-    use crate::memory::page_table::{pml4, CommonEntry, PageTable, PAGE_TABLE_ENTRY_COUNT};
-    use crate::memory::{PhysicalAddress, VirtualAddress};
+    use crate::memory::page_table::{load_current, CommonEntry, PageTable, PAGE_TABLE_ENTRY_COUNT};
+    use crate::memory::PhysicalAddress;
     use log::*;
 
-    /// PML4E
-    pub enum P4 {
-        P3(PhysicalAddress),
+    pub trait PageTableHierarchy<'p> {
+        fn entry(e: &CommonEntry) -> Self;
     }
 
-    /// PDPE
-    pub enum P3 {
-        P2(PhysicalAddress),
-        Huge1GB,
+    pub enum P4<'p> {
+        PML4T(&'p PageTable<'p, P3<'p>>),
     }
 
-    /// PDE
-    pub enum P2 {
-        P1(PhysicalAddress),
-        Huge2MB,
+    pub enum P3<'p> {
+        PDPT(&'p PageTable<'p, P2<'p>>),
     }
 
-    /// PTE
-    pub enum P1 {
-        Page(PhysicalAddress),
+    pub enum P2<'p> {
+        PDT(&'p PageTable<'p, P1<'p>>),
+        Huge1GPage(Frame),
+    }
+
+    pub enum P1<'p> {
+        PT(&'p PageTable<'p, Frame>),
+        Huge2MPage(Frame),
+    }
+
+    pub struct Frame(PhysicalAddress);
+
+    impl<'p> PageTableHierarchy<'p> for P4<'p> {
+        fn entry(e: &CommonEntry) -> Self {
+            let table = unsafe { e.address().cast() };
+            Self::PML4T(table)
+        }
+    }
+
+    impl<'p> PageTableHierarchy<'p> for P3<'p> {
+        fn entry(e: &CommonEntry) -> Self {
+            let table = unsafe { e.address().cast() };
+            Self::PDPT(table)
+        }
+    }
+
+    impl<'p> PageTableHierarchy<'p> for P2<'p> {
+        fn entry(e: &CommonEntry) -> Self {
+            if e.huge_pages() {
+                Self::Huge1GPage(Frame(e.address()))
+            } else {
+                let table = unsafe { e.address().cast() };
+                Self::PDT(table)
+            }
+        }
+    }
+
+    impl<'p> PageTableHierarchy<'p> for P1<'p> {
+        fn entry(e: &CommonEntry) -> Self {
+            if e.huge_pages() {
+                Self::Huge2MPage(Frame(e.address()))
+            } else {
+                let table = unsafe { e.address().cast() };
+                Self::PT(table)
+            }
+        }
+    }
+
+    impl<'p> PageTableHierarchy<'p> for Frame {
+        fn entry(e: &CommonEntry) -> Self {
+            Self(e.address())
+        }
     }
 
     pub fn walk_active_page_hierarchy() {
         assert_eq!(core::mem::size_of::<CommonEntry>(), 8);
 
-        // get pml4 from cr3
-        let pml4: &PageTable = unsafe { pml4().cast() };
+        let P4::PML4T(table) = load_current();
+        for (i, e) in table.present_entries() {
+            info!("pml4e #{}: {:#?}", i, e);
 
-        for (i, pml4e) in pml4.present_entries() {
-            info!("pml4e #{}: {:#?}", i, pml4e);
+            let P3::PDPT(table) = P3::entry(e);
+            for (i, e) in table.present_entries() {
+                info!("  pdpe #{}: {:#?}", i, e);
 
-            let pdpo: &PageTable = unsafe { pml4e.address().cast() };
-            for (i, pdpe) in pdpo.present_entries() {
-                info!("  pdpe #{}: {:#?}", i, pdpe);
+                if let P2::PDT(table) = P2::entry(e) {
+                    for (i, e) in table.present_entries() {
+                        info!("    pde #{}: {:#?}", i, e);
 
-                if !pdpe.huge_pages() {
-                    let pdo: &PageTable = unsafe { pdpe.address().cast() };
-                    for (i, pde) in pdo.present_entries() {
-                        info!("    pde #{}: {:#?}", i, pde);
-
-                        if !pde.huge_pages() {
-                            let pto: &PageTable = unsafe { pde.address().cast() };
-                            for (i, pte) in pto.present_entries() {
-                                info!("      pte #{}: {:#?}", i, pte);
+                        if let P1::PT(table) = P1::entry(e) {
+                            for (i, e) in table.present_entries() {
+                                info!("      pte #{}: {:#?}", i, e);
                             }
                         }
                     }
@@ -229,16 +272,3 @@ pub mod hierarchy {
         }
     }
 }
-
-const fn terabytes(n: u64) -> u64 {
-    n * (1 << 40)
-}
-
-/// Start of direct physical mapping
-const PHYSICAL_MAPPING_OFFSET: VirtualAddress = VirtualAddress(0xffffff00_00000000);
-
-/// Size of direct physical mapping
-const PHYSICAL_MAPPING_LENGTH: u64 = terabytes(64);
-
-/// Start of kernel code mapping
-const KERNEL_START_ADDR: VirtualAddress = VirtualAddress(0xffff0000_00000000);

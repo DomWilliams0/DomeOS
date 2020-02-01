@@ -35,8 +35,9 @@ fn parse_multiboot(multiboot: &multiboot::multiboot_info) {
 
     multiboot::print_commandline(multiboot);
 
-    //    info!("current page table is {:#?}", memory::PageTable::load());
     memory::walk_active_page_hierarchy();
+
+    memory::remap_kernel();
 
     // register available memory regions
     memory::free_pages::init_free_pages(MemoryRegions::new(multiboot));
