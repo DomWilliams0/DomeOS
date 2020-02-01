@@ -4,6 +4,7 @@ use log::*;
 
 use bitfield::Bit;
 use crate::irq::enable_interrupts;
+use crate::memory::PhysicalAddress;
 use crate::multiboot::{MemoryRegionType, MemoryRegions};
 use crate::serial::LogMode;
 use crate::vga::{self, Color};
@@ -34,7 +35,8 @@ fn parse_multiboot(multiboot: &multiboot::multiboot_info) {
 
     multiboot::print_commandline(multiboot);
 
-    info!("current page table is {:#?}", memory::PageTable::load());
+    //    info!("current page table is {:#?}", memory::PageTable::load());
+    memory::walk_active_page_hierarchy();
 
     // register available memory regions
     memory::free_pages::init_free_pages(MemoryRegions::new(multiboot));

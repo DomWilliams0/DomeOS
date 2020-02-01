@@ -1,8 +1,7 @@
-
-use log::*;
 use buddy_alloc::buddy_alloc::BuddyAlloc;
-use crate::multiboot::{MemoryRegions, MemoryRegionType};
 use crate::memory::PhysicalAddress;
+use crate::multiboot::{MemoryRegionType, MemoryRegions};
+use log::*;
 
 /// Arbitrary limit because we have no allocation yet, and so far I've yet to see
 /// more than a 2 available memory regions
@@ -13,9 +12,8 @@ static mut PAGE_REGIONS: [Option<BuddyAlloc>; MAX_PAGE_REGIONS] = [None; MAX_PAG
 static mut PAGE_REGION_COUNT: usize = 0;
 
 pub fn init_free_pages(regions: MemoryRegions) {
-
     for region in regions.filter(|r| r.region_type == MemoryRegionType::Available) {
-        let idx = unsafe{PAGE_REGION_COUNT};
+        let idx = unsafe { PAGE_REGION_COUNT };
 
         if idx >= MAX_PAGE_REGIONS {
             warn!("got too many available page regions, stopping early");
@@ -28,7 +26,10 @@ pub fn init_free_pages(regions: MemoryRegions) {
             continue;
         }
 
-        info!("registering memory region #{} of length {} at {:?}", idx, region.length, region.base_addr);
+        info!(
+            "registering memory region #{} of length {} at {:?}",
+            idx, region.length, region.base_addr
+        );
 
         // TODO these regions arent mapped yet
 /*
@@ -42,8 +43,7 @@ pub fn init_free_pages(regions: MemoryRegions) {
         }
 */
 
-
-/*
+        /*
         unsafe {
             let alloc = BuddyAlloc::new(
                 region.base_addr.0 as *const u8,
@@ -59,6 +59,9 @@ pub fn init_free_pages(regions: MemoryRegions) {
 
     // TODO result instead
     unsafe {
-        assert_ne!(PAGE_REGION_COUNT, 0, "No available memory regions discovered");
+        assert_ne!(
+            PAGE_REGION_COUNT, 0,
+            "No available memory regions discovered"
+        );
     }
 }

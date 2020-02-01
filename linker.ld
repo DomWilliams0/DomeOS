@@ -4,7 +4,8 @@ ENTRY(_start)
 SECTIONS
 {
 	/* start sections at 1MB */
-	. = 0x100000;
+	KERNEL_START = 0x100000;
+	. = KERNEL_START;
 
 	.boot :
 	{

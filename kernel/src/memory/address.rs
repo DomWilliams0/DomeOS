@@ -1,6 +1,7 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
 
 use core::ops::Shl;
+use derive_more::*;
 
 /// Bottom 12 bits should be 0 from 4096 alignment
 const ADDRESS_SHIFT: u64 = 12;
@@ -15,13 +16,17 @@ impl Debug for VirtualAddress {
     }
 }
 
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone, Add)]
 #[repr(transparent)]
 pub struct PhysicalAddress(pub u64);
 
 impl PhysicalAddress {
     pub fn from_4096_aligned(addr: u64) -> Self {
         Self(addr.shl(ADDRESS_SHIFT))
+    }
+
+    pub unsafe fn cast<'a, T>(self) -> &'a T {
+        &*(self.0 as *const T)
     }
 }
 
