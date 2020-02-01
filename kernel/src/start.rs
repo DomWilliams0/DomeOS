@@ -4,7 +4,7 @@ use log::*;
 
 use bitfield::Bit;
 use crate::irq::enable_interrupts;
-use crate::multiboot::MemoryRegions;
+use crate::multiboot::{MemoryRegionType, MemoryRegions};
 use crate::serial::LogMode;
 use crate::vga::{self, Color};
 use crate::{clock, idt, serial};
@@ -34,11 +34,10 @@ fn parse_multiboot(multiboot: &multiboot::multiboot_info) {
 
     multiboot::print_commandline(multiboot);
 
-    for memory_region in MemoryRegions::new(multiboot).available() {
-        info!("{:?}", memory_region);
-    }
+    info!("current page table is {:#?}", memory::PageTable::load());
 
-    info!("current table is {:#?}", memory::PageTable::load());
+    // register available memory regions
+    memory::free_pages::init_free_pages(MemoryRegions::new(multiboot));
 }
 
 fn breakpoint() {

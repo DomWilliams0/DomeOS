@@ -1,47 +1,9 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
 
 use bitfield::BitRange;
-use core::ops::Shl;
+use crate::memory::PhysicalAddress;
 use enumflags2::BitFlags;
 use modular_bitfield::{bitfield, prelude::*, FromBits};
-
-// TODO constructor rather than pub
-#[repr(transparent)]
-pub struct VirtualAddress(pub u64);
-
-impl Debug for VirtualAddress {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        write!(f, "VirtualAddress({:#010x})", self.0)
-    }
-}
-
-#[repr(transparent)]
-pub struct PhysicalAddress(pub u64);
-
-impl PhysicalAddress {
-    pub fn from_4096_aligned(addr: u64) -> Self {
-        Self(addr.shl(ADDRESS_SHIFT))
-    }
-}
-
-impl Debug for PhysicalAddress {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        write!(f, "PhysicalAddress({:#010x})", self.0)
-    }
-}
-
-/// Bottom 12 bits should be 0 from 4096 alignment
-const ADDRESS_SHIFT: u64 = 12;
-
-fn pml4() -> PhysicalAddress {
-    let value: u64;
-    unsafe {
-        asm!("mov %cr3, $0" : "=r" (value));
-    }
-
-    let addr: u64 = value.bit_range(51, 12);
-    PhysicalAddress::from_4096_aligned(addr)
-}
 
 #[derive(BitFlags, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
@@ -175,4 +137,14 @@ impl PageTable {
         let addr = pml4().0 as *mut PageTable;
         unsafe { &*addr }
     }
+}
+
+fn pml4() -> PhysicalAddress {
+    let value: u64;
+    unsafe {
+        asm!("mov %cr3, $0" : "=r" (value));
+    }
+
+    let addr: u64 = value.bit_range(51, 12);
+    PhysicalAddress::from_4096_aligned(addr)
 }

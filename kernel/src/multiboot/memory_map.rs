@@ -1,6 +1,5 @@
-use bitfield::fmt::{Error, Formatter};
 use bitfield::Bit;
-use core::fmt::Debug;
+use core::fmt::{Debug, Error as FmtError, Formatter};
 use crate::memory::PhysicalAddress;
 use crate::multiboot::memory_map::MemoryRegionType::{Acpi, Available, Defective,
                                                      PreserveOnHibernation, Reserved};
@@ -35,7 +34,7 @@ pub struct MemoryRegion {
 }
 
 impl Debug for MemoryRegion {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         write!(
             f,
             "MemoryRegion({:?}, len={:#x}, type={:?})",
@@ -69,10 +68,6 @@ impl MemoryRegions {
             current: start,
             end,
         }
-    }
-
-    pub fn available(self) -> impl Iterator<Item = MemoryRegion> {
-        self.filter(|region| region.region_type == MemoryRegionType::Available)
     }
 }
 
