@@ -2,11 +2,11 @@ use core::fmt::{Debug, Error as FmtError, Formatter};
 use core::ops::{Index, IndexMut};
 
 use bitfield::BitRange;
+use c2rust_bitfields::BitfieldStruct;
 use core::marker::PhantomData;
 use crate::memory::page_table::hierarchy::{P3, P4, PageTableHierarchy};
 use crate::memory::PhysicalAddress;
 use enumflags2::BitFlags;
-use modular_bitfield::{bitfield, prelude::*, FromBits};
 
 #[derive(BitFlags, Copy, Clone, Eq, PartialEq)]
 #[repr(u8)]
@@ -38,14 +38,9 @@ enum PageTableFlag {
 // page directory entry
 // page table entry
 
+#[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct PageTableFlags(BitFlags<PageTableFlag>);
-
-impl Specifier for PageTableFlags {
-    const BITS: usize = 8;
-    type Base = u8;
-    type Face = u8;
-}
 
 impl Debug for PageTableFlags {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
@@ -91,44 +86,36 @@ impl Debug for PageTableFlags {
     }
 }
 
-#[bitfield]
-#[derive(Clone)]
-struct CommonEntry {
+#[derive(BitfieldStruct, Clone)]
+pub struct CommonEntry {
     flags: PageTableFlags,
 
-    global: B1,
-
-    /// Can be used by kernel
-    unused1: B3,
-
-    addr: B40,
-
-    /// Can be used by kernel
-    unused2: B11,
-
-    no_execute: B1,
+    #[bitfield(name = "global", ty = "u8", bits = "0..=0")]
+    #[bitfield(name = "unused1", ty = "u8", bits = "1..=3")]
+    #[bitfield(name = "addr", ty = "u64", bits = "4..=43")]
+    #[bitfield(name = "unused2", ty = "u16", bits = "44..=54")]
+    #[bitfield(name = "no_execute", ty = "u16", bits = "55..=55")]
+    global_unused1_addr_unused2_nx: [u8; 8],
 }
 
 impl CommonEntry {
     pub fn address(&self) -> PhysicalAddress {
-        PhysicalAddress::from_4096_aligned(self.get_addr())
+        PhysicalAddress::from_4096_aligned(self.addr())
     }
-
-    pub fn flags(&self) -> PageTableFlags {
-        // TODO why is this necessary!?!
-        PageTableFlags(BitFlags::from_bits_truncate(self.get_flags()))
-    }
-
     pub fn present(&self) -> bool {
-        self.flags().0.contains(PageTableFlag::Present)
+        self.flags.0.contains(PageTableFlag::Present)
     }
 
     pub fn huge_pages(&self) -> bool {
-        self.flags().0.contains(PageTableFlag::PageSize)
+        self.flags.0.contains(PageTableFlag::PageSize)
     }
 
     pub fn set_present(&mut self, present: bool) {
-        todo!()
+        if present {
+            self.flags.0.insert(PageTableFlag::Present)
+        } else {
+            self.flags.0.remove(PageTableFlag::Present)
+        }
     }
 }
 
