@@ -1,7 +1,7 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
+use core::ops::{Shl, Shr};
 
 use bitfield::*;
-use core::ops::{Shl, Shr};
 use derive_more::*;
 
 /// Bottom 12 bits should be 0 from 4096 alignment

@@ -1,14 +1,13 @@
-use crate::{memory, multiboot};
-
 use log::*;
 
-use bitfield::Bit;
-use crate::irq::enable_interrupts;
+use kernel_utils::prelude::*;
 
+use crate::{memory, multiboot};
+use crate::{clock, idt, serial};
+use crate::irq::enable_interrupts;
 use crate::multiboot::MemoryRegions;
 use crate::serial::LogMode;
 use crate::vga::{self, Color};
-use crate::{clock, idt, serial};
 
 pub fn start(multiboot: &multiboot::multiboot_info) -> ! {
     vga::init(Color::LightGreen, Color::Black);

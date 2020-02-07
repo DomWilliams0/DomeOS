@@ -1,8 +1,10 @@
-use crate::memory::page_table::hierarchy::*;
-use crate::memory::page_table::pml4;
-use crate::memory::{kilobytes, terabytes, VirtualAddress};
-
 use log::*;
+
+use kernel_utils::memory::{kilobytes, terabytes};
+use kernel_utils::memory::address::VirtualAddress;
+use kernel_utils::memory::page_table::hierarchy::PageTableHierarchy;
+
+use crate::memory::page_table::pml4;
 
 /// Kernel virtual addresses: 128TiB -> 192TiB
 /// Physical mapping:         192TiB -> 256TiB

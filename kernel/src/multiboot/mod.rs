@@ -1,11 +1,14 @@
-use bitfield::Bit;
-use crate::multiboot::ctypes::c_void;
 pub use generated::*;
+use kernel_utils::prelude::Bit;
+pub use memory_map::{MemoryRegion, MemoryRegions, MemoryRegionType};
+
+use crate::multiboot::ctypes::c_void;
 
 /// Stolen from libc::unix
 #[allow(warnings)]
 mod ctypes {
     pub use core::ffi::c_void;
+
     pub type c_schar = i8;
     pub type c_uchar = u8;
     pub type c_short = i16;
@@ -30,8 +33,6 @@ mod ctypes {
 #[allow(warnings)]
 mod generated;
 mod memory_map;
-
-pub use memory_map::{MemoryRegion, MemoryRegionType, MemoryRegions};
 
 pub fn parse(magic: u32, multiboot: *mut c_void) -> Result<*mut multiboot_info, &'static str> {
     match (magic, multiboot) {

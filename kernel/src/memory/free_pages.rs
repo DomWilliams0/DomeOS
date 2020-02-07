@@ -1,7 +1,9 @@
 use buddy_alloc::buddy_alloc::BuddyAlloc;
-use crate::memory::PhysicalAddress;
-use crate::multiboot::{MemoryRegionType, MemoryRegions};
 use log::*;
+
+use kernel_utils::memory::address::PhysicalAddress;
+
+use crate::multiboot::{MemoryRegions, MemoryRegionType};
 
 /// Arbitrary limit because we have no allocation yet, and so far I've yet to see
 /// more than a 2 available memory regions

@@ -1,11 +1,10 @@
 use core::convert::TryFrom;
 use core::fmt::{Debug, Error, Formatter};
 
-use bitfield::BitRange;
-use enumflags2::BitFlags;
+use kernel_utils::memory::address::VirtualAddress;
+use kernel_utils::prelude::*;
 
 use crate::irq::InterruptContext;
-use crate::memory::VirtualAddress;
 
 #[allow(non_camel_case_types, dead_code)]
 #[derive(Debug)]
