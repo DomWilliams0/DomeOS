@@ -95,7 +95,7 @@ pub struct CommonEntry {
     #[bitfield(name = "addr", ty = "u64", bits = "4..=43")]
     #[bitfield(name = "unused2", ty = "u16", bits = "44..=54")]
     #[bitfield(name = "no_execute", ty = "u16", bits = "55..=55")]
-    global_unused1_addr_unused2_nx: [u8; 8],
+    global_unused1_addr_unused2_nx: [u8; 7],
 }
 
 impl CommonEntry {
@@ -132,7 +132,7 @@ const PAGE_TABLE_ENTRY_COUNT: usize = 512;
 #[repr(C)]
 pub struct PageTable<'p, P: PageTableHierarchy<'p>> {
     entries: [CommonEntry; PAGE_TABLE_ENTRY_COUNT],
-    _phantom: &'p PhantomData<P>,
+    _phantom: PhantomData<&'p P>,
 }
 
 impl<'p, P: PageTableHierarchy<'p>> Debug for PageTable<'p, P> {
@@ -353,5 +353,20 @@ pub mod hierarchy {
             // TODO correct?
             ResolveResult::PhysicalFrame(self)
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use crate::memory::page_table::hierarchy::{Frame, P1, P2, P3};
+    use crate::memory::page_table::{CommonEntry, PageTable};
+    use std::mem::size_of;
+
+    #[test]
+    fn assert_sizes() {
+        assert_eq!(size_of::<CommonEntry>(), 8);
+        assert_eq!(size_of::<PageTable<P3>>(), 4096);
+        assert_eq!(size_of::<PageTable<P2>>(), 4096);
+        assert_eq!(size_of::<PageTable<P1>>(), 4096);
+        assert_eq!(size_of::<PageTable<Frame>>(), 4096);
     }
 }

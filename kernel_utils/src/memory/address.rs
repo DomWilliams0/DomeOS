@@ -1,7 +1,6 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
 use core::ops::{Shl, Shr};
 
-use bitfield::*;
 use derive_more::*;
 
 /// Bottom 12 bits should be 0 from 4096 alignment
@@ -9,6 +8,12 @@ const ADDRESS_SHIFT: u64 = 12;
 
 /// 17 bits of sign extension on virtual addresses
 const SIGN_EXTEND: u64 = 17;
+
+/// Each table index is 9 bits
+const OFFSET_SHIFT: u64 = 9;
+
+/// Mask to extract a 9 bit offset from virtual addresses
+const OFFSET_MASK: u64 = (1 << OFFSET_SHIFT) - 1;
 
 // TODO constructor rather than pub
 #[derive(Copy, Clone, Add)]
@@ -23,37 +28,40 @@ impl Debug for VirtualAddress {
 
 impl VirtualAddress {
     pub fn new(addr: u64) -> Self {
-        let addr = addr >> SIGN_EXTEND;
-        let addr = addr << SIGN_EXTEND;
+        let sign_extend_mask = (1 << (SIGN_EXTEND - 1));
+        let addr = (addr.wrapping_mul(sign_extend_mask) as i64 / sign_extend_mask as i64) as u64;
         Self(addr)
     }
 
     pub fn pml4t_offset(self) -> u16 {
-        self.0.bit_range(47, 39)
+        ((self.0 >> 39) & OFFSET_MASK) as u16
     }
 
     pub fn pdp_offset(self) -> u16 {
-        self.0.bit_range(38, 30)
+        ((self.0 >> 30) & OFFSET_MASK) as u16
     }
 
     pub fn pd_offset(self) -> u16 {
-        self.0.bit_range(29, 21)
+        ((self.0 >> 21) & OFFSET_MASK) as u16
     }
 
     pub fn pt_offset(self) -> u16 {
-        self.0.bit_range(12, 20)
+        ((self.0 >> 12) & OFFSET_MASK) as u16
     }
 
     pub fn page_offset_4kb(self) -> u16 {
-        self.0.bit_range(11, 0)
+        let mask = (1 << ADDRESS_SHIFT) - 1;
+        (self.0 & mask) as u16
     }
 
-    pub fn page_offset_2mb(self) -> u16 {
-        self.0.bit_range(20, 0)
+    pub fn page_offset_2mb(self) -> u32 {
+        let mask = (1 << (ADDRESS_SHIFT + OFFSET_SHIFT)) - 1;
+        (self.0 & mask) as u32
     }
 
-    pub fn page_offset_1gb(self) -> u16 {
-        self.0.bit_range(29, 0)
+    pub fn page_offset_1gb(self) -> u64 {
+        let mask = (1 << (ADDRESS_SHIFT + OFFSET_SHIFT + OFFSET_SHIFT)) - 1;
+        (self.0 & mask) as u64
     }
 }
 
@@ -81,5 +89,31 @@ impl PhysicalAddress {
 impl Debug for PhysicalAddress {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         write!(f, "PhysicalAddress({:#010x})", self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::memory::address::VirtualAddress;
+
+    #[test]
+    fn virtaddr_offsets() {
+        let addr = VirtualAddress::new(
+            0b1010_1010_1111_0011_1011_1100_1111_1100_0001_0010_1100_1010_1010_0011_1011_1011,
+        );
+
+        // sign extension
+        assert_eq!(
+            addr.0,
+            0b1111_1111_1111_1111_1011_1100_1111_1100_0001_0010_1100_1010_1010_0011_1011_1011
+        );
+
+        assert_eq!(addr.pml4t_offset(), 0b1011_1100_1);
+        assert_eq!(addr.pdp_offset(), 0b111_1100_00);
+        assert_eq!(addr.pd_offset(), 0b01_0010_110);
+        assert_eq!(addr.pt_offset(), 0b0_1010_1010);
+        assert_eq!(addr.page_offset_4kb(), 0b0011_1011_1011);
+        assert_eq!(addr.page_offset_2mb(), 0b0_1010_1010_0011_1011_1011);
+        assert_eq!(addr.page_offset_1gb(), 0b01_0010_1100_1010_1010_0011_1011_1011);
     }
 }
