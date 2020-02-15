@@ -79,8 +79,15 @@ pub struct Screen {
     y: usize,
 }
 
-pub fn set_error_colors() {
-    get().set_colors(Color::White, Color::Red);
+pub fn set_colors(fg: Color, bg: Color) -> ColorGuard {
+    let mut vga = get();
+    let guard = ColorGuard {
+        fg: vga.foreground,
+        bg: vga.background,
+    };
+
+    vga.set_colors(fg, bg);
+    guard
 }
 
 impl ScreenChar {
@@ -203,6 +210,17 @@ impl Screen {
     }
 }
 
+pub struct ColorGuard {
+    fg: Color,
+    bg: Color,
+}
+
+impl Drop for ColorGuard {
+    fn drop(&mut self) {
+        get().set_colors(self.fg, self.bg);
+    }
+}
+
 #[macro_export]
 macro_rules! println {
     () => (print!("\n"));
@@ -227,12 +245,4 @@ impl fmt::Write for Screen {
         self.write_string(s);
         Ok(())
     }
-}
-
-pub fn set_colors<FG, BG>(fg: FG, bg: BG)
-where
-    FG: Into<Option<Color>>,
-    BG: Into<Option<Color>>,
-{
-    get().set_colors(fg, bg)
 }

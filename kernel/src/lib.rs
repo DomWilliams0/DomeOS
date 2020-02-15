@@ -6,7 +6,6 @@
 #![feature(panic_info_message)]
 #![feature(const_in_array_repeat_expressions)]
 use core::ffi::c_void;
-use core::fmt::Write;
 use core::panic::PanicInfo;
 
 use log::*;
@@ -50,18 +49,8 @@ pub fn hang() -> ! {
 }
 
 #[panic_handler]
-fn panic(panic_info: &PanicInfo) -> ! {
-    if vga::is_initialized() {
-        vga::set_error_colors();
-        if let Some(msg) = panic_info.message() {
-            let mut screen = vga::get();
-            write!(screen, "panic occurred: {}\n", msg).unwrap();
-        } else {
-            println!("panic occurred: {:?}", panic_info);
-        }
-    }
-
-    // log to serial
+fn panic_handler(panic_info: &PanicInfo) -> ! {
+    // log to serial and vga if enabled
     error!("panic occurred: {:?}", panic_info);
 
     // TODO dump regs

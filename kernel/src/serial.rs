@@ -2,13 +2,14 @@ use core::fmt::{Error, Write};
 use core::mem::MaybeUninit;
 use core::ops::BitAnd;
 
-use log::{LevelFilter, Log, Metadata, Record};
+use log::{Level, LevelFilter, Log, Metadata, Record};
 use spin::Mutex;
 
 use crate::clock;
 use crate::io::Port;
 use crate::serial::LogMode::SerialOnly;
 use crate::vga;
+use crate::vga::Color;
 
 static mut COM1: SerialPort = SerialPort {
     port: Port(0x3F8),
@@ -174,6 +175,14 @@ impl Log for LockedSerialLogger {
 
             // vga sometimes
             if logger.mode == LogMode::SerialAndVga && vga::is_initialized() {
+                let (fg, bg) = match record.level() {
+                    Level::Error => (Color::White, Color::Red),
+                    Level::Warn => (Color::Yellow, Color::Black),
+                    Level::Info => (Color::LightBlue, Color::Black),
+                    Level::Debug => (Color::Cyan, Color::Black),
+                    Level::Trace => (Color::LightCyan, Color::Black),
+                };
+                let _colors = vga::set_colors(fg, bg);
                 vga::_raw_print(format_args!("[{}] {}\n", record.level(), record.args()));
             }
         }
