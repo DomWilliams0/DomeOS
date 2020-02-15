@@ -36,9 +36,14 @@ add_custom_command(OUTPUT ${ISO_BIN}
 
 add_custom_target(iso DEPENDS ${ISO_BIN})
 
-add_custom_target(run
-                  COMMENT "Running qemu"
-                  COMMAND qemu-system-x86_64 -cdrom ${ISO_BIN} -monitor stdio -serial file:serial.log
-                          -d cpu_reset,int -D qemu-logfile -no-reboot
-                  BYPRODUCTS serial.log qemu-logfile
-                  DEPENDS ${ISO_BIN})
+function(mk_run name comment extra_flags)
+    add_custom_target(${name}
+                      COMMENT "${comment}"
+                      COMMAND qemu-system-x86_64 -cdrom ${ISO_BIN} -monitor stdio -serial file:serial.log
+                      -d cpu_reset,int -D qemu-logfile -no-reboot ${extra_flags}
+                      BYPRODUCTS serial.log qemu-logfile
+                      DEPENDS ${ISO_BIN})
+endfunction()
+
+mk_run(run "Running qemu" "")
+mk_run(debug "Debugging qemu" "-s;-S")
