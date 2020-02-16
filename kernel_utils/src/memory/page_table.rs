@@ -38,7 +38,7 @@ enum PageTableFlag {
 // page directory entry
 // page table entry
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 #[repr(transparent)]
 pub struct PageTableFlags(BitFlags<PageTableFlag>);
 
@@ -86,7 +86,26 @@ impl Debug for PageTableFlags {
     }
 }
 
-#[derive(BitfieldStruct, Clone)]
+#[derive(Copy, Clone)]
+pub enum Writeable {
+    Read,
+    Write,
+}
+
+#[derive(Copy, Clone)]
+pub enum Executable {
+    Executable,
+    NotExecutable,
+}
+
+#[derive(Copy, Clone)]
+pub enum Overwrite {
+    OverwriteExisting,
+    MustNotExist,
+}
+
+#[repr(C)]
+#[derive(BitfieldStruct, Clone, Default)]
 pub struct CommonEntry {
     flags: PageTableFlags,
 
@@ -117,6 +136,26 @@ impl CommonEntry {
             self.flags.0.remove(PageTableFlag::Present)
         }
     }
+
+    pub fn init(&mut self, address: PhysicalAddress, w: Writeable, x: Executable, overwrite: Overwrite) {
+        if let Overwrite::MustNotExist = overwrite {
+            assert!(!self.present(), "not expected to be present already: {:?}", self);
+        }
+
+        let flags = match w {
+            Writeable::Read => PageTableFlag::Present.into(),
+            Writeable::Write => PageTableFlag::Present | PageTableFlag::Write,
+        };
+
+        let nx = match x {
+            Executable::Executable => false,
+            Executable::NotExecutable => true,
+        };
+        self.set_no_execute(nx as u16);
+
+        self.flags.0.insert(flags);
+        self.set_addr(address.to_4096_aligned());
+    }
 }
 
 impl Debug for CommonEntry {
@@ -126,7 +165,7 @@ impl Debug for CommonEntry {
     }
 }
 
-const PAGE_TABLE_ENTRY_COUNT: usize = 512;
+pub const PAGE_TABLE_ENTRY_COUNT: usize = 512;
 
 #[derive(Clone)]
 #[repr(C)]
@@ -149,6 +188,13 @@ impl<'p, P: PageTableHierarchy<'p>> Debug for PageTable<'p, P> {
 impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
     pub fn present_entries(&self) -> impl Iterator<Item = (usize, &CommonEntry)> {
         self.entries.iter().enumerate().filter(|(_, e)| e.present())
+    }
+
+    pub fn copy_to(&self, other: &mut Self) {
+        self.entries
+            .iter()
+            .zip(other.entries.iter_mut())
+            .for_each(|(src, dst)| *dst = src.clone());
     }
 }
 
@@ -368,5 +414,14 @@ mod tests {
         assert_eq!(size_of::<PageTable<P2>>(), 4096);
         assert_eq!(size_of::<PageTable<P1>>(), 4096);
         assert_eq!(size_of::<PageTable<Frame>>(), 4096);
+    }
+
+    #[test]
+    fn nx() {
+        let mut e = CommonEntry::default();
+        assert_eq!(0u64, unsafe { std::mem::transmute(e.clone()) });
+
+        e.set_no_execute(true as u16);
+        assert_eq!(0x8000000000000000u64, unsafe { std::mem::transmute(e) });
     }
 }

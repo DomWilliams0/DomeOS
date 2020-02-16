@@ -1,9 +1,10 @@
 use core::mem::MaybeUninit;
-use core::ops::Shr;
+use core::ops::{Shl, Shr};
 
 use modular_bitfield::prelude::*;
 
 use crate::irq;
+use crate::irq::{disable_interrupts, enable_interrupts};
 
 static mut IDT: MaybeUninit<InterruptDescriptorTable> = MaybeUninit::uninit();
 
@@ -78,11 +79,23 @@ impl IdtEntry {
         let mut e = IdtEntry::default();
 
         let addr: u64 = handler as *const _ as u64;
-        e.set_base_low(addr as u16);
-        e.set_base_mid(addr.shr(16) as u16);
-        e.set_base_high(addr.shr(32) as u32);
-
+        e.set_addr(addr);
+        e.set_present(true);
         e
+    }
+
+    fn set_addr(&mut self, addr: u64) {
+        self.set_base_low(addr as u16);
+        self.set_base_mid(addr.shr(16) as u16);
+        self.set_base_high(addr.shr(32) as u32);
+    }
+
+    fn addr(&self) -> u64 {
+        let low = self.get_base_low() as u64;
+        let mid = self.get_base_mid() as u64;
+        let high = self.get_base_high() as u64;
+
+        low | mid.shl(16) | high.shl(32)
     }
 }
 
@@ -97,7 +110,7 @@ impl Default for IdtEntry {
         entry.set_descriptor_index(1); // code segment
         entry.set_gate_type(0xE); //3 2 bit interrupt gate
         entry.set_storage_segment(false); // interrupt gate
-        entry.set_present(true); // present
+        entry.set_present(false); // not present until registered
 
         entry
     }
@@ -191,6 +204,37 @@ pub fn init() {
         let idt = InterruptDescriptorTable::default();
         idt.load()
     }
+}
+
+pub fn remap(offset: u64) {
+    disable_interrupts();
+
+    let idt: &mut InterruptDescriptorTable = unsafe { &mut *IDT.as_mut_ptr() };
+
+    idt.entries
+        .iter_mut()
+        .enumerate()
+        .filter(|(_, e)| e.get_present())
+        .for_each(|(i, e)| {
+            let addr = e.addr();
+            use log::*;
+            trace!(
+                "remapping IDT entry #{} from {:#x} to {:#x}",
+                i,
+                addr,
+                addr + offset
+            );
+            e.set_addr(addr + offset);
+        });
+
+    unsafe {
+        (*IDT_POINTER.as_mut_ptr()).base += offset;
+
+        let pointer = IDT_POINTER.as_ptr();
+        asm!("lidt ($0)" :: "r" (pointer) : "memory");
+    }
+
+    enable_interrupts();
 }
 
 mod externs {

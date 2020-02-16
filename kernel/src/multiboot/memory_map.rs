@@ -1,11 +1,12 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
+use core::ops::Range;
 
 use kernel_utils::memory::address::PhysicalAddress;
-use kernel_utils::prelude::*;
+use kernel_utils::prelude::Bit;
 
-use crate::multiboot::{multiboot_info, multiboot_memory_map_t, multiboot_mmap_entry};
 use crate::multiboot::memory_map::MemoryRegionType::{Acpi, Available, Defective,
                                                      PreserveOnHibernation, Reserved};
+use crate::multiboot::{multiboot_info, multiboot_memory_map_t, multiboot_mmap_entry};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum MemoryRegionType {
@@ -45,6 +46,12 @@ impl Debug for MemoryRegion {
     }
 }
 
+impl MemoryRegion {
+    pub fn range(&self) -> Range<u64> {
+        self.base_addr.0..self.base_addr.0 + self.length
+    }
+}
+
 impl From<&multiboot_memory_map_t> for MemoryRegion {
     fn from(mmap: &multiboot_mmap_entry) -> Self {
         Self {
@@ -70,6 +77,11 @@ impl MemoryRegions {
             current: start,
             end,
         }
+    }
+
+    pub fn available(self) -> impl Iterator<Item = MemoryRegion> {
+        self.into_iter()
+            .filter(|r| r.region_type == MemoryRegionType::Available)
     }
 }
 

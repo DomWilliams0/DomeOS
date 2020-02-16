@@ -2,12 +2,12 @@ use log::*;
 
 use kernel_utils::prelude::*;
 
-use crate::{memory, multiboot};
-use crate::{clock, idt, serial};
 use crate::irq::enable_interrupts;
 use crate::multiboot::MemoryRegions;
 use crate::serial::LogMode;
 use crate::vga::{self, Color};
+use crate::{clock, idt, serial};
+use crate::{memory, multiboot};
 
 pub fn start(multiboot: &multiboot::multiboot_info) -> ! {
     vga::init(Color::LightGreen, Color::Black);
@@ -35,11 +35,12 @@ fn parse_multiboot(multiboot: &multiboot::multiboot_info) {
     multiboot::print_commandline(multiboot);
 
     // memory::walk_active_page_hierarchy();
-
-    memory::remap_kernel();
-
-    // register available memory regions
-    memory::free_pages::init_free_pages(MemoryRegions::new(multiboot));
+    memory::init(multiboot);
+    //
+    //    memory::remap_kernel();
+    //
+    //    // register available memory regions
+    //    memory::free_pages::init_free_pages(MemoryRegions::new(multiboot));
 }
 
 fn breakpoint() {

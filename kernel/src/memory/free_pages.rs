@@ -3,10 +3,10 @@ use log::*;
 
 use kernel_utils::memory::address::PhysicalAddress;
 
-use crate::multiboot::{MemoryRegions, MemoryRegionType};
+use crate::multiboot::{MemoryRegionType, MemoryRegions};
 
 /// Arbitrary limit because we have no allocation yet, and so far I've yet to see
-/// more than a 2 available memory regions
+/// more than 2 available memory regions
 const MAX_PAGE_REGIONS: usize = 4;
 static mut PAGE_REGIONS: [Option<BuddyAlloc>; MAX_PAGE_REGIONS] = [None; MAX_PAGE_REGIONS];
 

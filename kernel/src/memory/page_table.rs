@@ -1,5 +1,5 @@
 use kernel_utils::memory::address::PhysicalAddress;
-use kernel_utils::memory::page_table::hierarchy::{P3, P4};
+use kernel_utils::memory::page_table::hierarchy::{P3, P4, PageTableHierarchy};
 use kernel_utils::memory::page_table::PageTable;
 use kernel_utils::prelude::*;
 
@@ -11,11 +11,12 @@ fn cr3() -> u64 {
     value
 }
 
-pub fn pml4() -> P4<'static> {
+pub fn pml4() -> &'static PageTable<'static, P3<'static>> {
     let addr = cr3().bit_range(51, 12);
     let ptr = PhysicalAddress::from_4096_aligned(addr);
     let table = ptr.0 as *mut PageTable<'static, P3<'static>>;
-    P4::PML4T(unsafe { &mut *table })
+    //    P4::PML4T(unsafe { &mut *table })
+    unsafe { &mut *table }
 }
 
 pub fn set_pml4(p4: P4<'static>) {

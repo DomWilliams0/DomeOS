@@ -1,5 +1,5 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
-use core::ops::{Shl, Shr};
+use core::ops::{Add, AddAssign, Shl, Shr};
 
 use derive_more::*;
 
@@ -16,7 +16,7 @@ const OFFSET_SHIFT: u64 = 9;
 const OFFSET_MASK: u64 = (1 << OFFSET_SHIFT) - 1;
 
 // TODO constructor rather than pub
-#[derive(Copy, Clone, Add)]
+#[derive(Copy, Clone, Add, AddAssign)]
 #[repr(transparent)]
 pub struct VirtualAddress(pub u64);
 
@@ -28,37 +28,44 @@ impl Debug for VirtualAddress {
 
 impl VirtualAddress {
     pub fn new(addr: u64) -> Self {
-        let sign_extend_mask = (1 << (SIGN_EXTEND - 1));
+        let sign_extend_mask = 1 << (SIGN_EXTEND - 1);
         let addr = (addr.wrapping_mul(sign_extend_mask) as i64 / sign_extend_mask as i64) as u64;
         Self(addr)
     }
 
+    /// P4
     pub fn pml4t_offset(self) -> u16 {
         ((self.0 >> 39) & OFFSET_MASK) as u16
     }
 
+    /// P3
     pub fn pdp_offset(self) -> u16 {
         ((self.0 >> 30) & OFFSET_MASK) as u16
     }
 
+    /// P2
     pub fn pd_offset(self) -> u16 {
         ((self.0 >> 21) & OFFSET_MASK) as u16
     }
 
+    /// P1
     pub fn pt_offset(self) -> u16 {
         ((self.0 >> 12) & OFFSET_MASK) as u16
     }
 
+    /// P1
     pub fn page_offset_4kb(self) -> u16 {
         let mask = (1 << ADDRESS_SHIFT) - 1;
         (self.0 & mask) as u16
     }
 
+    /// P2
     pub fn page_offset_2mb(self) -> u32 {
         let mask = (1 << (ADDRESS_SHIFT + OFFSET_SHIFT)) - 1;
         (self.0 & mask) as u32
     }
 
+    /// P3
     pub fn page_offset_1gb(self) -> u64 {
         let mask = (1 << (ADDRESS_SHIFT + OFFSET_SHIFT + OFFSET_SHIFT)) - 1;
         (self.0 & mask) as u64
@@ -92,6 +99,40 @@ impl Debug for PhysicalAddress {
     }
 }
 
+impl Add<u64> for PhysicalAddress {
+    type Output = Self;
+
+    fn add(self, rhs: u64) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
+
+impl AddAssign<u64> for PhysicalAddress {
+    fn add_assign(&mut self, rhs: u64) {
+        self.0 += rhs;
+    }
+}
+
+impl<T> From<&T> for PhysicalAddress {
+    fn from(t: &T) -> Self {
+        Self(t as *const _ as u64)
+    }
+}
+
+impl Add<u64> for VirtualAddress {
+    type Output = Self;
+
+    fn add(self, rhs: u64) -> Self::Output {
+        Self(self.0 + rhs)
+    }
+}
+
+impl AddAssign<u64> for VirtualAddress {
+    fn add_assign(&mut self, rhs: u64) {
+        self.0 += rhs;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::memory::address::VirtualAddress;
@@ -114,6 +155,9 @@ mod tests {
         assert_eq!(addr.pt_offset(), 0b0_1010_1010);
         assert_eq!(addr.page_offset_4kb(), 0b0011_1011_1011);
         assert_eq!(addr.page_offset_2mb(), 0b0_1010_1010_0011_1011_1011);
-        assert_eq!(addr.page_offset_1gb(), 0b01_0010_1100_1010_1010_0011_1011_1011);
+        assert_eq!(
+            addr.page_offset_1gb(),
+            0b01_0010_1100_1010_1010_0011_1011_1011
+        );
     }
 }
