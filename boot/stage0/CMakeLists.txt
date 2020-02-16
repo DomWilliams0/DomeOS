@@ -10,14 +10,20 @@ enable_language(ASM_NASM)
 
 add_custom_command(OUTPUT ${STAGE0}
                    COMMENT "Compiling stage0"
-                   COMMAND nasm -f bin ${SRCS} -o ${STAGE0}) # TODO multiple srcs?
+                   COMMAND nasm -f bin ${SRCS} -o ${STAGE0}
+                   DEPENDS ${SRCS}) # TODO multiple srcs?
 
 add_custom_command(OUTPUT ${FLOPPY}
                    COMMENT "Creating floppy image"
                    COMMAND dd if=/dev/zero of=${FLOPPY} count=1440 bs=1k
                    COMMAND mkfs.msdos ${FLOPPY}
-                   COMMAND dd if=${STAGE0} of=${FLOPPY}
+                   COMMAND dd if=${STAGE0} of=${FLOPPY} conv=notrunc
                    DEPENDS ${STAGE0})
+
+add_custom_target(run
+                  COMMENT "Running qemu"
+                  COMMAND qemu-system-x86_64 -fda ${FLOPPY} -monitor stdio
+                  DEPENDS ${FLOPPY})
 
 add_custom_target(${PROJECT_NAME}
                   DEPENDS ${FLOPPY})
