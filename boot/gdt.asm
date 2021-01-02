@@ -2,7 +2,8 @@ extern long_mode
 global gdt64_flush
 extern idt_descriptor
 
-[bits 32]
+section .boot.bss
+
 gdt64:
 	dq 0
 .cs: equ $ - gdt64
@@ -11,6 +12,9 @@ gdt64:
 .ptr:
 	dw $ - gdt64 - 1 ; length of gdt
 	dq gdt64
+
+section .boot.text
+bits 32
 
 gdt64_flush:
 	cld

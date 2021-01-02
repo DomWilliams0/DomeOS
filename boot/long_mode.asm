@@ -2,7 +2,8 @@ extern gdt64
 extern kernel_main
 global long_mode
 
-[BITS 64]
+section .boot.text
+bits 64
 
 long_mode:
 	cli
@@ -19,6 +20,7 @@ long_mode:
 	and rax, ~(16 - 1)
 	mov rsp, rax
 
+	; TODO setup page table for higher half
 	; jump into kernel
 	call kernel_main
 

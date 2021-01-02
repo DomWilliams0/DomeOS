@@ -3,7 +3,7 @@ project(DomeOS_bootloader
 
 enable_language(ASM_NASM)
 set(SRCS boot.asm
-    descriptor_tables.asm
+    gdt.asm
     isr.asm
     long_mode.asm
     multiboot.asm

@@ -3,7 +3,7 @@ extern kernel_main
 extern long_mode
 extern gdt64_flush
 
-section .bss
+section .boot.bss
 align 4096
 bss_start:
 
@@ -24,7 +24,7 @@ stack_top:
 
 bss_end:
 
-section .text
+section .boot.text
 bits	 32
 
 ; entry point

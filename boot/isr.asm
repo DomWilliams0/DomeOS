@@ -1,3 +1,5 @@
+section .boot.text
+
 %define isr_count 32
 %define irq_count 16
 
