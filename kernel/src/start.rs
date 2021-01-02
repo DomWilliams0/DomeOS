@@ -23,9 +23,9 @@ pub fn kernel_main(_magic: i32, _multiboot: *mut c_void) -> ! {
 }
 
 fn breakpoint() {
-    unsafe { asm!("int3") }
+    unsafe { llvm_asm!("int3") }
 }
 
 fn div_by_zero() {
-    unsafe { asm!("mov dx, 0; div dx" ::: "ax", "dx" : "volatile", "intel") }
+    unsafe { llvm_asm!("mov dx, 0; div dx" ::: "ax", "dx" : "volatile", "intel") }
 }

@@ -1,6 +1,7 @@
 use core::fmt;
 use core::mem::MaybeUninit;
 
+use core::ops::{Deref, DerefMut};
 use log::*;
 use spin;
 use volatile::Volatile;
@@ -25,7 +26,7 @@ pub fn init(fg: Color, bg: Color) {
 }
 
 pub fn get<'a>() -> spin::MutexGuard<'a, Screen> {
-    unsafe { SCREEN.get_mut().lock() }
+    unsafe { SCREEN.assume_init_mut().lock() }
 }
 
 pub fn is_initialized() -> bool {
@@ -89,6 +90,20 @@ impl ScreenChar {
             character: c,
             color: color_as_byte(fg, bg),
         }
+    }
+}
+
+impl Deref for ScreenChar {
+    type Target = Self;
+
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl DerefMut for ScreenChar {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self
     }
 }
 

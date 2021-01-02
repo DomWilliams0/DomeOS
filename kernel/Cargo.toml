@@ -10,9 +10,9 @@ crate-type = ["staticlib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-spin = "^0.5"
-volatile = "^0.2"
-modular-bitfield = "^0.6"
-log = "^0.4"
-enumflags2 = "^0.6"
-bitfield = "^0.13"
+spin = "0.7"
+volatile = "0.4"
+modular-bitfield = "0.11"
+log = "0.4"
+enumflags2 = "0.6"
+bitfield = "0.13"

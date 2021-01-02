@@ -1,6 +1,6 @@
 project(DomeOS_kernel)
 
-set(CARGO_BUILD_CMD cargo xbuild)
+set(CARGO_BUILD_CMD cargo build)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CARGO_TARGET_DIR "debug")
 else()
