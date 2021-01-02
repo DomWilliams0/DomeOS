@@ -253,11 +253,4 @@ pub fn init(multiboot: &multiboot_info) {
     for x in MemoryRegions::new(multiboot).available() {
         info!("can use {:?}", x);
     }
-    let reserved_region = MemoryRegions::new(multiboot)
-        .available()
-        .find(|r| r.length >= RESERVE_LENGTH)
-        .expect("no available memory regions big enough to reserve");
-
-    //    info!("gonna reserve {:?}", reserved_region);
-    //    remap_kernel(reserved_region)
 }

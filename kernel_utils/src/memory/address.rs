@@ -95,7 +95,8 @@ impl PhysicalAddress {
 
 impl Debug for PhysicalAddress {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        write!(f, "PhysicalAddress({:#010x})", self.0)
+        // TODO revert back to {:#010x} when it works: https://github.com/rust-lang/rust/issues/80616
+        write!(f, "PhysicalAddress({:#0x})", self.0)
     }
 }
 

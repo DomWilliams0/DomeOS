@@ -1,5 +1,6 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
 use core::ops::Range;
+use log::*;
 
 use kernel_utils::memory::address::PhysicalAddress;
 use kernel_utils::prelude::Bit;
