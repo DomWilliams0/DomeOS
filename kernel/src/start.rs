@@ -2,7 +2,7 @@ use log::*;
 
 use kernel_utils::prelude::*;
 
-use crate::irq::enable_interrupts;
+use crate::irq::{disable_interrupts, enable_interrupts};
 use crate::serial::LogMode;
 use crate::vga::{self, Color};
 use crate::{clock, idt, serial};
@@ -18,7 +18,7 @@ pub fn start(multiboot: &multiboot::multiboot_info) -> ! {
 
     parse_multiboot(multiboot);
 
-    loop {}
+    hang();
 }
 
 fn parse_multiboot(multiboot: &multiboot::multiboot_info) {
@@ -48,4 +48,13 @@ fn breakpoint() {
 
 fn div_by_zero() {
     unsafe { llvm_asm!("mov dx, 0; div dx" ::: "ax", "dx" : "volatile", "intel") }
+}
+
+fn hang() -> ! {
+    disable_interrupts();
+
+    info!("hanging forever");
+    loop {
+        unsafe { llvm_asm!("hlt") }
+    }
 }

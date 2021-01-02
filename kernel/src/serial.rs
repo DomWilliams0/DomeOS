@@ -7,6 +7,7 @@ use spin::Mutex;
 
 use crate::clock;
 use crate::io::Port;
+use crate::panic::is_panicking;
 use crate::serial::LogMode::SerialOnly;
 use crate::vga;
 use crate::vga::Color;
@@ -50,11 +51,10 @@ pub enum LogMode {
 }
 
 struct SerialLogger {
-    level: LevelFilter,
     mode: LogMode,
 }
 
-struct LockedSerialLogger(Mutex<SerialLogger>);
+struct LockedSerialLogger(Mutex<SerialLogger>, LevelFilter);
 
 impl SerialPort {
     fn register(&self, register: SerialRegister) -> Port {
@@ -132,10 +132,7 @@ pub fn init(log_level: LevelFilter) {
 
         // init logger
         let logger = SERIAL_LOGGER.assume_init_mut();
-        *logger = LockedSerialLogger(Mutex::new(SerialLogger {
-            level: log_level,
-            mode: SerialOnly,
-        }));
+        *logger = LockedSerialLogger(Mutex::new(SerialLogger { mode: SerialOnly }), log_level);
 
         // safety: interrupts are disabled at this point, so can use racy variant
         log::set_logger_racy(logger).unwrap();
@@ -154,12 +151,17 @@ impl Write for SerialPort {
 
 impl Log for LockedSerialLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        let logger = self.0.lock();
-        metadata.level() <= logger.level
+        // no locking needed
+        metadata.level() <= self.1
     }
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
+            if record.level() <= Level::Error && self.0.is_locked() && is_panicking() {
+                // WE NEED THIS LOG
+                unsafe { self.0.force_unlock() }
+            }
+
             let logger = self.0.lock();
 
             // serial always

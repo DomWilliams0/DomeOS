@@ -7,7 +7,6 @@
 #![feature(panic_info_message)]
 #![feature(const_in_array_repeat_expressions)]
 use core::ffi::c_void;
-use core::panic::PanicInfo;
 
 use log::*;
 
@@ -20,6 +19,7 @@ mod io;
 mod irq;
 mod memory;
 mod multiboot;
+mod panic;
 mod serial;
 mod start;
 mod vga;
@@ -47,14 +47,4 @@ pub fn hang() -> ! {
             llvm_asm!("hlt");
         }
     }
-}
-
-#[panic_handler]
-fn panic_handler(panic_info: &PanicInfo) -> ! {
-    // log to serial and vga if enabled
-    error!("panic occurred: {:?}", panic_info);
-
-    // TODO dump regs
-
-    hang();
 }
