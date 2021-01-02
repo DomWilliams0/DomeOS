@@ -90,7 +90,7 @@ impl Debug for PageFaultFlags {
 fn read_cr2() -> VirtualAddress {
     let value: u64;
     unsafe {
-        asm!("mov %cr2, $0" : "=r" (value));
+        llvm_asm!("mov %cr2, $0" : "=r" (value));
     }
     VirtualAddress(value)
 }

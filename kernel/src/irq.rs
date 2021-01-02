@@ -2,9 +2,9 @@ use core::fmt::{Debug, Error, Formatter};
 
 use log::*;
 
-use core::convert::TryFrom;
 use crate::exception::Exception;
 use crate::io::Port;
+use core::convert::TryFrom;
 
 const PIC_MASTER_COMMAND: Port = Port(0x20);
 const PIC_MASTER_DATA: Port = Port(0x21);
@@ -81,7 +81,7 @@ pub fn unregister_handler(irq: Irq) {
 
 #[no_mangle]
 pub extern "C" fn irq_handler(ctx: *const InterruptContext) {
-    let ctx: &InterruptContext = unsafe { (&*ctx) };
+    let ctx: &InterruptContext = unsafe { &*ctx };
     let irq = (ctx.int_no - PIC_MASTER_OFFSET as u64) as usize; // remap to original irq
     assert!(irq < IRQ_HANDLER_COUNT);
 
@@ -109,7 +109,7 @@ unsafe fn eoi(irq: usize) {
 
 #[no_mangle]
 pub extern "C" fn fault_handler(ctx: *const InterruptContext) {
-    let ctx: &InterruptContext = unsafe { (&*ctx) };
+    let ctx: &InterruptContext = unsafe { &*ctx };
     if let Ok(exc) = Exception::try_from(ctx) {
         panic!("Unhandled exception {:?})\n{:?}", exc, ctx);
     }
@@ -117,12 +117,12 @@ pub extern "C" fn fault_handler(ctx: *const InterruptContext) {
 
 pub fn enable_interrupts() {
     debug!("enabling interrupts");
-    unsafe { asm!("sti") };
+    unsafe { llvm_asm!("sti") };
 }
 
 pub fn disable_interrupts() {
     debug!("disabling interrupts");
-    unsafe { asm!("cli") };
+    unsafe { llvm_asm!("cli") };
 }
 
 #[repr(C)]

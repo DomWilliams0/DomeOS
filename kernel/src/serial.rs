@@ -71,7 +71,8 @@ impl SerialPort {
     unsafe fn can_send(&self) -> bool {
         self.register(SerialRegister::LineStatus)
             .read_u8()
-            .bitand(0x20) != 0
+            .bitand(0x20)
+            != 0
     }
 
     unsafe fn puts(&mut self, s: &str) {
@@ -113,7 +114,7 @@ pub fn init(log_level: LevelFilter) {
         COM1.write(SerialRegister::ModemControl, 0x0B);
 
         // init logger
-        let logger = SERIAL_LOGGER.get_mut();
+        let logger = SERIAL_LOGGER.assume_init_mut();
         *logger = LockedSerialLogger(Mutex::new(SerialLogger { level: log_level }));
 
         // safety: interrupts are disabled at this point, so can use racy variant
@@ -156,7 +157,8 @@ impl Log for LockedSerialLogger {
                     record.target(),
                     record.level(),
                     record.args()
-                )).unwrap();
+                ))
+                .unwrap();
             }
         }
     }

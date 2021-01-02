@@ -180,7 +180,7 @@ impl InterruptDescriptorTable {
         });
 
         let pointer = IDT_POINTER.as_ptr();
-        asm!("lidt ($0)" :: "r" (pointer) : "memory");
+        llvm_asm!("lidt ($0)" :: "r" (pointer) : "memory");
     }
 }
 
