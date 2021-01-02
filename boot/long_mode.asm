@@ -14,6 +14,11 @@ long_mode:
 	mov gs, ax
 	mov ss, ax
 
+	; ensure the stack is 16-byte aligned
+	mov rax, rsp
+	and rax, ~(16 - 1)
+	mov rsp, rax
+
 	; jump into kernel
 	call kernel_main
 
