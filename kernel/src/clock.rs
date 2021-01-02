@@ -12,6 +12,11 @@ const PIT_CHANNEL0_DATA: Port = Port(0x40);
 // const PIT_CHANNEL2_DATA: Port = Port(0x42);
 const PIT_COMMAND: Port = Port(0x43);
 
+const TICKS_PER_SECOND: u64 = 120;
+
+/// Total number of ticks since boot
+static mut TICKS: u64 = 0;
+
 #[bitfield]
 struct PitCommand {
     /// 0: 16 bit binary, 1: 0000-9999
@@ -51,12 +56,6 @@ fn set_interval(hz: u64) {
         PIT_CHANNEL0_DATA.write_u8(divisor.shr(8) as u8); // hi
     }
 }
-
-const TICKS_PER_SECOND: u64 = 120;
-
-/// Total number of ticks since boot
-static mut TICKS: u64 = 0;
-
 extern "C" fn on_clock(_ctx: *const irq::InterruptContext) {
     let ticks = unsafe {
         TICKS += 1;

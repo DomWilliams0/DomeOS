@@ -10,6 +10,8 @@ static mut IDT: MaybeUninit<InterruptDescriptorTable> = MaybeUninit::uninit();
 #[export_name = "idt_descriptor"]
 pub(crate) static mut IDT_POINTER: MaybeUninit<DescriptorTablePointer> = MaybeUninit::uninit();
 
+const IDT_ENTRY_COUNT: usize = 256;
+
 #[repr(C, packed)]
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct DescriptorTablePointer {
@@ -39,7 +41,7 @@ struct IdtEntry {
     ist: B3,
 
     /// If you say so
-    _zero: B5,
+    reserved0: B5,
 
     // Flags
     /// 1110 for 32 bit interrupt gates
@@ -61,10 +63,8 @@ struct IdtEntry {
     base_high: B32,
 
     /// More reserved
-    _zero_more: B32,
+    reserved1: B32,
 }
-
-const IDT_ENTRY_COUNT: usize = 256;
 
 #[repr(transparent)]
 struct InterruptDescriptorTable {
