@@ -26,6 +26,49 @@ pub type IrqHandler = extern "C" fn(*const InterruptContext);
 
 static mut IRQ_HANDLERS: [Option<IrqHandler>; IRQ_HANDLER_COUNT] = [None; IRQ_HANDLER_COUNT];
 
+#[repr(u8)]
+#[derive(Debug)]
+#[allow(dead_code)]
+pub enum Irq {
+    Clock = 0,
+    Keyboard = 1,
+    FloppyDisk = 6,
+    Mouse = 12,
+    Coprocessor = 13,
+    PrimaryHardDisk = 14,
+    SecondaryHardDisk = 15,
+}
+
+#[repr(C)]
+pub struct InterruptContext {
+    pub rax: u64,
+    pub rbx: u64,
+    pub rcx: u64,
+    pub rdx: u64,
+    pub rsi: u64,
+    pub rdi: u64,
+    pub rbp: u64,
+
+    pub r8: u64,
+    pub r9: u64,
+    pub r10: u64,
+    pub r11: u64,
+    pub r12: u64,
+    pub r13: u64,
+    pub r14: u64,
+    pub r15: u64,
+
+    pub int_no: u64,
+    pub err_code: u64,
+
+    // pushed by CPU
+    pub rip: u64,
+    pub cs: u64,
+    pub rflags: u64,
+    pub rsp: u64,
+    pub ss: u64,
+}
+
 /// Remap master PIC to 0x20 and slave to 0x28
 pub unsafe fn remap() {
     // save masks
@@ -50,19 +93,6 @@ pub unsafe fn remap() {
     // restore masks
     PIC_MASTER_DATA.write_u8(masks.0);
     PIC_SLAVE_DATA.write_u8(masks.1);
-}
-
-#[repr(u8)]
-#[derive(Debug)]
-#[allow(dead_code)]
-pub enum Irq {
-    Clock = 0,
-    Keyboard = 1,
-    FloppyDisk = 6,
-    Mouse = 12,
-    Coprocessor = 13,
-    PrimaryHardDisk = 14,
-    SecondaryHardDisk = 15,
 }
 
 pub fn register_handler(irq: Irq, handler: IrqHandler) {
@@ -123,36 +153,6 @@ pub fn enable_interrupts() {
 pub fn disable_interrupts() {
     debug!("disabling interrupts");
     unsafe { llvm_asm!("cli") };
-}
-
-#[repr(C)]
-pub struct InterruptContext {
-    pub rax: u64,
-    pub rbx: u64,
-    pub rcx: u64,
-    pub rdx: u64,
-    pub rsi: u64,
-    pub rdi: u64,
-    pub rbp: u64,
-
-    pub r8: u64,
-    pub r9: u64,
-    pub r10: u64,
-    pub r11: u64,
-    pub r12: u64,
-    pub r13: u64,
-    pub r14: u64,
-    pub r15: u64,
-
-    pub int_no: u64,
-    pub err_code: u64,
-
-    // pushed by CPU
-    pub rip: u64,
-    pub cs: u64,
-    pub rflags: u64,
-    pub rsp: u64,
-    pub ss: u64,
 }
 
 impl Debug for InterruptContext {

@@ -39,6 +39,14 @@ enum SerialRegister {
     Scratch = 7,
 }
 
+static mut SERIAL_LOGGER: MaybeUninit<LockedSerialLogger> = MaybeUninit::uninit();
+
+struct SerialLogger {
+    level: LevelFilter,
+}
+
+struct LockedSerialLogger(Mutex<SerialLogger>);
+
 impl SerialPort {
     fn register(&self, register: SerialRegister) -> Port {
         let offset = match register {
@@ -131,14 +139,6 @@ impl Write for SerialPort {
         Ok(())
     }
 }
-
-static mut SERIAL_LOGGER: MaybeUninit<LockedSerialLogger> = MaybeUninit::uninit();
-
-struct SerialLogger {
-    level: LevelFilter,
-}
-
-struct LockedSerialLogger(Mutex<SerialLogger>);
 
 impl Log for LockedSerialLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {

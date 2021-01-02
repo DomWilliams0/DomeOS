@@ -37,12 +37,6 @@ pub enum Exception {
 #[repr(transparent)]
 pub struct VirtualAddress(u64);
 
-impl Debug for VirtualAddress {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "VirtualAddress({:#x})", self.0)
-    }
-}
-
 #[derive(BitFlags, Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]
 enum PageFaultFlag {
@@ -54,6 +48,12 @@ enum PageFaultFlag {
 }
 
 pub struct PageFaultFlags(BitFlags<PageFaultFlag>);
+
+impl Debug for VirtualAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "VirtualAddress({:#x})", self.0)
+    }
+}
 
 impl Debug for PageFaultFlags {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
