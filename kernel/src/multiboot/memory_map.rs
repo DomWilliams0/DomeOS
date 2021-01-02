@@ -4,8 +4,9 @@ use core::ops::Range;
 use kernel_utils::memory::address::PhysicalAddress;
 use kernel_utils::prelude::Bit;
 
-use crate::multiboot::memory_map::MemoryRegionType::{Acpi, Available, Defective,
-                                                     PreserveOnHibernation, Reserved};
+use crate::multiboot::memory_map::MemoryRegionType::{
+    Acpi, Available, Defective, PreserveOnHibernation, Reserved,
+};
 use crate::multiboot::{multiboot_info, multiboot_memory_map_t, multiboot_mmap_entry};
 
 #[derive(Debug, Eq, PartialEq)]

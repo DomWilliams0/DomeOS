@@ -3,7 +3,6 @@ use log::*;
 use kernel_utils::prelude::*;
 
 use crate::irq::enable_interrupts;
-use crate::multiboot::MemoryRegions;
 use crate::serial::LogMode;
 use crate::vga::{self, Color};
 use crate::{clock, idt, serial};
@@ -44,9 +43,9 @@ fn parse_multiboot(multiboot: &multiboot::multiboot_info) {
 }
 
 fn breakpoint() {
-    unsafe { asm!("int3") }
+    unsafe { llvm_asm!("int3") }
 }
 
 fn div_by_zero() {
-    unsafe { asm!("mov dx, 0; div dx" ::: "ax", "dx" : "volatile", "intel") }
+    unsafe { llvm_asm!("mov dx, 0; div dx" ::: "ax", "dx" : "volatile", "intel") }
 }

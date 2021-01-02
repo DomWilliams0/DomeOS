@@ -34,29 +34,29 @@ pub fn init_free_pages(regions: MemoryRegions) {
         );
 
         // TODO these regions arent mapped yet
-/*
-        let mut ptr = region.base_addr.0 as *mut i32;
-        unsafe {
-            loop {
-                debug!("gonna write to {:?}", ptr);
-                *ptr = 'A' as i32;
-                ptr = ptr.add(2);
-            }
-        }
-*/
+        /*
+                let mut ptr = region.base_addr.0 as *mut i32;
+                unsafe {
+                    loop {
+                        debug!("gonna write to {:?}", ptr);
+                        *ptr = 'A' as i32;
+                        ptr = ptr.add(2);
+                    }
+                }
+        */
 
         /*
-        unsafe {
-            let alloc = BuddyAlloc::new(
-                region.base_addr.0 as *const u8,
-                region.length as usize,
-                4096,
-            );
+                unsafe {
+                    let alloc = BuddyAlloc::new(
+                        region.base_addr.0 as *const u8,
+                        region.length as usize,
+                        4096,
+                    );
 
-            PAGE_REGIONS[idx] = Some(alloc);
-            PAGE_REGION_COUNT+=1;
-        }
-*/
+                    PAGE_REGIONS[idx] = Some(alloc);
+                    PAGE_REGION_COUNT+=1;
+                }
+        */
     }
 
     // TODO result instead

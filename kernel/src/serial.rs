@@ -42,6 +42,20 @@ enum SerialRegister {
     Scratch = 7,
 }
 
+static mut SERIAL_LOGGER: MaybeUninit<LockedSerialLogger> = MaybeUninit::uninit();
+
+pub enum LogMode {
+    SerialOnly,
+    SerialAndVga,
+}
+
+struct SerialLogger {
+    level: LevelFilter,
+    mode: LogMode,
+}
+
+struct LockedSerialLogger(Mutex<SerialLogger>);
+
 impl SerialPort {
     fn register(&self, register: SerialRegister) -> Port {
         let offset = match register {
@@ -74,7 +88,8 @@ impl SerialPort {
     unsafe fn can_send(&self) -> bool {
         self.register(SerialRegister::LineStatus)
             .read_u8()
-            .bitand(0x20) != 0
+            .bitand(0x20)
+            != 0
     }
 
     unsafe fn puts(&mut self, s: &str) {
@@ -116,7 +131,7 @@ pub fn init(log_level: LevelFilter) {
         COM1.write(SerialRegister::ModemControl, 0x0B);
 
         // init logger
-        let logger = SERIAL_LOGGER.get_mut();
+        let logger = SERIAL_LOGGER.assume_init_mut();
         *logger = LockedSerialLogger(Mutex::new(SerialLogger {
             level: log_level,
             mode: SerialOnly,
@@ -137,21 +152,6 @@ impl Write for SerialPort {
     }
 }
 
-static mut SERIAL_LOGGER: MaybeUninit<LockedSerialLogger> = MaybeUninit::uninit();
-
-#[derive(Eq, PartialEq)]
-pub enum LogMode {
-    SerialOnly,
-    SerialAndVga,
-}
-
-struct SerialLogger {
-    level: LevelFilter,
-    mode: LogMode,
-}
-
-struct LockedSerialLogger(Mutex<SerialLogger>);
-
 impl Log for LockedSerialLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
         let logger = self.0.lock();
@@ -170,11 +170,12 @@ impl Log for LockedSerialLogger {
                     record.target(),
                     record.level(),
                     record.args()
-                )).unwrap();
+                ))
+                .unwrap();
             }
 
             // vga sometimes
-            if logger.mode == LogMode::SerialAndVga && vga::is_initialized() {
+            if matches!(logger.mode, LogMode::SerialAndVga) && vga::is_initialized() {
                 let (fg, bg) = match record.level() {
                     Level::Error => (Color::White, Color::Red),
                     Level::Warn => (Color::Yellow, Color::Black),
@@ -192,7 +193,7 @@ impl Log for LockedSerialLogger {
 }
 
 pub fn set_log_mode(mode: LogMode) {
-    let mut log = unsafe { SERIAL_LOGGER.get_mut().0.lock() };
+    let mut log = unsafe { SERIAL_LOGGER.assume_init_mut().0.lock() };
 
     log.mode = mode;
 }

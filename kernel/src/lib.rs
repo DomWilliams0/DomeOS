@@ -1,8 +1,9 @@
 #![no_std]
 #![no_main]
+#![allow(dead_code)]
 #![feature(maybe_uninit_ref)]
 #![feature(abi_x86_interrupt)]
-#![feature(asm)]
+#![feature(llvm_asm)]
 #![feature(panic_info_message)]
 #![feature(const_in_array_repeat_expressions)]
 use core::ffi::c_void;
@@ -43,7 +44,7 @@ pub fn hang() -> ! {
         disable_interrupts();
 
         loop {
-            asm!("hlt");
+            llvm_asm!("hlt");
         }
     }
 }

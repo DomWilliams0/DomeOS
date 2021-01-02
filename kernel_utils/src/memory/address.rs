@@ -85,7 +85,7 @@ impl PhysicalAddress {
         self.0.shr(ADDRESS_SHIFT)
     }
 
-    /// # Warning
+    /// # Safety
     /// Null pointers casted to references are UB! It will play havoc with Options and Boxes where
     /// they use the null case for None/null detection!
     pub unsafe fn cast_mut<'a, T>(self) -> &'a mut T {

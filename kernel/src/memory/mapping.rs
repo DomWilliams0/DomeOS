@@ -3,16 +3,15 @@ use core::{mem, panic};
 use log::*;
 
 use kernel_utils::memory::address::{PhysicalAddress, VirtualAddress};
-use kernel_utils::memory::page_table::hierarchy::{Frame, P1, P2, P3, P4, PageTableHierarchy};
-use kernel_utils::memory::page_table::{CommonEntry, Executable, Overwrite, PageTable, Writeable,
-                                       PAGE_TABLE_ENTRY_COUNT};
+use kernel_utils::memory::page_table::hierarchy::{Frame, P1, P2, P3, P4};
+use kernel_utils::memory::page_table::{
+    CommonEntry, Executable, Overwrite, PageTable, Writeable, PAGE_TABLE_ENTRY_COUNT,
+};
 use kernel_utils::memory::{kilobytes, megabytes, terabytes};
 
-use core::f64;
 use crate::idt;
-use crate::irq::disable_interrupts;
 use crate::memory::page_table::{pml4, set_pml4};
-use crate::multiboot::{multiboot_info, MemoryRegion, MemoryRegionType, MemoryRegions};
+use crate::multiboot::{multiboot_info, MemoryRegion, MemoryRegions};
 
 /// Kernel virtual addresses: 128TiB -> 192TiB
 /// Physical mapping:         192TiB -> 256TiB
@@ -47,7 +46,7 @@ struct DumbAllocator {
 }
 
 const fn round_up(val: u64, multiple: u64) -> u64 {
-    val + (multiple - 1) & !(multiple - 1)
+    (val + (multiple - 1)) & !(multiple - 1)
 }
 
 const fn div_round_up(a: u64, b: u64) -> u64 {
@@ -206,7 +205,7 @@ fn remap_kernel(reserved_region: MemoryRegion) {
     set_pml4(P4::PML4T(p4_table));
     idt::remap(KERNEL_START_ADDR);
     unsafe {
-        asm!("mov $0, %rsp\n\
+        llvm_asm!("mov $0, %rsp\n\
               jmp *$1" :: "r" (kernel_stack.0), "r" (jmp));
     }
 }
@@ -256,8 +255,7 @@ pub fn init(multiboot: &multiboot_info) {
     }
     let reserved_region = MemoryRegions::new(multiboot)
         .available()
-        .filter(|r| r.length >= RESERVE_LENGTH)
-        .next()
+        .find(|r| r.length >= RESERVE_LENGTH)
         .expect("no available memory regions big enough to reserve");
 
     //    info!("gonna reserve {:?}", reserved_region);

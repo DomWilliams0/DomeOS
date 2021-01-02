@@ -1,12 +1,12 @@
 use kernel_utils::memory::address::PhysicalAddress;
-use kernel_utils::memory::page_table::hierarchy::{P3, P4, PageTableHierarchy};
+use kernel_utils::memory::page_table::hierarchy::{P3, P4};
 use kernel_utils::memory::page_table::PageTable;
 use kernel_utils::prelude::*;
 
 fn cr3() -> u64 {
     let value: u64;
     unsafe {
-        asm!("mov %cr3, $0" : "=r" (value));
+        llvm_asm!("mov %cr3, $0" : "=r" (value));
     }
     value
 }
@@ -27,7 +27,7 @@ pub fn set_pml4(p4: P4<'static>) {
     cr3.set_bit_range(51, 12, ptr.to_4096_aligned());
 
     unsafe {
-        asm!("mov $0, %cr3" :: "r" (cr3) : "memory");
+        llvm_asm!("mov $0, %cr3" :: "r" (cr3) : "memory");
     }
 }
 pub fn walk_active_page_hierarchy() {
