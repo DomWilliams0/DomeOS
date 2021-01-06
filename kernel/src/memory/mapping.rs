@@ -253,4 +253,8 @@ pub fn init(multiboot: &multiboot_info) {
     for x in MemoryRegions::new(multiboot).available() {
         info!("can use {:?}", x);
     }
+
+    let x = 5usize;
+    info!("stack var is at {:?}", &x as *const _);
+
 }

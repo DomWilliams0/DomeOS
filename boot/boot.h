@@ -1,0 +1,1 @@
+%define KERNEL_VIRT 0xffffffff80000000
