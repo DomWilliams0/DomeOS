@@ -3,6 +3,8 @@ use kernel_utils::prelude::Bit;
 pub use memory_map::{MemoryRegion, MemoryRegionType};
 
 use crate::multiboot::ctypes::c_void;
+use core::fmt::{Display, Formatter};
+use core::marker::PhantomData;
 
 /// Stolen from libc::unix
 #[allow(warnings)]
@@ -42,22 +44,43 @@ pub fn parse(magic: u32, multiboot: *mut c_void) -> Result<*mut multiboot_info, 
     }
 }
 
-pub fn print_commandline(multiboot: &multiboot_info) {
-    use crate::{print, println};
+pub struct CommandLine<'multiboot> {
+    start: *mut u8,
+    phantom: PhantomData<&'multiboot ()>,
+}
 
-    // TODO use log with partial message?
-    if multiboot.flags.bit(2) {
-        print!("multiboot command line: '");
+impl<'multiboot> CommandLine<'multiboot> {
+    pub fn init(multiboot: &multiboot_info) -> Option<Self> {
+        if multiboot.flags.bit(2) {
+            Some(Self {
+                start: multiboot.cmdline as *mut u8,
+                phantom: PhantomData,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl Display for CommandLine<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let mut ptr = self.start;
+        // safety: field is initialized from multiboot when bit 2 is set, and lifetime ensures this
+        // doesn't outlive the data
         unsafe {
-            let mut ptr = multiboot.cmdline as *mut u8;
-            loop {
-                if *ptr == 0x00 {
-                    break;
-                }
-                print!("{}", *ptr as char);
+            while *ptr != 0x00 {
+                write!(f, "{}", *ptr as char)?;
                 ptr = ptr.add(1);
             }
         }
-        println!("'");
+
+        Ok(())
+    }
+}
+
+pub fn log_command_line(multiboot: &multiboot_info) {
+    match CommandLine::init(multiboot) {
+        None => log::info!("no command line args given"),
+        Some(args) => log::info!("command line: '{}'", args),
     }
 }

@@ -33,7 +33,7 @@ fn parse_multiboot(multiboot: &multiboot::multiboot_info) {
         );
     }
 
-    multiboot::print_commandline(multiboot);
+    multiboot::log_command_line(multiboot);
 
     // memory::walk_active_page_hierarchy();
     memory::init(multiboot);
