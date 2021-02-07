@@ -3,14 +3,13 @@ use core::{mem, panic};
 use log::*;
 
 use kernel_utils::memory::address::{PhysicalAddress, VirtualAddress};
-use kernel_utils::memory::page_table::hierarchy::{Frame, P1, P2, P3, P4};
 use kernel_utils::memory::page_table::{
     CommonEntry, Executable, Overwrite, PageTable, Writeable, PAGE_TABLE_ENTRY_COUNT,
 };
 use kernel_utils::memory::{kilobytes, megabytes, terabytes};
 
 use crate::idt;
-use crate::memory::page_table::{pml4, set_pml4};
+use crate::memory::page_table::{log_active_page_hierarchy, pml4, set_pml4};
 use crate::multiboot::{multiboot_info, MemoryRegion};
 
 /// Kernel virtual addresses: 128TiB -> 192TiB
@@ -80,7 +79,7 @@ struct KernelStack {
 }
 
 fn remap_kernel(reserved_region: MemoryRegion) {
-    let (old_start, old_end) = kernel_range();
+    /*    let (old_start, old_end) = kernel_range();
     let kernel_size = old_end - old_start;
     debug!(
         "kernel code ranges from {:#x?} to {:#x?}",
@@ -202,15 +201,15 @@ fn remap_kernel(reserved_region: MemoryRegion) {
     //    testy();
     let jmp = VirtualAddress::new(KERNEL_START_ADDR + testy as *const () as u64 - old_start);
     debug!("set rsp to {:?} and jmp to {:?}", kernel_stack, jmp);
-    set_pml4(P4::PML4T(p4_table));
+    set_pml4(P4(p4_table));
     idt::remap(KERNEL_START_ADDR);
     unsafe {
         llvm_asm!("mov $0, %rsp\n\
               jmp *$1" :: "r" (kernel_stack.0), "r" (jmp));
-    }
+    }*/
 }
 
-fn map_region<'p>(
+/*fn map_region<'p>(
     p4: &mut PageTable<'p, P3<'p>>,
     start_phys: PhysicalAddress,
     len: u64,
@@ -242,11 +241,7 @@ fn map_region<'p>(
         pages -= pages_this_round;
     })
 }
-
-fn testy() {
-    let x = 5;
-    debug!("hello from {:?}", &x as *const _);
-}
+*/
 
 pub fn init(multiboot: &multiboot_info) {
     const RESERVE_LENGTH: u64 = megabytes(4);
@@ -254,6 +249,5 @@ pub fn init(multiboot: &multiboot_info) {
         info!("* {:?}", region);
     }
 
-    let x = 5usize;
-    info!("stack var is at {:?}", &x as *const _);
+    log_active_page_hierarchy();
 }

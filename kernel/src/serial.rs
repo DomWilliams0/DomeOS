@@ -181,8 +181,8 @@ impl Log for LockedSerialLogger {
                 let (fg, bg) = match record.level() {
                     Level::Error => (Color::White, Color::Red),
                     Level::Warn => (Color::Yellow, Color::Black),
-                    Level::Info => (Color::LightBlue, Color::Black),
-                    Level::Debug => (Color::Cyan, Color::Black),
+                    Level::Info => (Color::Cyan, Color::Black),
+                    Level::Debug => (Color::LightBlue, Color::Black),
                     Level::Trace => (Color::LightCyan, Color::Black),
                 };
                 let _colors = vga::set_colors(fg, bg);

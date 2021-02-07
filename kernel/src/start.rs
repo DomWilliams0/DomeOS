@@ -35,13 +35,7 @@ fn parse_multiboot(multiboot: &multiboot::multiboot_info) {
 
     multiboot::log_command_line(multiboot);
 
-    // memory::walk_active_page_hierarchy();
     memory::init(multiboot);
-    //
-    //    memory::remap_kernel();
-    //
-    //    // register available memory regions
-    //    memory::free_pages::init_free_pages(MemoryRegions::new(multiboot));
 }
 
 fn breakpoint() {
