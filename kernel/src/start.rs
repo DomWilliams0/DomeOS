@@ -3,12 +3,11 @@ use log::*;
 use kernel_utils::prelude::*;
 
 use crate::irq::{disable_interrupts, enable_interrupts};
-use crate::multiboot::{MemoryRegion, MemoryRegionType};
+
 use crate::serial::LogMode;
 use crate::vga::{self, Color};
 use crate::{clock, idt, serial};
 use crate::{memory, multiboot};
-use kernel_utils::memory::address::PhysicalAddress;
 
 pub fn start(multiboot: &multiboot::multiboot_info) -> ! {
     vga::init(Color::LightGreen, Color::Black);
@@ -20,6 +19,7 @@ pub fn start(multiboot: &multiboot::multiboot_info) -> ! {
 
     parse_multiboot(multiboot);
 
+    info!("goodbye!");
     hang();
 }
 

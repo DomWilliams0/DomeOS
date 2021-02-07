@@ -21,7 +21,7 @@ file(GENERATE
      set timeout=0
      set default=0
      menuentry \"domeos\" {
-         multiboot /boot/$<TARGET_FILE_BASE_NAME:${PROJECT_NAME}> some command line args
+         multiboot /boot/$<TARGET_FILE_BASE_NAME:${PROJECT_NAME}> some args in grub.cfg
          boot
      }")
 

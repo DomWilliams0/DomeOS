@@ -1,6 +1,6 @@
 pub use generated::*;
 use kernel_utils::prelude::Bit;
-pub use memory_map::{MemoryRegion, MemoryRegionType, MemoryRegions};
+pub use memory_map::{MemoryRegion, MemoryRegionType};
 
 use crate::multiboot::ctypes::c_void;
 
@@ -45,8 +45,9 @@ pub fn parse(magic: u32, multiboot: *mut c_void) -> Result<*mut multiboot_info, 
 pub fn print_commandline(multiboot: &multiboot_info) {
     use crate::{print, println};
 
+    // TODO use log with partial message?
     if multiboot.flags.bit(2) {
-        print!("command line: '");
+        print!("multiboot command line: '");
         unsafe {
             let mut ptr = multiboot.cmdline as *mut u8;
             loop {

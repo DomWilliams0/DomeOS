@@ -3,7 +3,7 @@ use log::*;
 
 use kernel_utils::memory::address::PhysicalAddress;
 
-use crate::multiboot::{MemoryRegionType, MemoryRegions};
+use crate::multiboot::{MemoryRegion, MemoryRegionType};
 
 /// Arbitrary limit because we have no allocation yet, and so far I've yet to see
 /// more than 2 available memory regions
@@ -13,7 +13,7 @@ static mut PAGE_REGIONS: [Option<BuddyAlloc>; MAX_PAGE_REGIONS] = [None; MAX_PAG
 /// Number of page regions, will be >0
 static mut PAGE_REGION_COUNT: usize = 0;
 
-pub fn init_free_pages(regions: MemoryRegions) {
+pub fn init_free_pages(regions: impl Iterator<Item = MemoryRegion>) {
     for region in regions.filter(|r| r.region_type == MemoryRegionType::Available) {
         let idx = unsafe { PAGE_REGION_COUNT };
 

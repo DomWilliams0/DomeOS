@@ -11,7 +11,7 @@ use kernel_utils::memory::{kilobytes, megabytes, terabytes};
 
 use crate::idt;
 use crate::memory::page_table::{pml4, set_pml4};
-use crate::multiboot::{multiboot_info, MemoryRegion, MemoryRegions};
+use crate::multiboot::{multiboot_info, MemoryRegion};
 
 /// Kernel virtual addresses: 128TiB -> 192TiB
 /// Physical mapping:         192TiB -> 256TiB
@@ -250,11 +250,10 @@ fn testy() {
 
 pub fn init(multiboot: &multiboot_info) {
     const RESERVE_LENGTH: u64 = megabytes(4);
-    for x in MemoryRegions::new(multiboot).available() {
-        info!("can use {:?}", x);
+    for region in MemoryRegion::iter_from_multiboot(multiboot) {
+        info!("* {:?}", region);
     }
 
     let x = 5usize;
     info!("stack var is at {:?}", &x as *const _);
-
 }

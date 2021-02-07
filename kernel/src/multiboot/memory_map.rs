@@ -9,6 +9,8 @@ use crate::multiboot::memory_map::MemoryRegionType::{
     Acpi, Available, Defective, PreserveOnHibernation, Reserved,
 };
 use crate::multiboot::{multiboot_info, multiboot_memory_map_t, multiboot_mmap_entry};
+use core::iter;
+use core::mem;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum MemoryRegionType {
@@ -31,7 +33,6 @@ impl From<u32> for MemoryRegionType {
     }
 }
 
-//#[derive(Debug)]
 pub struct MemoryRegion {
     pub base_addr: PhysicalAddress,
     pub length: u64,
@@ -49,71 +50,45 @@ impl Debug for MemoryRegion {
 }
 
 impl MemoryRegion {
-    pub fn range(&self) -> Range<u64> {
-        self.base_addr.0..self.base_addr.0 + self.length
-    }
-}
-
-impl From<&multiboot_memory_map_t> for MemoryRegion {
-    fn from(mmap: &multiboot_mmap_entry) -> Self {
+    pub fn new(mmap: &multiboot_mmap_entry) -> Self {
         Self {
             base_addr: PhysicalAddress(mmap.addr),
             length: mmap.len,
             region_type: mmap.type_.into(),
         }
     }
-}
 
-pub struct MemoryRegions {
-    current: *mut multiboot_memory_map_t,
-    end: *mut multiboot_memory_map_t,
-}
+    pub fn range(&self) -> Range<u64> {
+        self.base_addr.0..self.base_addr.0 + self.length
+    }
 
-impl MemoryRegions {
-    pub fn new(mbi: &multiboot_info) -> Self {
+    pub fn iter_from_multiboot(mbi: &multiboot_info) -> impl Iterator<Item = Self> {
         assert!(mbi.flags.bit(6), "memory map isn't available");
 
         let start = mbi.mmap_addr as *mut multiboot_memory_map_t;
         let end = (mbi.mmap_addr + mbi.mmap_length) as *mut multiboot_memory_map_t;
-        Self {
-            current: start,
-            end,
-        }
-    }
 
-    pub fn available(self) -> impl Iterator<Item = MemoryRegion> {
-        self.into_iter()
-            .filter(|r| r.region_type == MemoryRegionType::Available)
-    }
-}
+        let mut current = start;
+        iter::from_fn(move || {
+            while current < end {
+                // safety: current is < self.end
+                let mmap = unsafe { &*current };
+                let region = MemoryRegion::new(mmap);
 
-impl Iterator for MemoryRegions {
-    type Item = MemoryRegion;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if self.current >= self.end {
-                break None;
-            } else {
-                // Safety: current is < self.end
-                let mmap = unsafe { &*self.current };
-                let region = MemoryRegion::from(mmap);
-
-                // Safety: move on to next in bytes, not multiples of multiboot_memory_map_t
-                self.current = unsafe {
-                    let bytes_offset = mmap.size as usize + core::mem::size_of_val(&mmap.size);
-                    let ptr = self.current as *mut u8;
-                    let ptr = ptr.add(bytes_offset);
-                    ptr as *mut multiboot_memory_map_t
+                // advance by number of bytes in entry, NOT multiples of struct
+                current = unsafe {
+                    let bytes_offset = mmap.size as usize + mem::size_of_val(&mmap.size);
+                    let ptr = current as *mut u8;
+                    ptr.add(bytes_offset) as *mut multiboot_memory_map_t
                 };
 
-                // Ignore length == 0
-                if region.length == 0 {
-                    continue;
-                } else {
-                    break Some(region);
+                // ignore region if length == 0
+                if region.length != 0 {
+                    return Some(region);
                 }
             }
-        }
+
+            None
+        })
     }
 }
