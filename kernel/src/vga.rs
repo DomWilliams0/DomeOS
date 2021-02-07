@@ -64,6 +64,8 @@ pub fn set_colors(fg: Color, bg: Color) -> ColorGuard {
 }
 
 pub fn init(fg: Color, bg: Color) {
+    debug_assert!(!is_initialized());
+
     unsafe {
         SCREEN
             .as_mut_ptr()

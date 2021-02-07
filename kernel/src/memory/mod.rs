@@ -19,15 +19,14 @@ pub fn init(multiboot: &'static crate::multiboot::multiboot_info) {
         debug!("* {:?}", region);
     }
 
-    log_active_page_hierarchy();
-
     // init physical frame allocator
     let mut alloc = DumbFrameAllocator::new(multiboot);
-    // for (i, frame) in core::iter::from_fn(|| alloc.allocate()).enumerate() {
-    //     if i % 4096 == 0 {
-    //         debug!("frame {:4}: {:?}", i, frame.address());
-    //     }
-    // }
+    for (i, frame) in core::iter::from_fn(|| alloc.allocate())
+        .enumerate()
+        .take(12)
+    {
+        debug!("frame {:4}: {:?}", i, frame.address());
+    }
 
     // init virtual memory allocator
 

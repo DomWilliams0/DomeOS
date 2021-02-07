@@ -77,6 +77,7 @@ impl VirtualAddress {
 pub struct PhysicalAddress(pub u64);
 
 impl PhysicalAddress {
+    /// Shifts left 12 bytes
     pub fn from_4096_aligned(addr: u64) -> Self {
         Self(addr.shl(ADDRESS_SHIFT))
     }
