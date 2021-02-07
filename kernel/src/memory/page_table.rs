@@ -1,7 +1,7 @@
-use kernel_utils::memory::address::PhysicalAddress;
-use kernel_utils::memory::page_table::PageTable;
-use kernel_utils::memory::{P1, P2, P3, P4};
-use kernel_utils::prelude::*;
+use utils::memory::address::PhysicalAddress;
+use utils::memory::page_table::PageTable;
+use utils::memory::{P1, P2, P3, P4};
+use utils::prelude::*;
 use log::*;
 
 fn cr3() -> u64 {

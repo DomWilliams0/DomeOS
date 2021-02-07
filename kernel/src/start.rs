@@ -1,6 +1,6 @@
 use log::*;
 
-use kernel_utils::prelude::*;
+use utils::prelude::*;
 
 use crate::irq::{disable_interrupts, enable_interrupts};
 

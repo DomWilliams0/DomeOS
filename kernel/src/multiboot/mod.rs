@@ -1,5 +1,5 @@
 pub use generated::*;
-use kernel_utils::prelude::Bit;
+use utils::prelude::Bit;
 pub use memory_map::{MemoryRegion, MemoryRegionType};
 
 use crate::multiboot::ctypes::c_void;

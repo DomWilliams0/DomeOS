@@ -1,7 +1,7 @@
 use buddy_alloc::buddy_alloc::BuddyAlloc;
 use log::*;
 
-use kernel_utils::memory::address::PhysicalAddress;
+use utils::memory::address::PhysicalAddress;
 
 use crate::multiboot::{MemoryRegion, MemoryRegionType};
 

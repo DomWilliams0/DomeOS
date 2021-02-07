@@ -2,11 +2,11 @@ use core::{mem, panic};
 
 use log::*;
 
-use kernel_utils::memory::address::{PhysicalAddress, VirtualAddress};
-use kernel_utils::memory::page_table::{
+use utils::memory::address::{PhysicalAddress, VirtualAddress};
+use utils::memory::page_table::{
     CommonEntry, Executable, Overwrite, PageTable, Writeable, PAGE_TABLE_ENTRY_COUNT,
 };
-use kernel_utils::memory::{kilobytes, megabytes, terabytes};
+use utils::memory::{kilobytes, megabytes, terabytes};
 
 use crate::idt;
 use crate::memory::free_pages::init_free_pages;

@@ -1,6 +1,6 @@
 use crate::multiboot::{multiboot_info, MemoryRegion, MemoryRegionType};
 use core::mem::MaybeUninit;
-use kernel_utils::memory::address::PhysicalAddress;
+use utils::memory::address::PhysicalAddress;
 use log::*;
 
 pub struct PhysicalFrame(PhysicalAddress);

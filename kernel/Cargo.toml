@@ -10,7 +10,7 @@ crate-type = ["staticlib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-kernel_utils = { path = "../kernel_utils", default-features = false }
+utils = { path = "../utils", default-features = false }
 spin = "0.7"
 volatile = "0.4"
 modular-bitfield = "0.6"

@@ -1,8 +1,8 @@
 use core::convert::TryFrom;
 use core::fmt::{Debug, Error, Formatter};
 
-use kernel_utils::memory::address::VirtualAddress;
-use kernel_utils::prelude::*;
+use utils::memory::address::VirtualAddress;
+use utils::prelude::*;
 
 use crate::irq::InterruptContext;
 
