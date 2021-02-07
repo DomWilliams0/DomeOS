@@ -19,6 +19,6 @@ fn panic_handler(panic_info: &PanicInfo) -> ! {
 }
 
 pub fn is_panicking() -> bool {
-    // safety: switch it flipped false->true once only
+    // safety: switch flipped false->true once only
     unsafe { PANICKED }
 }

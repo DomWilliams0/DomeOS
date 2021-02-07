@@ -169,7 +169,11 @@ impl Log for LockedSerialLogger {
                 COM1.write_fmt(format_args!(
                     "[{:.08} {} {}] {}\n",
                     clock::since_boot().as_secs_f64(),
-                    record.target(),
+                    {
+                        let tgt = record.target();
+                        let idx = tgt.find("::").map(|idx| idx + 2).unwrap_or(0);
+                        &tgt[idx..]
+                    },
                     record.level(),
                     record.args()
                 ))
