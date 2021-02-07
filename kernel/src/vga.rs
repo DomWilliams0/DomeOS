@@ -15,33 +15,6 @@ type VGABuffer = [[Volatile<ScreenChar>; WIDTH]; HEIGHT];
 static mut SCREEN: MaybeUninit<spin::Mutex<Screen>> = MaybeUninit::uninit();
 static mut SCREEN_INIT: bool = false;
 
-pub fn init(fg: Color, bg: Color) {
-    unsafe {
-        SCREEN
-            .as_mut_ptr()
-            .write(spin::Mutex::new(Screen::with_colors(fg, bg)));
-        SCREEN_INIT = true;
-    }
-}
-
-pub fn get<'a>() -> spin::MutexGuard<'a, Screen> {
-    unsafe { SCREEN.assume_init_mut().lock() }
-}
-
-pub fn is_initialized() -> bool {
-    unsafe { SCREEN_INIT }
-}
-
-fn fill<FG, BG>(fg: FG, bg: BG)
-where
-    FG: Into<Option<Color>>,
-    BG: Into<Option<Color>>,
-{
-    let mut screen = get();
-    screen.set_colors(fg, bg);
-    screen.clear()
-}
-
 #[allow(unused)]
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -88,6 +61,37 @@ pub fn set_colors(fg: Color, bg: Color) -> ColorGuard {
 
     vga.set_colors(fg, bg);
     guard
+}
+
+pub fn init(fg: Color, bg: Color) {
+    unsafe {
+        SCREEN
+            .as_mut_ptr()
+            .write(spin::Mutex::new(Screen::with_colors(fg, bg)));
+        SCREEN_INIT = true;
+    }
+}
+
+pub fn get<'a>() -> spin::MutexGuard<'a, Screen> {
+    unsafe { SCREEN.assume_init_mut().lock() }
+}
+
+pub fn is_initialized() -> bool {
+    unsafe { SCREEN_INIT }
+}
+
+fn fill<FG, BG>(fg: FG, bg: BG)
+where
+    FG: Into<Option<Color>>,
+    BG: Into<Option<Color>>,
+{
+    let mut screen = get();
+    screen.set_colors(fg, bg);
+    screen.clear()
+}
+
+pub fn set_error_colors() {
+    get().set_colors(Color::White, Color::Red);
 }
 
 impl ScreenChar {
