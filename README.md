@@ -6,10 +6,10 @@ Only tested on Linux with the Rust nightly specified in `rust-toolchain`.
 
 Dependencies:
 
-	* mtools
-	* grub
-	* xorriso
-	* qemu
+* mtools
+* grub
+* xorriso
+* qemu
 
 ```
 mkdir build
