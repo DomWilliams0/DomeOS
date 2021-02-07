@@ -12,7 +12,7 @@ use crate::multiboot::{multiboot_info, multiboot_memory_map_t, multiboot_mmap_en
 use core::iter;
 use core::mem;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub enum MemoryRegionType {
     Available,
     Acpi,
@@ -62,7 +62,7 @@ impl MemoryRegion {
         self.base_addr.0..self.base_addr.0 + self.length
     }
 
-    pub fn iter_from_multiboot(mbi: &multiboot_info) -> impl Iterator<Item = Self> {
+    pub fn iter_from_multiboot(mbi: &multiboot_info) -> impl Iterator<Item = Self> + Clone {
         assert!(mbi.flags.bit(6), "memory map isn't available");
 
         let start = mbi.mmap_addr as *mut multiboot_memory_map_t;

@@ -14,8 +14,13 @@ static mut PAGE_REGIONS: [Option<BuddyAlloc>; MAX_PAGE_REGIONS] = [None; MAX_PAG
 static mut PAGE_REGION_COUNT: usize = 0;
 
 pub fn init_free_pages(regions: impl Iterator<Item = MemoryRegion>) {
-    for region in regions.filter(|r| r.region_type == MemoryRegionType::Available) {
+    for region in regions.filter(|r| matches!(r.region_type, MemoryRegionType::Available)) {
         let idx = unsafe { PAGE_REGION_COUNT };
+
+        info!(
+            "static is at {:?}",
+            PhysicalAddress(unsafe { &PAGE_REGION_COUNT } as *const _ as u64)
+        );
 
         if idx >= MAX_PAGE_REGIONS {
             warn!("got too many available page regions, stopping early");

@@ -9,6 +9,7 @@ use kernel_utils::memory::page_table::{
 use kernel_utils::memory::{kilobytes, megabytes, terabytes};
 
 use crate::idt;
+use crate::memory::free_pages::init_free_pages;
 use crate::memory::page_table::{log_active_page_hierarchy, pml4, set_pml4};
 use crate::multiboot::{multiboot_info, MemoryRegion};
 
@@ -244,10 +245,12 @@ fn remap_kernel(reserved_region: MemoryRegion) {
 */
 
 pub fn init(multiboot: &multiboot_info) {
-    const RESERVE_LENGTH: u64 = megabytes(4);
-    for region in MemoryRegion::iter_from_multiboot(multiboot) {
-        info!("* {:?}", region);
+    let regions = MemoryRegion::iter_from_multiboot(multiboot);
+    for region in regions.clone() {
+        debug!("* {:?}", region);
     }
+
+    init_free_pages(regions);
 
     log_active_page_hierarchy();
 }

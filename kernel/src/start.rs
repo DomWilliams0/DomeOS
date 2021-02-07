@@ -9,7 +9,7 @@ use crate::vga::{self, Color};
 use crate::{clock, idt, serial};
 use crate::{memory, multiboot};
 
-pub fn start(multiboot: &multiboot::multiboot_info) -> ! {
+pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     vga::init(Color::LightGreen, Color::Black);
     serial::set_log_mode(LogMode::SerialAndVga);
 
@@ -23,7 +23,7 @@ pub fn start(multiboot: &multiboot::multiboot_info) -> ! {
     hang();
 }
 
-fn parse_multiboot(multiboot: &multiboot::multiboot_info) {
+fn parse_multiboot(multiboot: &'static multiboot::multiboot_info) {
     debug!("multiboot flags: {:#b}", multiboot.flags);
 
     if multiboot.flags.bit(0) {
