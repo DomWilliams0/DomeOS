@@ -3,8 +3,9 @@ mod free_pages;
 #[deprecated]
 mod mapping;
 
-mod frames;
 mod page_table;
+mod phys;
+mod virt;
 
 pub fn init(multiboot: &'static crate::multiboot::multiboot_info) {
     use crate::multiboot::MemoryRegion;
@@ -17,14 +18,16 @@ pub fn init(multiboot: &'static crate::multiboot::multiboot_info) {
     }
 
     // init physical frame allocator
-    frames::init_frame_allocator(multiboot);
-    for i in 0..12 {
-        use frames::FrameAllocator;
-        let frame = frames::frame_allocator().allocate().unwrap();
+    phys::init_frame_allocator(multiboot);
+    for i in 0..8 {
+        use phys::FrameAllocator;
+        let frame = phys::frame_allocator().allocate_any().unwrap();
         debug!("frame {:4}: {:?}", i, frame.address());
     }
 
     // init virtual memory allocator
+    // r#virt::init_virtual_allocator();
 
-    // resize 4MB identity mapping?
+    // TODO remove 0x0 identity mapping
+    // TODO resize kernel mapping to fit exactly
 }

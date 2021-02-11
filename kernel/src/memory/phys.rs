@@ -1,20 +1,23 @@
+use crate::memory::phys::physical_size::{kernel_end, kernel_size};
 use crate::multiboot::{multiboot_info, MemoryRegion, MemoryRegionType};
 use core::mem::MaybeUninit;
-use utils::memory::address::PhysicalAddress;
 use log::*;
+use utils::memory::address::PhysicalAddress;
+use utils::InitializedGlobal;
 
 pub struct PhysicalFrame(PhysicalAddress);
 
 pub trait FrameAllocator {
-    fn allocate(&mut self) -> Option<PhysicalFrame>;
+    /// Finds a free physical frame located after 1MB and the kernel
+    fn allocate_any(&mut self) -> Option<PhysicalFrame>;
+
+    /// Finds a free physical frame below 1MB
+    fn allocate_low(&mut self) -> Option<PhysicalFrame>;
 
     // TODO free
 }
 
-static mut FRAME_ALLOCATOR: MaybeUninit<DumbFrameAllocator> = MaybeUninit::uninit();
-
-#[cfg(debug_assertions)]
-static mut FRAME_ALLOCATOR_INIT: bool = false;
+static mut FRAME_ALLOCATOR: InitializedGlobal<DumbFrameAllocator> = InitializedGlobal::uninit();
 
 struct DumbFrameAllocator {
     multiboot: &'static multiboot_info,
@@ -23,40 +26,27 @@ struct DumbFrameAllocator {
     /// First frame to dish out after the kernel
     start: u64,
 }
-
-extern "C" {
-    static KERNEL_END: usize;
-    static KERNEL_VIRT: usize;
-}
-
 pub fn init_frame_allocator(mbi: &'static multiboot_info) {
-    debug_assert!(unsafe { !FRAME_ALLOCATOR_INIT });
+    let size = kernel_size();
+    debug!("kernel is {} ({:#x})bytes", size, size);
+    assert!(
+        size < 4 * 1024 * 1024,
+        "kernel is bigger than 4MB, initial identity mapping is too small!"
+    );
 
+    let allocator = DumbFrameAllocator::new(mbi);
     unsafe {
-        FRAME_ALLOCATOR = MaybeUninit::new(DumbFrameAllocator::new(mbi));
-
-        #[cfg(debug_assertions)]
-        {
-            FRAME_ALLOCATOR_INIT = true;
-        }
+        FRAME_ALLOCATOR.init(allocator);
     }
 }
 
 pub fn frame_allocator() -> &'static mut impl FrameAllocator {
-    debug_assert!(unsafe { FRAME_ALLOCATOR_INIT });
-
-    // safety: asserted initialized
-    unsafe { FRAME_ALLOCATOR.assume_init_mut() }
+    unsafe { FRAME_ALLOCATOR.get() }
 }
 
 impl DumbFrameAllocator {
     fn new(mbi: &'static multiboot_info) -> Self {
-        let kernel_end = unsafe {
-            let end = (&KERNEL_END) as *const _ as u64;
-            let virt_offset = (&KERNEL_VIRT) as *const _ as u64;
-
-            end - virt_offset
-        };
+        let kernel_end = kernel_end();
 
         trace!("kernel ends at {:#x}", kernel_end);
         DumbFrameAllocator {
@@ -85,15 +75,43 @@ impl DumbFrameAllocator {
 }
 
 impl FrameAllocator for DumbFrameAllocator {
-    fn allocate(&mut self) -> Option<PhysicalFrame> {
+    fn allocate_any(&mut self) -> Option<PhysicalFrame> {
         let next = self.all_frames().nth(self.next);
         self.next += 1;
         next
+    }
+
+    fn allocate_low(&mut self) -> Option<PhysicalFrame> {
+        unimplemented!()
     }
 }
 
 impl PhysicalFrame {
     pub fn address(&self) -> PhysicalAddress {
         self.0
+    }
+}
+
+mod physical_size {
+    extern "C" {
+        static KERNEL_END: usize;
+        static KERNEL_VIRT: usize;
+        static KERNEL_PHYS: usize;
+    }
+
+    /// Physical address of KERNEL_END symbol
+    pub fn kernel_end() -> u64 {
+        unsafe {
+            let end = (&KERNEL_END) as *const _ as u64;
+            let virt_offset = (&KERNEL_VIRT) as *const _ as u64;
+
+            end - virt_offset
+        }
+    }
+
+    pub fn kernel_size() -> u64 {
+        let kernel_start = unsafe { (&KERNEL_PHYS) as *const _ as u64 };
+
+        kernel_end() - kernel_start
     }
 }

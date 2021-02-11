@@ -11,7 +11,7 @@ fn panic_handler(panic_info: &PanicInfo) -> ! {
     }
 
     // log to serial and vga if enabled
-    error!("panic occurred: {:?}", panic_info);
+    error!("panic occurred: {:#?}", panic_info);
 
     // TODO dump regs
 

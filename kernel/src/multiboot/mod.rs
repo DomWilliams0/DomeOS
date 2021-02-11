@@ -1,6 +1,6 @@
 pub use generated::*;
-use utils::prelude::Bit;
 pub use memory_map::{MemoryRegion, MemoryRegionType};
+use utils::prelude::Bit;
 
 use crate::multiboot::ctypes::c_void;
 use core::fmt::{Display, Formatter};

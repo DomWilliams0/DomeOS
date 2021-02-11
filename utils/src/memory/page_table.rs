@@ -10,7 +10,7 @@ use crate::memory::hierarchy::PageTableHierarchy;
 use crate::memory::Frame;
 
 #[derive(BitFlags, Copy, Clone, Eq, PartialEq)]
-#[repr(u8)]
+#[repr(u64)]
 enum PageTableFlag {
     Present = 1 << 0,
     Write = 1 << 1,
@@ -24,14 +24,13 @@ enum PageTableFlag {
 
     /// Used in 2 middle layers: if set it's the bottom
     /// of the hierarchy
-    PageSize = 1 << 7,
-    /*
-        /// Only present in lowest level of hierarchy, if set
-        /// TLB wont be invalidated (requires CR4.PGE)
-        Global = 1<<8,
+    HugePages = 1 << 7,
 
-        NoExecute = 1<<63,
-    */
+    /// Only present in lowest level of hierarchy, if set
+    /// TLB wont be invalidated (requires CR4.PGE)
+    Global = 1 << 8,
+
+    NoExecute = 1 << 63,
 }
 
 // page map level 4
@@ -78,7 +77,7 @@ impl Debug for PageTableFlags {
             write!(f, " | DIRTY")?;
         }
 
-        if self.0.contains(PageTableFlag::PageSize) {
+        if self.0.contains(PageTableFlag::HugePages) {
             write!(f, " | BIG_PAGE")?;
         }
 
@@ -149,7 +148,7 @@ impl<'p, P: PageTableHierarchy<'p>> CommonEntry<'p, P> {
     }
 
     pub fn huge_pages(&self) -> bool {
-        self.flags.0.contains(PageTableFlag::PageSize)
+        self.flags.0.contains(PageTableFlag::HugePages)
     }
 
     pub fn set_present(&mut self, present: bool) {
