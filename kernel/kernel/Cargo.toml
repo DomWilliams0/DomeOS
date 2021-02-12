@@ -1,0 +1,20 @@
+[package]
+name = "domeos-kernel"
+version = "0.1.0"
+authors = ["Dom Williams <me@domwillia.ms>"]
+edition = "2018"
+
+[lib]
+crate-type = ["staticlib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+utils = { path = "../utils", default-features = false }
+spin = "0.7"
+volatile = "0.4"
+modular-bitfield = "0.6"
+log = "0.4"
+enumflags2 = "0.6"
+bitfield = "0.13"
+buddy-alloc = "0.4"
