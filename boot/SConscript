@@ -1,0 +1,7 @@
+src = Dir("#boot")
+env = Environment(tools=["default", "nasm"], ASFLAGS=["-I", src.path, "-felf64"])
+
+boot_objs = [env.StaticObject(src) for src in Glob("*.asm")]
+
+Export("boot_objs")
+
