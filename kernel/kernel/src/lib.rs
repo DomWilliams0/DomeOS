@@ -4,7 +4,6 @@
 #![feature(abi_x86_interrupt)]
 #![feature(llvm_asm)]
 #![feature(panic_info_message)]
-#![feature(const_in_array_repeat_expressions)]
 use core::ffi::c_void;
 
 use log::*;

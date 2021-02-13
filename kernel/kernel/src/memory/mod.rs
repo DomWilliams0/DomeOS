@@ -1,8 +1,5 @@
 use utils::memory::*;
 
-#[deprecated]
-mod free_pages;
-
 mod page_table;
 mod phys;
 mod virt;
