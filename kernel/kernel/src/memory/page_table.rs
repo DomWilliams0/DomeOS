@@ -16,12 +16,11 @@ pub fn pml4() -> P4<'static> {
     let addr = cr3().bit_range(51, 12);
     let ptr = PhysicalAddress::from_4096_aligned(addr);
     let table = ptr.0 as *mut PageTable<'static, P3<'static>>;
-    P4(unsafe { &mut *table })
+    P4::with_initialized(unsafe { &mut *table })
 }
 
-pub fn set_pml4(p4: P4<'static>) {
-    let P4(table) = p4;
-    let ptr = PhysicalAddress(table as *const PageTable<'static, P3<'static>> as u64);
+pub fn set_pml4(mut p4: P4<'static>) {
+    let ptr = PhysicalAddress((&mut *p4) as *const PageTable<'static, P3<'static>> as u64);
 
     let mut cr3 = cr3();
     cr3.set_bit_range(51, 12, ptr.to_4096_aligned());
@@ -31,11 +30,11 @@ pub fn set_pml4(p4: P4<'static>) {
     }
 }
 pub fn log_active_page_hierarchy() {
-    let P4(p4) = pml4();
+    let p4 = pml4();
     for (i, e) in p4.present_entries() {
         info!("pml4e {}: {:?}", i, e);
 
-        let P3(p3) = e.traverse().unwrap();
+        let p3 = e.traverse().unwrap();
         for (i, e) in p3.present_entries() {
             info!(" pdpe {}: {:?}", i, e);
 

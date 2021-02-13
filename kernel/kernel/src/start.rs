@@ -8,6 +8,7 @@ use crate::serial::LogMode;
 use crate::vga::{self, Color};
 use crate::{clock, idt, serial};
 use crate::{memory, multiboot};
+use utils::KernelResult;
 
 pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     vga::init(Color::LightGreen, Color::Black);
@@ -18,6 +19,15 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     enable_interrupts();
 
     parse_multiboot(multiboot);
+
+    let init_result = (|| -> KernelResult<()> {
+        memory::init(multiboot)?;
+        Ok(())
+    })();
+
+    if let Err(err) = init_result {
+        error!("setup failed: {}", err);
+    }
 
     info!("goodbye!");
     hang();
@@ -34,8 +44,6 @@ fn parse_multiboot(multiboot: &'static multiboot::multiboot_info) {
     }
 
     multiboot::log_command_line(multiboot);
-
-    memory::init(multiboot);
 }
 
 fn breakpoint() {

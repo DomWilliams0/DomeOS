@@ -4,7 +4,7 @@ Import("out_dir")
 env = Environment(ENV=os.environ)
 
 kernel_lib = os.path.join(Dir("#kernel").abspath, "target/domeos/debug/libdomeos_kernel.a")
-kernel_lib = env.Command(kernel_lib, [], "cargo build", chdir=1)
+kernel_lib = env.Command(kernel_lib, [], "cargo build", chdir="kernel")
 env.AlwaysBuild(kernel_lib)
 
 Export("kernel_lib")

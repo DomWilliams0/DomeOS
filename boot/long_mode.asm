@@ -18,7 +18,7 @@ init_pml4:
 init_pdp:
 	dq init_pd - KERNEL_VIRT + 3
 	times 509 dq 0
-	dq init_pd - KERNEL_VIRT + 3
+	dq 0x0000000000000083 ; 1GB page (PRESENT | WRITEABLE | HUGE)
 	dq 0
 
 init_pd:

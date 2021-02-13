@@ -1,18 +1,17 @@
 use crate::memory::phys::physical_size::{kernel_end, kernel_size};
 use crate::multiboot::{multiboot_info, MemoryRegion, MemoryRegionType};
-use core::mem::MaybeUninit;
 use log::*;
 use utils::memory::address::PhysicalAddress;
-use utils::InitializedGlobal;
+use utils::memory::PhysicalFrame;
+use utils::{InitializedGlobal, KernelError, KernelResult};
 
-pub struct PhysicalFrame(PhysicalAddress);
-
+/// Allocates physical pages
 pub trait FrameAllocator {
     /// Finds a free physical frame located after 1MB and the kernel
-    fn allocate_any(&mut self) -> Option<PhysicalFrame>;
+    fn allocate_any(&mut self) -> KernelResult<PhysicalFrame>;
 
     /// Finds a free physical frame below 1MB
-    fn allocate_low(&mut self) -> Option<PhysicalFrame>;
+    fn allocate_low(&mut self) -> KernelResult<PhysicalFrame>;
 
     // TODO free
 }
@@ -28,7 +27,7 @@ struct DumbFrameAllocator {
 }
 pub fn init_frame_allocator(mbi: &'static multiboot_info) {
     let size = kernel_size();
-    debug!("kernel is {} ({:#x})bytes", size, size);
+    debug!("kernel is {} ({:#x}) bytes", size, size);
     assert!(
         size < 4 * 1024 * 1024,
         "kernel is bigger than 4MB, initial identity mapping is too small!"
@@ -65,7 +64,7 @@ impl DumbFrameAllocator {
             .flat_map(|range| range.step_by(4096))
             .filter_map(move |addr| {
                 if addr > min {
-                    Some(PhysicalFrame(PhysicalAddress(addr)))
+                    Some(PhysicalFrame::new(PhysicalAddress(addr)))
                 } else {
                     // overlaps with kernel
                     None
@@ -75,20 +74,14 @@ impl DumbFrameAllocator {
 }
 
 impl FrameAllocator for DumbFrameAllocator {
-    fn allocate_any(&mut self) -> Option<PhysicalFrame> {
+    fn allocate_any(&mut self) -> KernelResult<PhysicalFrame> {
         let next = self.all_frames().nth(self.next);
         self.next += 1;
-        next
+        next.ok_or(KernelError::NoFrame)
     }
 
-    fn allocate_low(&mut self) -> Option<PhysicalFrame> {
+    fn allocate_low(&mut self) -> KernelResult<PhysicalFrame> {
         unimplemented!()
-    }
-}
-
-impl PhysicalFrame {
-    pub fn address(&self) -> PhysicalAddress {
-        self.0
     }
 }
 

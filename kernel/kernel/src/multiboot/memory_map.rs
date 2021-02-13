@@ -1,6 +1,5 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
 use core::ops::Range;
-use log::*;
 
 use utils::memory::address::PhysicalAddress;
 use utils::prelude::Bit;

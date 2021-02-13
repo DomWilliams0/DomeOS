@@ -1,6 +1,10 @@
 use utils::InitializedGlobal;
 
+/// Allocates virtual address spaces
 pub trait VirtualMemoryManager {}
+
+// TODO struct for address space
+// enable() -> writes its ptr to cr3
 
 static mut VIRTUAL_MM: InitializedGlobal<SimpleVirtualMemoryManager> = InitializedGlobal::uninit();
 
