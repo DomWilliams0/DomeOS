@@ -80,6 +80,17 @@ impl VirtualAddress {
     pub fn from_physical(addr: PhysicalAddress) -> VirtualAddress {
         Self::new(addr.0 + VIRT_PHYSICAL_BASE)
     }
+
+    pub fn log_all_offsets(self) {
+        log::debug!(
+            "{:?} -> {}, {}, {}, {}",
+            self,
+            self.pml4t_offset(),
+            self.pdp_offset(),
+            self.pd_offset(),
+            self.pt_offset()
+        );
+    }
 }
 
 #[derive(Eq, PartialEq, Copy, Clone, Add)]

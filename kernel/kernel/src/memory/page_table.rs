@@ -19,8 +19,8 @@ pub fn pml4() -> P4<'static> {
     P4::with_initialized(unsafe { &mut *table })
 }
 
-pub fn set_pml4(mut p4: P4<'static>) {
-    let ptr = PhysicalAddress((&mut *p4) as *const PageTable<'static, P3<'static>> as u64);
+pub fn set_pml4(mut p4: &P4<'static>) {
+    let ptr = PhysicalAddress((&**p4) as *const PageTable<'static, P3<'static>> as u64);
 
     let mut cr3 = cr3();
     cr3.set_bit_range(51, 12, ptr.to_4096_aligned());
@@ -32,27 +32,19 @@ pub fn set_pml4(mut p4: P4<'static>) {
 pub fn log_active_page_hierarchy() {
     let p4 = pml4();
     for (i, e) in p4.present_entries() {
-        info!("pml4e {}: {:?}", i, e);
+        info!("pml4 {}: {:?}", i, e);
 
         let p3 = e.traverse().unwrap();
         for (i, e) in p3.present_entries() {
-            info!(" pdpe {}: {:?}", i, e);
+            info!(" pdp {}: {:?}", i, e);
 
-            match e.traverse().unwrap() {
-                P2::Huge1GPage(frame) => info!("  pdpe {}: {:?}", i, frame),
+            if let P2::PDT(p2) = e.traverse().unwrap() {
+                for (i, e) in p2.present_entries() {
+                    info!("  pde {}: {:?}", i, e);
 
-                P2::PDT(p2) => {
-                    for (i, e) in p2.present_entries() {
-                        info!("  pde {}: {:?}", i, e);
-
-                        match e.traverse().unwrap() {
-                            P1::Huge2MPage(frame) => info!("   pde {}: {:?}", i, frame),
-
-                            P1::PT(p1) => {
-                                for (i, e) in p1.present_entries() {
-                                    info!("   pte {}: {:?}", i, e);
-                                }
-                            }
+                    if let P1::PT(p1) = e.traverse().unwrap() {
+                        for (i, e) in p1.present_entries() {
+                            info!("   pte {}: {:?}", i, e);
                         }
                     }
                 }

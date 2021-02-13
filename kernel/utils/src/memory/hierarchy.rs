@@ -24,6 +24,8 @@ pub trait PageTableHierarchy<'p> {
 
     fn entry_index(addr: VirtualAddress) -> u16;
 
+    fn table_mut(&mut self) -> KernelResult<&mut PageTable<'p, Self::NextLevel>>;
+
     // fn current(e: &'p mut CommonEntry<'p, P>) -> ResolveResult<'p, Self::NextLevel>;
 
     // fn traverse(&self, addr: VirtualAddress) -> ResolveResult<'p, Self::NextLevel>;
@@ -63,6 +65,10 @@ impl<'p> PageTableHierarchy<'p> for P4<'p> {
     fn entry_index(addr: VirtualAddress) -> u16 {
         addr.pml4t_offset()
     }
+
+    fn table_mut(&mut self) -> KernelResult<&mut PageTable<'p, Self::NextLevel>> {
+        Ok(self.0)
+    }
 }
 
 impl<'p> PageTableHierarchy<'p> for P3<'p> {
@@ -75,6 +81,10 @@ impl<'p> PageTableHierarchy<'p> for P3<'p> {
 
     fn entry_index(addr: VirtualAddress) -> u16 {
         addr.pdp_offset()
+    }
+
+    fn table_mut(&mut self) -> KernelResult<&mut PageTable<'p, Self::NextLevel>> {
+        Ok(self.0)
     }
 }
 
@@ -96,6 +106,13 @@ impl<'p> PageTableHierarchy<'p> for P2<'p> {
     fn entry_index(addr: VirtualAddress) -> u16 {
         addr.pd_offset()
     }
+
+    fn table_mut(&mut self) -> KernelResult<&mut PageTable<'p, Self::NextLevel>> {
+        match self {
+            P2::PDT(table) => Ok(*table),
+            P2::Huge1GPage(frame) => Err(KernelError::NoTableAvailable(Self::NAME, frame.0)),
+        }
+    }
 }
 
 impl<'p> PageTableHierarchy<'p> for P1<'p> {
@@ -116,6 +133,13 @@ impl<'p> PageTableHierarchy<'p> for P1<'p> {
     fn entry_index(addr: VirtualAddress) -> u16 {
         addr.pt_offset()
     }
+
+    fn table_mut(&mut self) -> KernelResult<&mut PageTable<'p, Self::NextLevel>> {
+        match self {
+            P1::PT(table) => Ok(*table),
+            P1::Huge2MPage(frame) => Err(KernelError::NoTableAvailable(Self::NAME, frame.0)),
+        }
+    }
 }
 
 impl<'p> PageTableHierarchy<'p> for Frame {
@@ -131,6 +155,10 @@ impl<'p> PageTableHierarchy<'p> for Frame {
 
     fn entry_index(addr: VirtualAddress) -> u16 {
         todo!()
+    }
+
+    fn table_mut(&mut self) -> KernelResult<&mut PageTable<'p, Self::NextLevel>> {
+        Err(KernelError::NoTableAvailable(Self::NAME, self.0))
     }
 }
 

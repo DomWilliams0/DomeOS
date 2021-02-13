@@ -118,6 +118,13 @@ impl<'e, 'p, P> EntryBuilder<'e, 'p, P> {
         }
     }
 
+    pub fn with_zeroed_entry(current: &'e mut CommonEntry<'p, P>) -> Self {
+        Self {
+            entry: Some(current),
+            ..Self::default()
+        }
+    }
+
     pub fn writeable(mut self) -> Self {
         self.flags.insert(PageTableFlag::Write);
         self
@@ -244,8 +251,14 @@ impl<'p, P: PageTableHierarchy<'p>> CommonEntry<'p, P> {
         }
     }
 
-    pub fn builder<'e>(&'e mut self) -> EntryBuilder<'e, 'p, P> {
+    /// Keeps existing flags
+    pub fn modify<'e>(&'e mut self) -> EntryBuilder<'e, 'p, P> {
         EntryBuilder::with_entry(self)
+    }
+
+    /// Clears all bits
+    pub fn replace<'e>(&'e mut self) -> EntryBuilder<'e, 'p, P> {
+        EntryBuilder::with_zeroed_entry(self)
     }
 
     pub fn address(&self) -> PhysicalAddress {

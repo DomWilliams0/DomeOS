@@ -1,10 +1,5 @@
 use utils::memory::*;
 
-use crate::memory::page_table::pml4;
-use crate::memory::phys::frame_allocator;
-use utils::memory::address::PhysicalAddress;
-use utils::memory::page_table::{EntryBuilder, PageTable};
-
 #[deprecated]
 mod free_pages;
 
@@ -13,10 +8,14 @@ mod phys;
 mod virt;
 
 pub fn init(multiboot: &'static crate::multiboot::multiboot_info) -> utils::KernelResult<()> {
+    use crate::memory::page_table::pml4;
+    use crate::memory::phys::frame_allocator;
     use crate::multiboot::MemoryRegion;
     use log::*;
     use phys::FrameAllocator;
+    use utils::memory::address::PhysicalAddress;
     use utils::memory::address::VirtualAddress;
+    use utils::memory::page_table::PageTable;
 
     let regions = MemoryRegion::iter_from_multiboot(multiboot);
     debug!("memory map from multiboot: ");
@@ -51,7 +50,7 @@ pub fn init(multiboot: &'static crate::multiboot::multiboot_info) -> utils::Kern
             for (p3_offset, entry) in p3_table.entries_mut().enumerate() {
                 let addr = (i as u64 * gigabytes(512)) + gigabytes(p3_offset as u64);
                 entry
-                    .builder()
+                    .replace()
                     .writeable()
                     .huge()
                     .address(PhysicalAddress(addr))
@@ -63,7 +62,7 @@ pub fn init(multiboot: &'static crate::multiboot::multiboot_info) -> utils::Kern
             // point p4 entry at new p3
             let p4_entry = &mut p4[p4_offset];
             p4_entry
-                .builder()
+                .replace()
                 .writeable()
                 .present()
                 .global()
@@ -81,10 +80,12 @@ pub fn init(multiboot: &'static crate::multiboot::multiboot_info) -> utils::Kern
         trace!("it worked!");
     }
 
-    // now safe to remove 1MB identity map
-    p4[0].builder().not_present().build();
-
-    // TODO remove the other mapping from boot too?
+    // now safe to remove low identity maps from early boot
+    {
+        let mut p3 = p4[0].traverse()?;
+        p3[0].modify().not_present().build();
+        p4[0].modify().not_present().build();
+    }
 
     // init virtual memory allocator
     // r#virt::init_virtual_allocator();
