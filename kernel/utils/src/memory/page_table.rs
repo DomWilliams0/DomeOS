@@ -410,6 +410,7 @@ mod tests {
 
     use crate::memory::hierarchy::{Frame, P1, P2, P3};
     use crate::memory::page_table::{CommonEntry, PageTable};
+    use crate::memory::P4;
 
     #[test]
     fn assert_sizes() {
@@ -422,7 +423,7 @@ mod tests {
 
     #[test]
     fn nx() {
-        let mut e = CommonEntry::<()>::default();
+        let mut e = CommonEntry::<P4>::zeroed();
         assert_eq!(0u64, unsafe { std::mem::transmute(e.clone()) });
 
         e.bits.set_no_execute(true as u16);

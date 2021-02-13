@@ -19,6 +19,7 @@ env["CC"] = "ld"  # awful but this has taken long enough
 
 link_binary = env.Program("build/iso/boot/DomeOS", boot_objs, LIBS=[kernel_lib])
 
+
 # create grub structure and make iso
 def mk_grub(env, target, source):
     os.makedirs("build/iso/boot/grub", exist_ok=True)
@@ -38,13 +39,14 @@ def mk_grub(env, target, source):
 
 iso = env.Command("build/DomeOS.iso", [link_binary, "build/boot"], action=mk_grub)
 env.Depends(iso, link_binary)
-Default(iso) # only build this by default
-Clean(iso, "build") # delete whole build dir on clean
+Default(iso)  # only build this by default
+Clean(iso, "build")  # delete whole build dir on clean
 
 # run command
 qemu_cmd = "qemu-system-x86_64 -cdrom build/DomeOS.iso -monitor stdio -serial file:serial.log -d cpu_reset,int -D qemu-logfile -no-reboot"
 if "debug" in COMMAND_LINE_TARGETS:
     qemu_cmd += " -s -S"
+
 
 def PhonyTarget(target, action):
     env = Environment(ENV=os.environ, BUILDERS={"phony": Builder(action=action)})
@@ -55,3 +57,22 @@ def PhonyTarget(target, action):
 
 run_qemu = PhonyTarget(["run", "debug"], qemu_cmd)
 env.Depends(run_qemu, iso)
+
+
+# really crappy host testing
+def host_tests(target, source, env):
+    modules = ["kernel/utils"]
+
+    # im so sick of trying to fit discovery and running of tests into scons' sick model that im doing it all right here
+    # right now, fk it
+
+    import subprocess
+    for module in modules:
+        subprocess.run(["cargo", "test", "-Zbuild-std", "--manifest-path", "Cargo.toml", "--features", "std", "--target",
+                                 "x86_64-unknown-linux-gnu"], cwd=module, check=True)
+
+    return []
+
+
+tests_host = env.Command("test", [], action=host_tests)
+env.AlwaysBuild(tests_host)
