@@ -17,7 +17,10 @@ impl<T> InitializedGlobal<T> {
     }
 
     pub fn init(&mut self, val: T) {
-        debug_assert!(!self.init);
+        #[cfg(debug_assertions)]
+        {
+            assert!(!self.init);
+        }
 
         self.val = MaybeUninit::new(val);
 
@@ -28,7 +31,10 @@ impl<T> InitializedGlobal<T> {
     }
 
     pub fn get(&mut self) -> &mut T {
-        debug_assert!(self.init);
+        #[cfg(debug_assertions)]
+        {
+            assert!(self.init);
+        }
 
         // safety: asserted initialized
         unsafe { self.val.assume_init_mut() }
