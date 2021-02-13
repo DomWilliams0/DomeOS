@@ -1,6 +1,7 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
 use core::ops::{Add, AddAssign, Shl, Shr};
 
+use crate::memory::VIRT_PHYSICAL_BASE;
 use derive_more::*;
 
 /// Bottom 12 bits should be 0 from 4096 alignment
@@ -69,6 +70,15 @@ impl VirtualAddress {
     pub fn page_offset_1gb(self) -> u64 {
         let mask = (1 << (ADDRESS_SHIFT + OFFSET_SHIFT + OFFSET_SHIFT)) - 1;
         (self.0 & mask) as u64
+    }
+
+    pub fn as_ptr<T>(self) -> *mut T {
+        self.0 as *mut T
+    }
+
+    /// Adds physical identity base
+    pub fn from_physical(addr: PhysicalAddress) -> VirtualAddress {
+        Self::new(addr.0 + VIRT_PHYSICAL_BASE)
     }
 }
 

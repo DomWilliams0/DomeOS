@@ -1,11 +1,13 @@
+pub use constants::*;
+pub use frame::PhysicalFrame;
+pub use hierarchy::*;
+
 pub mod address;
 mod frame;
 pub mod page_table;
 
+mod constants;
 mod hierarchy;
-pub use hierarchy::*;
-
-pub use frame::PhysicalFrame;
 
 pub const fn terabytes(n: u64) -> u64 {
     n * (1 << 40)

@@ -1,14 +1,13 @@
-use crate::memory::constants::{VIRT_PHYSICAL_BASE, VIRT_PHYSICAL_SIZE};
+use utils::memory::*;
+
 use crate::memory::page_table::pml4;
 use crate::memory::phys::frame_allocator;
 use utils::memory::address::PhysicalAddress;
 use utils::memory::page_table::{EntryBuilder, PageTable};
-use utils::memory::{gigabytes, P3};
 
 #[deprecated]
 mod free_pages;
 
-mod constants;
 mod page_table;
 mod phys;
 mod virt;
@@ -35,6 +34,7 @@ pub fn init(multiboot: &'static crate::multiboot::multiboot_info) -> utils::Kern
         // huge physical identity mapping
         // TODO do this lazily?
         let base = VirtualAddress::new(VIRT_PHYSICAL_BASE);
+        debug!("identity mapping physical memory from {:?}", base);
         let p3_count = (VIRT_PHYSICAL_SIZE / gigabytes(512)) as u16;
         let start_idx = base.pml4t_offset();
 
@@ -50,31 +50,44 @@ pub fn init(multiboot: &'static crate::multiboot::multiboot_info) -> utils::Kern
             // initialize p3 entries to each point to 1GB each
             for (p3_offset, entry) in p3_table.entries_mut().enumerate() {
                 let addr = (i as u64 * gigabytes(512)) + gigabytes(p3_offset as u64);
-                *entry = EntryBuilder::default()
+                entry
+                    .builder()
                     .writeable()
                     .huge()
                     .address(PhysicalAddress(addr))
                     .present()
+                    .global()
                     .build();
             }
 
             // point p4 entry at new p3
             let p4_entry = &mut p4[p4_offset];
-            *p4_entry = EntryBuilder::default()
+            p4_entry
+                .builder()
                 .writeable()
                 .present()
+                .global()
                 .address(p3_frame.address())
                 .build();
         }
     }
 
-    debug!("{:#?}", p4);
+    // update VGA to use new offset address
+    // safety: just mapped physical identity map
+    unsafe {
+        let new_addr = VirtualAddress::from_physical(PhysicalAddress(0xb8000));
+        trace!("moving VGA buffer to {:?}", new_addr);
+        crate::vga::move_vga_buffer(new_addr);
+        trace!("it worked!");
+    }
+
+    // now safe to remove 1MB identity map
+    p4[0].builder().not_present().build();
+
+    // TODO remove the other mapping from boot too?
 
     // init virtual memory allocator
     // r#virt::init_virtual_allocator();
-
-    // TODO remove 0x0 identity mapping
-    // TODO resize kernel mapping to fit exactly
 
     Ok(())
 }

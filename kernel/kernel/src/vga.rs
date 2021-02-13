@@ -3,6 +3,7 @@ use core::mem::MaybeUninit;
 
 use core::ops::{Deref, DerefMut};
 use log::*;
+use utils::memory::address::VirtualAddress;
 use volatile::Volatile;
 
 const WIDTH: usize = 80;
@@ -94,6 +95,12 @@ where
 
 pub fn set_error_colors() {
     get().set_colors(Color::White, Color::Red);
+}
+
+/// # Safety
+/// New address must be writable and the start of the physical VGA buffer
+pub unsafe fn move_vga_buffer(new_addr: VirtualAddress) {
+    get().buffer = &mut *(new_addr.0 as *mut VGABuffer);
 }
 
 impl ScreenChar {

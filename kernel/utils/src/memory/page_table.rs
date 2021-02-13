@@ -57,10 +57,10 @@ pub struct CommonEntry<'p, P> {
     _phantom: PhantomData<&'p P>,
 }
 
-#[derive(Default)]
-pub struct EntryBuilder {
+pub struct EntryBuilder<'e, 'p, P> {
     flags: BitFlags<PageTableFlag>,
     bits: EntryBits,
+    entry: Option<&'e mut CommonEntry<'p, P>>,
 }
 
 #[repr(transparent)]
@@ -99,11 +99,22 @@ impl<'p, P: PageTableHierarchy<'p>> Default for CommonEntry<'p, P> {
     }
 }
 
-impl EntryBuilder {
-    pub fn with_entry<P>(current: &CommonEntry<P>) -> Self {
+impl<'e, 'p, P> Default for EntryBuilder<'e, 'p, P> {
+    fn default() -> Self {
+        Self {
+            flags: Default::default(),
+            bits: Default::default(),
+            entry: None,
+        }
+    }
+}
+
+impl<'e, 'p, P> EntryBuilder<'e, 'p, P> {
+    pub fn with_entry(current: &'e mut CommonEntry<'p, P>) -> Self {
         Self {
             flags: current.flags.0,
             bits: current.bits,
+            entry: Some(current),
         }
     }
 
@@ -208,12 +219,19 @@ impl EntryBuilder {
         self
     }
 
-    pub fn build<'p, P>(self) -> CommonEntry<'p, P> {
-        CommonEntry {
+    /// If [with_entry] was used then the reference is written to as well
+    pub fn build(self) -> CommonEntry<'e, P> {
+        let entry = CommonEntry {
             flags: PageTableFlags(self.flags),
             bits: self.bits,
             _phantom: PhantomData,
+        };
+
+        if let Some(e) = self.entry {
+            *e = entry;
         }
+
+        entry
     }
 }
 
@@ -224,6 +242,10 @@ impl<'p, P: PageTableHierarchy<'p>> CommonEntry<'p, P> {
             bits: Default::default(),
             _phantom: Default::default(),
         }
+    }
+
+    pub fn builder<'e>(&'e mut self) -> EntryBuilder<'e, 'p, P> {
+        EntryBuilder::with_entry(self)
     }
 
     pub fn address(&self) -> PhysicalAddress {
