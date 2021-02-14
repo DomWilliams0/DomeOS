@@ -10,6 +10,7 @@ Dependencies:
 * grub
 * xorriso
 * qemu
+* objcopy
 
 ```
 mkdir build

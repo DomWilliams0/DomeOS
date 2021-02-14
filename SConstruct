@@ -18,10 +18,15 @@ for d in dirs:
 
 Import("kernel_lib", "boot_objs")
 
-env["LINKFLAGS"] = ["-T", "linker.ld", "-n", "-g"]
+env["LINKFLAGS"] = ["-T", "linker.ld", "-n", "-g", "--Map", "./build/symbols.map"]
 env["CC"] = "ld"  # awful but this has taken long enough
 
-link_binary = env.Program("build/iso/boot/DomeOS", boot_objs, LIBS=[kernel_lib])
+build = env.Program(["build/iso/boot/DomeOS", "build/symbols.map"], boot_objs, LIBS=[kernel_lib])
+env.Depends(build, ["linker.ld", "SConstruct"])
+domeos = env.Command("build/symbols.bin", "build/symbols.map", [
+    "cargo run --manifest-path ld-link-map/Cargo.toml --release build/symbols.map build/symbols.bin",
+    "objcopy -I binary -O elf64-x86-64 -B i386:x86-64 build/symbols.bin build/symbols.o"
+])
 
 
 # create grub structure and make iso
@@ -41,8 +46,8 @@ def mk_grub(env, target, source):
     env.Execute("grub-mkrescue -o build/DomeOS.iso build/iso")
 
 
-iso = env.Command("build/DomeOS.iso", [link_binary, "build/boot"], action=mk_grub)
-env.Depends(iso, link_binary)
+iso = env.Command("build/DomeOS.iso", [domeos, "build/boot"], action=mk_grub)
+env.Depends(iso, domeos)
 Default(iso)  # only build this by default
 Clean(iso, "build")  # delete whole build dir on clean
 

@@ -1,0 +1,19 @@
+[package]
+name = "ld-link-map"
+version = "0.1.0"
+authors = ["Dom Williams <me@domwillia.ms>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "ld-link-map"
+path = "src/main.rs"
+
+[dependencies]
+genio = "0.2"
+rustc-demangle = {version = "0.1", optional = true}
+
+[features]
+default = ["std"]
+std = ["rustc-demangle"]
