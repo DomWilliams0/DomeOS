@@ -5,8 +5,12 @@ dirs = [
     "kernel",
 ]
 
-out_dir = Dir("#build/")
-Export("out_dir")
+args = Variables()
+args.Add(EnumVariable("build", "Set build type", "debug", allowed_values=["debug", "release"]))
+args.Add(BoolVariable("framepointers", "Force frame pointers for stack unwinding in panics", 1))
+
+env = Environment(ENV=os.environ, variables=args)
+Export("env")
 
 for d in dirs:
     build_dir = os.path.join("build", d)
@@ -14,7 +18,7 @@ for d in dirs:
 
 Import("kernel_lib", "boot_objs")
 
-env = Environment(LINKFLAGS=["-T", "linker.ld", "-n", "-g"], ENV=os.environ)
+env["LINKFLAGS"] = ["-T", "linker.ld", "-n", "-g"]
 env["CC"] = "ld"  # awful but this has taken long enough
 
 link_binary = env.Program("build/iso/boot/DomeOS", boot_objs, LIBS=[kernel_lib])
@@ -68,8 +72,9 @@ def host_tests(target, source, env):
 
     import subprocess
     for module in modules:
-        subprocess.run(["cargo", "test", "-Zbuild-std", "--manifest-path", "Cargo.toml", "--features", "std", "--target",
-                                 "x86_64-unknown-linux-gnu"], cwd=module, check=True)
+        subprocess.run(
+            ["cargo", "test", "-Zbuild-std", "--manifest-path", "Cargo.toml", "--features", "std", "--target",
+             "x86_64-unknown-linux-gnu"], cwd=module, check=True)
 
     return []
 

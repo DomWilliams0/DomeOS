@@ -1,10 +1,18 @@
 import os
-Import("out_dir")
 
-env = Environment(ENV=os.environ)
+Import("env")
+env = env.Clone()
 
-kernel_lib = os.path.join(Dir("#kernel").abspath, "target/domeos/debug/libdomeos_kernel.a")
-kernel_lib = env.Command(kernel_lib, [], "cargo build", chdir="kernel")
+args = ""
+if env["build"] == "release":
+    args = " --release"
+
+if not env["framepointers"]:
+    # setting RUSTFLAGS triggers a full rebuild so only do if unset from default
+    env["ENV"]["RUSTFLAGS"] = "-Cforce-frame-pointers=no"
+
+kernel_lib = os.path.join(Dir("#kernel").abspath, "target/domeos/{}/libdomeos_kernel.a".format(env["build"]))
+kernel_lib = env.Command(kernel_lib, [], "cargo build" + args, chdir="kernel")
 env.AlwaysBuild(kernel_lib)
 
 Export("kernel_lib")

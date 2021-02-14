@@ -1,7 +1,13 @@
 src = Dir("#boot")
+
+Import("env")
+build = env["build"]
+
 env = Environment(tools=["default", "nasm"], ASFLAGS=["-I", src.path, "-felf64"])
+
+if build == "release":
+    env["ASFLAGS"] += ["-O2"]
 
 boot_objs = [env.StaticObject(src) for src in Glob("*.asm")]
 
 Export("boot_objs")
-
