@@ -2,8 +2,15 @@ use crate::hang;
 use core::fmt::{Display, Formatter};
 use core::panic::PanicInfo;
 use log::*;
+use utils::memory::kilobytes;
 
 static mut PANICKED: bool = false;
+
+// linker map is packed by helpers/ld-link-map then patched into this array after build by
+// helpers/patcher
+const PACKED_SYMBOLS_COUNT: usize = kilobytes(512) as usize / core::mem::size_of::<u32>();
+const PACKED_SYMBOLS_MARKER: u32 = 0xbeef_face;
+static PACKED_SYMBOLS: [u32; PACKED_SYMBOLS_COUNT] = [PACKED_SYMBOLS_MARKER; PACKED_SYMBOLS_COUNT];
 
 #[panic_handler]
 fn panic_handler(panic_info: &PanicInfo) -> ! {
@@ -35,13 +42,35 @@ pub fn is_panicking() -> bool {
 }
 
 #[derive(Debug)]
-struct Frame {
+pub struct Frame {
     idx: usize,
     ptr: *const u64,
+    symbol: Option<(u64, &'static str)>,
 }
 
-fn backtrace(mut per_frame: impl FnMut(Frame)) {
-    let mut addr = {
+pub fn backtrace(mut per_frame: impl FnMut(Frame)) {
+    let symbols = {
+        let first_word = unsafe {
+            let ptr = &PACKED_SYMBOLS as *const u32;
+            let word = ptr.read();
+            trace!("packed symbols are at {:?}, first word is {:#x}", ptr, word);
+            word
+        };
+        if first_word == PACKED_SYMBOLS_MARKER {
+            warn!("packed symbols not patched in, backtrace not available");
+            None
+        } else {
+            let packed_symbols: &[u8] = unsafe {
+                let byte_len = PACKED_SYMBOLS.len() * core::mem::size_of_val(&PACKED_SYMBOLS[0]);
+                let ptr = PACKED_SYMBOLS.as_ptr() as *const u8;
+                core::slice::from_raw_parts(ptr, byte_len)
+            };
+
+            Some(ld_link_map::packed::iter_entries(packed_symbols))
+        }
+    };
+
+    let mut rbp = {
         let rbp: u64;
         unsafe {
             llvm_asm!("mov %rbp, $0" : "=r" (rbp));
@@ -51,26 +80,40 @@ fn backtrace(mut per_frame: impl FnMut(Frame)) {
     };
 
     let mut idx = 0;
-    while !addr.is_null() {
-        per_frame(Frame::resolve(addr, idx));
+    while !rbp.is_null() {
+        let symbol = {
+            // deref +8 bytes to get function return address is contained in
+            let ret_addr = unsafe { *rbp.offset(1) };
+            symbols
+                .clone()
+                .and_then(|symbols| ld_link_map::packed::resolve_entry(symbols, ret_addr))
+                .map(|entry| {
+                    let offset = ret_addr - entry.address;
+                    (offset, entry.name)
+                })
+        };
+
+        per_frame(Frame {
+            idx,
+            ptr: rbp,
+            symbol,
+        });
 
         // move on
         idx += 1;
         unsafe {
-            addr = *addr as *const _;
+            rbp = *rbp as *const _;
         }
-    }
-}
-
-impl Frame {
-    fn resolve(rbp: *const u64, idx: usize) -> Self {
-        // TODO resolve symbol
-        Self { idx, ptr: rbp }
     }
 }
 
 impl Display for Frame {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "  {:2}: [{:?}]", self.idx, self.ptr)
+        write!(f, "  {:2}: [{:?}]", self.idx, self.ptr)?;
+        if let Some((offset, symbol)) = self.symbol {
+            write!(f, " {}+{:#x}", symbol, offset)?;
+        }
+
+        Ok(())
     }
 }

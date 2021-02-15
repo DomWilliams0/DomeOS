@@ -3,6 +3,9 @@
 members = [
     "kernel",
     "utils",
+
+    "helpers/ld-link-map",
+    "helpers/patcher",
 ]
 
 default-members = ["kernel"]

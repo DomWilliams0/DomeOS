@@ -46,6 +46,9 @@ long_mode:
 	add rax, KERNEL_VIRT
 	mov rsp, rax
 
+	; ensure frame pointer is null so unwinding knows when to stop
+	xor rbp, rbp
+
 	; jump into kernel
 	call kernel_main
 

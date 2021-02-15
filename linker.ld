@@ -32,14 +32,6 @@ SECTIONS
         . = ALIGN(4096);
     }
 
-    /* symbol lookup for backtraces */
-    .dome_symbols : AT(ADDR(.dome_symbols) - KERNEL_VIRT)
-    {
-        _dome_symbols = .;
-        build/symbols.o
-        . = ALIGN(4096);
-    }
-
     /* uninitialised rw data and stack */
     .bss : AT(ADDR(.bss) - KERNEL_VIRT)
     {

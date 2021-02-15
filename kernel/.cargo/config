@@ -1,6 +1,8 @@
 [build]
 target = "domeos.json"
-rustflags = ["-C", "code-model=kernel"] # "kernel" = -2GB higher half
+rustflags = [
+    "-Ccode-model=kernel", # "kernel" = -2GB higher half
+]
 
 [unstable]
 build-std = ["core", "compiler_builtins", "alloc"]

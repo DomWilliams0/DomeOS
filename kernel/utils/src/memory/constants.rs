@@ -10,6 +10,8 @@ pub const VIRT_KERNEL_BASE: u64 = 0xffff_ffff_8000_0000;
 pub const VIRT_KERNEL_MAX: u64 = 0xffff_ffff_c000_0000;
 pub const VIRT_KERNEL_SIZE: u64 = VIRT_KERNEL_MAX - VIRT_KERNEL_BASE;
 
+pub const PHYS_KERNEL_BASE: u64 = 0x10_0000;
+
 #[derive(Copy, Clone)]
 pub enum VirtualMapping {
     PhysicalIdentity,

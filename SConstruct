@@ -24,8 +24,11 @@ env["CC"] = "ld"  # awful but this has taken long enough
 build = env.Program(["build/iso/boot/DomeOS", "build/symbols.map"], boot_objs, LIBS=[kernel_lib])
 env.Depends(build, ["linker.ld", "SConstruct"])
 domeos = env.Command("build/symbols.bin", "build/symbols.map", [
-    "cargo run --manifest-path ld-link-map/Cargo.toml --release build/symbols.map build/symbols.bin",
-    "objcopy -I binary -O elf64-x86-64 -B i386:x86-64 build/symbols.bin build/symbols.o"
+    # build packed link map
+    "cargo run --manifest-path kernel/helpers/ld-link-map/Cargo.toml --release build/symbols.map build/symbols.bin",
+
+    # patch in packed link map
+    "cargo run --manifest-path kernel/helpers/patcher/Cargo.toml --release build/iso/boot/DomeOS build/symbols.bin",
 ])
 
 
@@ -70,16 +73,23 @@ env.Depends(run_qemu, iso)
 
 # really crappy host testing
 def host_tests(target, source, env):
-    modules = ["kernel/utils"]
+    modules = [
+        ("kernel/utils", ["--features", "std"]),
+        "kernel/helpers/ld-link-map",
+        "kernel/helpers/patcher"]
 
-    # im so sick of trying to fit discovery and running of tests into scons' sick model that im doing it all right here
-    # right now, fk it
+    # im so fed up of trying to fit test discovery and building of tests into scons' sick model that im doing it
+    # all right here right now, fk it
 
     import subprocess
     for module in modules:
+        if isinstance(module, tuple):
+            module, extra_args = module
+        else:
+            extra_args = []
         subprocess.run(
-            ["cargo", "test", "-Zbuild-std", "--manifest-path", "Cargo.toml", "--features", "std", "--target",
-             "x86_64-unknown-linux-gnu"], cwd=module, check=True)
+            ["cargo", "test", "-Zbuild-std", "--manifest-path", "Cargo.toml", "--target", "x86_64-unknown-linux-gnu", *extra_args],
+            cwd=module, check=True)
 
     return []
 

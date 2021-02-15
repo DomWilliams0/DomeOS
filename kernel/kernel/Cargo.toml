@@ -11,6 +11,7 @@ crate-type = ["staticlib"]
 
 [dependencies]
 utils = { path = "../utils", default-features = false }
+ld-link-map = { path = "../helpers/ld-link-map", default-features = false }
 spin = "0.7"
 volatile = "0.4"
 modular-bitfield = "0.6"
