@@ -8,4 +8,4 @@ test:
 
 .PHONY: run
 run:
-	scons run
+	scons run headless=1

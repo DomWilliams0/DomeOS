@@ -8,6 +8,7 @@ dirs = [
 args = Variables()
 args.Add(EnumVariable("build", "Set build type", "debug", allowed_values=["debug", "release"]))
 args.Add(BoolVariable("framepointers", "Force frame pointers for stack unwinding in panics", 1))
+args.Add(BoolVariable("headless", "Run headless in qemu", 0))
 
 env = Environment(ENV=os.environ, variables=args)
 Export("env")
@@ -58,6 +59,8 @@ Clean(iso, "build")  # delete whole build dir on clean
 qemu_cmd = "qemu-system-x86_64 -cdrom build/DomeOS.iso -monitor stdio -serial file:serial.log -d cpu_reset,int -D qemu-logfile -no-reboot"
 if "debug" in COMMAND_LINE_TARGETS:
     qemu_cmd += " -s -S"
+if env["headless"]:
+    qemu_cmd += " -nographic"
 
 
 def PhonyTarget(target, action):
