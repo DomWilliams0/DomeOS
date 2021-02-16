@@ -7,8 +7,12 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
-name = "ld-link-map"
-path = "src/main.rs"
+name = "create-packed"
+path = "src/main-to-packed.rs"
+
+[[bin]]
+name = "search-resolve"
+path = "src/main-resolve.rs"
 
 [dependencies]
 byteorder = {version = "1.4", default-features = false}
