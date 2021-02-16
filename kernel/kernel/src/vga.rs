@@ -4,7 +4,7 @@ use crate::spinlock::SpinLock;
 use core::ops::{Deref, DerefMut};
 use log::*;
 use utils::memory::address::VirtualAddress;
-use utils::InitializedGlobal;
+use utils::InitializedGlobalChecked;
 use volatile::Volatile;
 
 const WIDTH: usize = 80;
@@ -14,7 +14,7 @@ const VGA_ADDR: usize = 0xb8000;
 type VgaBuffer = [[Volatile<ScreenChar>; WIDTH]; HEIGHT];
 
 /// Must be initialized with `init` before any printing is done
-static mut SCREEN: InitializedGlobal<SpinLock<Screen>> = InitializedGlobal::uninit();
+static mut SCREEN: InitializedGlobalChecked<SpinLock<Screen>> = InitializedGlobalChecked::uninit();
 
 #[allow(unused)]
 #[repr(u8)]

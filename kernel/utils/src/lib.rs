@@ -7,7 +7,7 @@ mod globals;
 pub mod memory;
 
 pub use error::{KernelError, KernelResult};
-pub use globals::InitializedGlobal;
+pub use globals::{InitializedGlobal, InitializedGlobalChecked};
 
 pub mod prelude {
     pub use bitfield::{Bit, BitRange};
