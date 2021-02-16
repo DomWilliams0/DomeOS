@@ -1,3 +1,4 @@
+use crate::vga;
 use utils::memory::*;
 
 mod page_table;
@@ -73,7 +74,7 @@ pub fn init(multiboot: &'static crate::multiboot::multiboot_info) -> utils::Kern
     unsafe {
         let new_addr = VirtualAddress::from_physical(PhysicalAddress(0xb8000));
         trace!("moving VGA buffer to {:?}", new_addr);
-        crate::vga::move_vga_buffer(new_addr);
+        vga::get().move_vga_buffer(new_addr);
         trace!("it worked!");
     }
 
@@ -83,9 +84,6 @@ pub fn init(multiboot: &'static crate::multiboot::multiboot_info) -> utils::Kern
         p3[0].modify().not_present().build();
         p4[0].modify().not_present().build();
     }
-
-    // init virtual memory allocator
-    // r#virt::init_virtual_allocator();
 
     Ok(())
 }

@@ -3,12 +3,11 @@ use core::mem::MaybeUninit;
 use core::ops::BitAnd;
 
 use log::{Level, LevelFilter, Log, Metadata, Record};
-use spin::Mutex;
 
 use crate::clock;
 use crate::io::Port;
 use crate::panic::is_panicking;
-use crate::serial::LogMode::SerialOnly;
+use crate::spinlock::SpinLock;
 use crate::vga;
 use crate::vga::Color;
 
@@ -50,11 +49,7 @@ pub enum LogMode {
     SerialAndVga,
 }
 
-struct SerialLogger {
-    mode: LogMode,
-}
-
-struct LockedSerialLogger(Mutex<SerialLogger>, LevelFilter);
+struct LockedSerialLogger(SpinLock<()>, LevelFilter, LogMode);
 
 impl SerialPort {
     fn register(&self, register: SerialRegister) -> Port {
@@ -132,7 +127,7 @@ pub fn init(log_level: LevelFilter) {
 
         // init logger
         let logger = SERIAL_LOGGER.assume_init_mut();
-        *logger = LockedSerialLogger(Mutex::new(SerialLogger { mode: SerialOnly }), log_level);
+        *logger = LockedSerialLogger(SpinLock::new(()), log_level, LogMode::SerialOnly);
 
         // safety: interrupts are disabled at this point, so can use racy variant
         log::set_logger_racy(logger).unwrap();
@@ -157,14 +152,28 @@ impl Log for LockedSerialLogger {
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
-            if record.level() <= Level::Error && self.0.is_locked() && is_panicking() {
-                // WE NEED THIS LOG
-                unsafe { self.0.force_unlock() }
-            }
+            // we can ignore taking the serial port mutex if we're panicking and logging an error
+            let _guard = {
+                let first_attempt = self.0.try_lock();
 
-            let logger = self.0.lock();
+                match first_attempt {
+                    some @ Some(_) => {
+                        // nice we got it first time
+                        some
+                    }
+                    None => {
+                        if is_panicking() {
+                            // WE NEED THIS LOG, skip taking the lock
+                            None
+                        } else {
+                            // block on taking it normally
+                            Some(self.0.lock())
+                        }
+                    }
+                }
+            };
 
-            // serial always
+            // log to serial
             unsafe {
                 COM1.write_fmt(format_args!(
                     "[{:.08} {} {}] {}\n",
@@ -180,8 +189,7 @@ impl Log for LockedSerialLogger {
                 .unwrap();
             }
 
-            // vga sometimes
-            if matches!(logger.mode, LogMode::SerialAndVga) && vga::is_initialized() {
+            if matches!(self.2, LogMode::SerialAndVga) && vga::is_initialized() {
                 let (fg, bg) = match record.level() {
                     Level::Error => (Color::White, Color::Red),
                     Level::Warn => (Color::Yellow, Color::Black),
@@ -189,8 +197,16 @@ impl Log for LockedSerialLogger {
                     Level::Debug => (Color::LightBlue, Color::Black),
                     Level::Trace => (Color::LightCyan, Color::Black),
                 };
-                let _colors = vga::set_colors(fg, bg);
-                vga::_raw_print(format_args!("[{}] {}\n", record.level(), record.args()));
+                // take the vga lock normally unless panicking, then skip
+                let vga = match vga::try_get() {
+                    None if !is_panicking() => Some(vga::get()),
+                    other => other,
+                };
+
+                if let Some(mut vga) = vga {
+                    vga.set_colors(fg, bg);
+                    vga.write_fmt(format_args!("[{}] {}\n", record.level(), record.args()));
+                }
             }
         }
     }
@@ -199,7 +215,5 @@ impl Log for LockedSerialLogger {
 }
 
 pub fn set_log_mode(mode: LogMode) {
-    let mut log = unsafe { SERIAL_LOGGER.assume_init_mut().0.lock() };
-
-    log.mode = mode;
+    unsafe { SERIAL_LOGGER.assume_init_mut().2 = mode };
 }

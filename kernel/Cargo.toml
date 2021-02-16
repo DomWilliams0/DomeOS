@@ -9,3 +9,6 @@ members = [
 ]
 
 default-members = ["kernel"]
+
+[profile.dev]
+opt-level = 1

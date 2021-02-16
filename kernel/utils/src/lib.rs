@@ -13,5 +13,6 @@ pub mod prelude {
     pub use bitfield::{Bit, BitRange};
     pub use c2rust_bitfields::BitfieldStruct;
     pub use derive_more::*;
+    pub use displaydoc::Display;
     pub use enumflags2::{self, BitFlags};
 }

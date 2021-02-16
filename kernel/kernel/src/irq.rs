@@ -26,6 +26,13 @@ pub type IrqHandler = extern "C" fn(*const InterruptContext);
 
 static mut IRQ_HANDLERS: [Option<IrqHandler>; IRQ_HANDLER_COUNT] = [None; IRQ_HANDLER_COUNT];
 
+/// Flag for debug asserts that we're not currently in an interrupt/exception
+#[cfg(debug_assertions)]
+static mut HANDLING_INTERRUPT: bool = false;
+
+/// Sets and clears global HANDLING_INTERRUPT on init/drop
+struct InterruptGuard;
+
 #[repr(u8)]
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -109,8 +116,15 @@ pub fn unregister_handler(irq: Irq) {
     }
 }
 
+#[cfg(debug_assertions)]
+pub fn is_in_interrupt() -> bool {
+    unsafe { HANDLING_INTERRUPT }
+}
+
 #[no_mangle]
 pub extern "C" fn irq_handler(ctx: *const InterruptContext) {
+    let _guard = InterruptGuard::init();
+
     let ctx: &InterruptContext = unsafe { &*ctx };
     let irq = (ctx.int_no - PIC_MASTER_OFFSET as u64) as usize; // remap to original irq
     assert!(irq < IRQ_HANDLER_COUNT);
@@ -139,9 +153,31 @@ unsafe fn eoi(irq: usize) {
 
 #[no_mangle]
 pub extern "C" fn fault_handler(ctx: *const InterruptContext) {
+    let _guard = InterruptGuard::init();
+
     let ctx: &InterruptContext = unsafe { &*ctx };
-    if let Ok(exc) = Exception::try_from(ctx) {
-        panic!("Unhandled exception {:?})\n{:?}", exc, ctx);
+    match Exception::try_from(ctx) {
+        Ok(exc) => exc.handle(ctx),
+        Err(err) => panic!("error handling exception: {}", err),
+    }
+}
+
+impl InterruptGuard {
+    fn init() -> Self {
+        #[cfg(debug_assertions)]
+        unsafe {
+            HANDLING_INTERRUPT = true
+        }
+        Self
+    }
+}
+
+impl Drop for InterruptGuard {
+    fn drop(&mut self) {
+        #[cfg(debug_assertions)]
+        unsafe {
+            HANDLING_INTERRUPT = false
+        }
     }
 }
 

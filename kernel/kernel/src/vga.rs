@@ -1,20 +1,20 @@
 use core::fmt;
-use core::mem::MaybeUninit;
 
+use crate::spinlock::SpinLock;
 use core::ops::{Deref, DerefMut};
 use log::*;
 use utils::memory::address::VirtualAddress;
+use utils::InitializedGlobal;
 use volatile::Volatile;
 
 const WIDTH: usize = 80;
 const HEIGHT: usize = 25;
 const VGA_ADDR: usize = 0xb8000;
 
-type VGABuffer = [[Volatile<ScreenChar>; WIDTH]; HEIGHT];
+type VgaBuffer = [[Volatile<ScreenChar>; WIDTH]; HEIGHT];
 
 /// Must be initialized with `init` before any printing is done
-static mut SCREEN: MaybeUninit<spin::Mutex<Screen>> = MaybeUninit::uninit();
-static mut SCREEN_INIT: bool = false;
+static mut SCREEN: InitializedGlobal<SpinLock<Screen>> = InitializedGlobal::uninit();
 
 #[allow(unused)]
 #[repr(u8)]
@@ -46,61 +46,51 @@ struct ScreenChar {
 }
 
 pub struct Screen {
-    buffer: &'static mut VGABuffer,
+    buffer: &'static mut VgaBuffer,
     foreground: Color,
     background: Color,
     x: usize,
     y: usize,
 }
 
-pub fn set_colors(fg: Color, bg: Color) -> ColorGuard {
-    let mut vga = get();
-    let guard = ColorGuard {
-        fg: vga.foreground,
-        bg: vga.background,
-    };
+pub struct VgaGuard<'a> {
+    screen: spin::MutexGuard<'a, Screen>,
 
-    vga.set_colors(fg, bg);
-    guard
+    /// (fg, bg) to revert to on drop
+    original: Option<(Color, Color)>,
 }
 
 pub fn init(fg: Color, bg: Color) {
-    debug_assert!(!is_initialized());
-
     unsafe {
-        SCREEN
-            .as_mut_ptr()
-            .write(spin::Mutex::new(Screen::with_colors(fg, bg)));
-        SCREEN_INIT = true;
+        SCREEN.init(SpinLock::new(Screen::with_colors(fg, bg)));
     }
 }
 
-pub fn get<'a>() -> spin::MutexGuard<'a, Screen> {
-    unsafe { SCREEN.assume_init_mut().lock() }
+pub fn get<'a>() -> VgaGuard<'a> {
+    let screen = unsafe { SCREEN.get().lock() };
+    let colors = screen.colors();
+
+    VgaGuard {
+        screen,
+        original: Some(colors),
+    }
+}
+
+pub fn try_get<'a>() -> Option<VgaGuard<'a>> {
+    let screen = unsafe { SCREEN.get().try_lock() };
+
+    screen.map(|screen| {
+        let colors = screen.colors();
+
+        VgaGuard {
+            screen,
+            original: Some(colors),
+        }
+    })
 }
 
 pub fn is_initialized() -> bool {
-    unsafe { SCREEN_INIT }
-}
-
-fn fill<FG, BG>(fg: FG, bg: BG)
-where
-    FG: Into<Option<Color>>,
-    BG: Into<Option<Color>>,
-{
-    let mut screen = get();
-    screen.set_colors(fg, bg);
-    screen.clear()
-}
-
-pub fn set_error_colors() {
-    get().set_colors(Color::White, Color::Red);
-}
-
-/// # Safety
-/// New address must be writable and the start of the physical VGA buffer
-pub unsafe fn move_vga_buffer(new_addr: VirtualAddress) {
-    get().buffer = &mut *(new_addr.0 as *mut VGABuffer);
+    unsafe { SCREEN.is_initialized() }
 }
 
 impl ScreenChar {
@@ -112,20 +102,6 @@ impl ScreenChar {
     }
 }
 
-impl Deref for ScreenChar {
-    type Target = Self;
-
-    fn deref(&self) -> &Self::Target {
-        self
-    }
-}
-
-impl DerefMut for ScreenChar {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self
-    }
-}
-
 fn color_as_byte(fg: Color, bg: Color) -> u8 {
     fg as u8 | ((bg as u8) << 4)
 }
@@ -133,7 +109,7 @@ fn color_as_byte(fg: Color, bg: Color) -> u8 {
 impl Screen {
     fn with_colors(fg: Color, bg: Color) -> Self {
         let mut s = Self {
-            buffer: unsafe { &mut *(VGA_ADDR as *mut VGABuffer) },
+            buffer: unsafe { &mut *(VGA_ADDR as *mut VgaBuffer) },
             foreground: fg,
             background: bg,
             x: 0,
@@ -147,17 +123,17 @@ impl Screen {
         s
     }
 
-    fn set_colors<FG, BG>(&mut self, fg: FG, bg: BG)
-    where
-        FG: Into<Option<Color>>,
-        BG: Into<Option<Color>>,
-    {
+    pub fn set_colors(&mut self, fg: impl Into<Option<Color>>, bg: impl Into<Option<Color>>) {
         if let Some(fg) = fg.into() {
             self.foreground = fg
         }
         if let Some(bg) = bg.into() {
             self.background = bg
         }
+    }
+
+    fn colors(&self) -> (Color, Color) {
+        (self.foreground, self.background)
     }
 
     fn screen_char(&self, c: u8) -> ScreenChar {
@@ -167,7 +143,7 @@ impl Screen {
     fn clear(&mut self) {
         let sc = self.screen_char(b' ');
         let len = WIDTH * HEIGHT;
-        let buf: *mut ScreenChar = self.buffer as *mut VGABuffer as *mut ScreenChar;
+        let buf: *mut ScreenChar = self.buffer as *mut VgaBuffer as *mut ScreenChar;
 
         unsafe {
             let slice = core::slice::from_raw_parts_mut(buf, len);
@@ -235,41 +211,57 @@ impl Screen {
             self.write_byte(b);
         }
     }
-}
 
-pub struct ColorGuard {
-    fg: Color,
-    bg: Color,
-}
+    pub fn write_fmt(&mut self, args: fmt::Arguments) {
+        fmt::Write::write_fmt(self, args).unwrap();
+    }
 
-impl Drop for ColorGuard {
-    fn drop(&mut self) {
-        get().set_colors(self.fg, self.bg);
+    /// # Safety
+    /// New address must be writable and the start of the physical VGA buffer
+    pub unsafe fn move_vga_buffer(&mut self, new_addr: VirtualAddress) {
+        self.buffer = &mut *(new_addr.0 as *mut VgaBuffer);
     }
 }
 
-#[macro_export]
-macro_rules! println {
-    () => (print!("\n"));
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+impl Drop for VgaGuard<'_> {
+    fn drop(&mut self) {
+        if let Some((fg, bg)) = self.original {
+            self.screen.set_colors(fg, bg);
+        }
+    }
 }
 
-#[macro_export]
-macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga::_raw_print(format_args!($($arg)*)));
+impl Deref for VgaGuard<'_> {
+    type Target = Screen;
+
+    fn deref(&self) -> &Self::Target {
+        &self.screen
+    }
 }
 
-#[doc(hidden)]
-/// Use println!() and print!()
-pub fn _raw_print(args: fmt::Arguments) {
-    use fmt::Write;
-    get().write_fmt(args).unwrap();
+impl DerefMut for VgaGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.screen
+    }
 }
 
 impl fmt::Write for Screen {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.write_string(s);
         Ok(())
+    }
+}
+
+impl Deref for ScreenChar {
+    type Target = Self;
+
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl DerefMut for ScreenChar {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self
     }
 }

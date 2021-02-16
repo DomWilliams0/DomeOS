@@ -1,9 +1,13 @@
 #![no_std]
+// lints
 #![allow(dead_code)]
+#![allow(clippy::module_inception)]
+// features
 #![feature(maybe_uninit_ref)]
 #![feature(abi_x86_interrupt)]
 #![feature(llvm_asm)]
 #![feature(panic_info_message)]
+
 use core::ffi::c_void;
 
 use log::*;
@@ -19,6 +23,7 @@ mod memory;
 mod multiboot;
 mod panic;
 mod serial;
+mod spinlock;
 mod start;
 mod vga;
 
