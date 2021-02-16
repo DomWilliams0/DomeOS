@@ -13,8 +13,8 @@ Dependencies:
 * ld
 
 ```
-mkdir build
-cd build
-cmake ..
-make run
+$ scons                # builds only
+$ scons run            # builds and runs in qemu
+$ scons run headless=1 # builds and runs in qemu with no graphical window
+
 ```
