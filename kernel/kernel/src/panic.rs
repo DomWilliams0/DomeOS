@@ -52,7 +52,9 @@ pub fn backtrace(mut per_frame: impl FnMut(Frame)) {
     let symbols = {
         let first_word = unsafe {
             let ptr = &PACKED_SYMBOLS as *const u32;
-            let word = ptr.read();
+            // the read here must be volatile to avoid the compiler optimising it away without
+            // knowing it's been patched in to the binary post-build
+            let word = ptr.read_volatile();
             trace!("packed symbols are at {:?}, first word is {:#x}", ptr, word);
             word
         };
