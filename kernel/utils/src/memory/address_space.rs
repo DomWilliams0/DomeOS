@@ -1,6 +1,6 @@
 use crate::memory::address::{PhysicalAddress, VirtualAddress};
 use crate::memory::page_table::PAGE_TABLE_ENTRY_COUNT;
-use crate::memory::{PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P2, P3, P4};
+use crate::memory::{HasTable, PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P2, P3, P4};
 use crate::KernelResult;
 use enumflags2::BitFlags;
 use log::*;
@@ -52,10 +52,14 @@ enum IterationRange {
 }
 
 impl IterationRange {
-    fn from_range<'p, P: PageTableHierarchy<'p>>(
+    fn from_range<'p, P, N>(
         start: VirtualAddress,
         end: VirtualAddress,
-    ) -> impl Iterator<Item = Self> {
+    ) -> impl Iterator<Item = Self>
+    where
+        P: PageTableHierarchy<'p, NextLevel = N> + HasTable<'p>,
+        N: PageTableHierarchy<'p> + HasTable<'p>,
+    {
         let this_start = P::entry_index(start);
         let this_end = P::entry_index(end);
         assert!(this_end >= this_start);
@@ -133,9 +137,9 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
 
         let mut total_count = 0_u64;
         let p4_range = start.pml4t_offset()..=limit.pml4t_offset();
-        let mut p3_range = IterationRange::from_range::<P4>(start, limit);
-        let mut p2_range = IterationRange::from_range::<P3>(start, limit);
-        let mut p1_range = IterationRange::from_range::<P2>(start, limit);
+        let mut p3_range = IterationRange::from_range::<P4, _>(start, limit);
+        let mut p2_range = IterationRange::from_range::<P3, _>(start, limit);
+        let mut p1_range = IterationRange::from_range::<P2, _>(start, limit);
 
         fn iter_once(
             range: &mut impl Iterator<Item = IterationRange>,

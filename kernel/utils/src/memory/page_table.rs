@@ -7,7 +7,7 @@ use enumflags2::BitFlags;
 
 use crate::memory::address::{PhysicalAddress, VirtualAddress};
 use crate::memory::hierarchy::PageTableHierarchy;
-use crate::memory::Frame;
+use crate::memory::{Frame, HasTable};
 use crate::KernelResult;
 
 pub const PAGE_TABLE_ENTRY_COUNT: usize = 512;
@@ -362,7 +362,7 @@ impl<'p, P: PageTableHierarchy<'p>> EntryIndex<'p, P> for u16 {
     }
 }
 
-impl<'p, P: PageTableHierarchy<'p>> EntryIndex<'p, P> for VirtualAddress {
+impl<'p, P: HasTable<'p>> EntryIndex<'p, P> for VirtualAddress {
     fn index(self) -> u16 {
         P::entry_index(self)
     }
