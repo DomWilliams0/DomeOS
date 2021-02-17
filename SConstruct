@@ -24,7 +24,7 @@ env["CC"] = "ld"  # awful but this has taken long enough
 
 build = env.Program(["build/iso/boot/DomeOS", "build/symbols.map"], boot_objs, LIBS=[kernel_lib])
 env.Depends(build, ["linker.ld", "SConstruct"])
-domeos = env.Command("build/symbols.bin", "build/symbols.map", [
+domeos = env.Command("build/symbols.bin", ["build/symbols.map", build], [
     # build packed link map
     "cargo run --manifest-path kernel/helpers/ld-link-map/Cargo.toml --release --bin create-packed build/symbols.map build/symbols.bin",
 
@@ -50,8 +50,7 @@ def mk_grub(env, target, source):
     env.Execute("grub-mkrescue -o build/DomeOS.iso build/iso")
 
 
-iso = env.Command("build/DomeOS.iso", [domeos, "build/boot"], action=mk_grub)
-env.Depends(iso, domeos)
+iso = env.Command("build/DomeOS.iso", [domeos, build, "build/boot"], action=mk_grub)
 Default(iso)  # only build this by default
 Clean(iso, "build")  # delete whole build dir on clean
 
