@@ -1,4 +1,6 @@
-section .boot.text
+; these are NOT in .boot and are linked to the higher half virtual address. this means interrupts must not
+; be enabled until we're in long mode and the mapping has been set up!
+section .text
 
 %define isr_count 32
 %define irq_count 16

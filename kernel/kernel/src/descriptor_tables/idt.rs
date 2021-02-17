@@ -5,7 +5,8 @@ use modular_bitfield::prelude::*;
 
 use crate::descriptor_tables::common::DescriptorTablePointer;
 use crate::irq;
-use utils::memory::address::VirtualAddress;
+
+use utils::memory::VIRT_KERNEL_BASE;
 
 static mut IDT: MaybeUninit<InterruptDescriptorTable> = MaybeUninit::uninit();
 
@@ -172,12 +173,12 @@ impl Default for InterruptDescriptorTable {
 }
 
 impl InterruptDescriptorTable {
-    /// Handler must be a low early boot addr (e.g. around 1MB), will be offset to the kernel's
-    /// higher half range
+    /// Handler must be in the higher half mapped range, i.e. above VIRT_KERNEL_BASE
     fn register(&mut self, index: usize, handler: InterruptHandler) {
+        let ptr = handler as *const InterruptHandler;
         debug_assert!(index < IDT_ENTRY_COUNT);
-        self.entries[index] =
-            IdtEntry::with_handler(VirtualAddress::from_kernel_code(handler as *const _));
+        debug_assert!(ptr as u64 > VIRT_KERNEL_BASE);
+        self.entries[index] = IdtEntry::with_handler(ptr);
     }
 
     unsafe fn load(self) {
