@@ -132,7 +132,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             let limit = VirtualAddress::new_checked(start.0 + size);
             let aligned = limit.round_up_to(FRAME_SIZE);
             trace!("aligned {:?} to {:?}", limit, aligned);
-            limit
+            aligned
         };
 
         let mut total_count = 0_u64;
