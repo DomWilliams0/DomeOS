@@ -1,10 +1,9 @@
 use log::*;
 
-use utils::prelude::*;
 use utils::KernelResult;
 
 use crate::irq::{disable_interrupts, enable_interrupts};
-
+use crate::multiboot::Multiboot;
 use crate::serial::LogMode;
 use crate::vga::{self, Color};
 use crate::{clock, descriptor_tables, serial};
@@ -18,7 +17,7 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     descriptor_tables::init();
     clock::init();
 
-    parse_multiboot(multiboot);
+    let multiboot = Multiboot::new(multiboot);
 
     let init_result = (|| -> KernelResult<()> {
         // set up page tables for desired mapping
@@ -37,19 +36,6 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
 
     info!("goodbye!");
     hang();
-}
-
-fn parse_multiboot(multiboot: &'static multiboot::multiboot_info) {
-    debug!("multiboot flags: {:#b}", multiboot.flags);
-
-    if multiboot.flags.bit(0) {
-        debug!(
-            "memory range: {}KiB -> {}KiB",
-            multiboot.mem_lower, multiboot.mem_upper
-        );
-    }
-
-    multiboot::log_command_line(multiboot);
 }
 
 fn breakpoint() {

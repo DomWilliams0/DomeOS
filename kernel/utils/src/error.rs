@@ -19,4 +19,7 @@ pub enum KernelError {
 
     /// Page table of type {0} at {1:?} does not have a page table available
     NoTableAvailable(&'static str, PhysicalAddress),
+
+    /// Not implemented
+    NotImplemented,
 }

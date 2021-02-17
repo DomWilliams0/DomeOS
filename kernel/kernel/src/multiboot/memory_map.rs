@@ -20,22 +20,16 @@ pub enum MemoryRegionType {
     Reserved(u32),
 }
 
-impl From<u32> for MemoryRegionType {
-    fn from(val: u32) -> Self {
-        match val {
-            1 => Available,
-            3 => Acpi,
-            4 => PreserveOnHibernation,
-            5 => Defective,
-            _ => Reserved(val),
-        }
-    }
-}
-
 pub struct MemoryRegion {
     pub base_addr: PhysicalAddress,
     pub length: u64,
     pub region_type: MemoryRegionType,
+}
+
+#[derive(Copy, Clone)]
+pub struct MultibootMemoryMap {
+    start: *const multiboot_memory_map_t,
+    end: *const multiboot_memory_map_t,
 }
 
 impl Debug for MemoryRegion {
@@ -45,6 +39,18 @@ impl Debug for MemoryRegion {
             "MemoryRegion({:?}, len={:#x}, type={:?})",
             self.base_addr, self.length, self.region_type
         )
+    }
+}
+
+impl From<u32> for MemoryRegionType {
+    fn from(val: u32) -> Self {
+        match val {
+            1 => Available,
+            3 => Acpi,
+            4 => PreserveOnHibernation,
+            5 => Defective,
+            _ => Reserved(val),
+        }
     }
 }
 
@@ -60,16 +66,34 @@ impl MemoryRegion {
     pub fn range(&self) -> Range<u64> {
         self.base_addr.0..self.base_addr.0 + self.length
     }
+}
 
-    pub fn iter_from_multiboot(mbi: &multiboot_info) -> impl Iterator<Item = Self> + Clone {
-        assert!(mbi.flags.bit(6), "memory map isn't available");
+impl MultibootMemoryMap {
+    pub fn new(mbi: &'static multiboot_info) -> Option<Self> {
+        if mbi.flags.bit(6) {
+            let start = mbi.mmap_addr as *const multiboot_memory_map_t;
+            let end = (mbi.mmap_addr + mbi.mmap_length) as *const multiboot_memory_map_t;
+            Some(Self { start, end })
+        } else {
+            None
+        }
+    }
 
-        let start = mbi.mmap_addr as *mut multiboot_memory_map_t;
-        let end = (mbi.mmap_addr + mbi.mmap_length) as *mut multiboot_memory_map_t;
+    /// # Safety
+    /// Original pointers + this offset must still point to a valid memory map
+    pub unsafe fn add_pointer_offset(&mut self, offset: u64) {
+        self.start = (self.start as u64 + offset) as *const _;
+        self.end = (self.end as u64 + offset) as *const _;
+    }
 
-        let mut current = start;
+    pub fn pointer(&self) -> *const multiboot_memory_map_t {
+        self.start
+    }
+
+    pub fn iter_regions(&self) -> impl Iterator<Item = MemoryRegion> + Clone + '_ {
+        let mut current = self.start;
         iter::from_fn(move || {
-            while current < end {
+            while current < self.end {
                 // safety: current is < self.end
                 let mmap = unsafe { &*current };
                 let region = MemoryRegion::new(mmap);

@@ -13,14 +13,19 @@ pub fn main() {
         )
     });
 
-    let rip = rip.to_str().and_then(|s| u64::from_str_radix(s, 16).ok()).expect("invalid rip, should be hex address");
+    let rip = rip
+        .to_str()
+        .and_then(|s| u64::from_str_radix(s, 16).ok())
+        .expect("invalid rip, should be hex address");
 
     let packed = std::fs::read(path).expect("failed to read input file");
 
     let entries = ld_link_map::packed::iter_entries(&packed);
     match ld_link_map::packed::resolve_entry(entries, rip) {
-        Some(entry) => println!("resolved to function {} at {:#x}", entry.name, entry.address),
+        Some(entry) => println!(
+            "resolved to function {} at {:#x}",
+            entry.name, entry.address
+        ),
         None => println!("function not found"),
     }
-
 }

@@ -1,31 +1,34 @@
-use crate::memory::phys::physical_size::{kernel_end, kernel_size};
-use crate::multiboot::{multiboot_info, MemoryRegion, MemoryRegionType};
+use crate::memory::phys::dumb::DumbFrameAllocator;
+use crate::memory::phys::physical_size::kernel_size;
+use crate::multiboot::{multiboot_memory_map_t, MultibootMemoryMap};
+use enumflags2::BitFlags;
 use log::*;
-use utils::memory::address::PhysicalAddress;
+
 use utils::memory::PhysicalFrame;
-use utils::{InitializedGlobal, KernelError, KernelResult};
+use utils::prelude::*;
+use utils::{InitializedGlobal, KernelResult};
+
+#[derive(BitFlags, Debug, Copy, Clone)]
+#[repr(u16)]
+pub enum FrameFlags {
+    /// Will come from below the first 1MB
+    Low = 1 << 0,
+    // /// Will come from the first identity mapped 1GB after the kernel
+    // PreMapped = 1 << 1,
+}
 
 /// Allocates physical pages
 pub trait FrameAllocator {
-    /// Finds a free physical frame located after 1MB and the kernel
-    fn allocate_any(&mut self) -> KernelResult<PhysicalFrame>;
+    fn allocate(&mut self, flags: BitFlags<FrameFlags>) -> KernelResult<PhysicalFrame>;
 
-    /// Finds a free physical frame below 1MB
-    fn allocate_low(&mut self) -> KernelResult<PhysicalFrame>;
+    fn free(&mut self, frame: PhysicalFrame) -> KernelResult<()>;
 
-    // TODO free
+    fn relocate_multiboot(&mut self, mbi: &'static multiboot_memory_map_t);
 }
 
 static mut FRAME_ALLOCATOR: InitializedGlobal<DumbFrameAllocator> = InitializedGlobal::uninit();
 
-struct DumbFrameAllocator {
-    multiboot: &'static multiboot_info,
-    next: usize,
-
-    /// First frame to dish out after the kernel
-    start: u64,
-}
-pub fn init_frame_allocator(mbi: &'static multiboot_info) {
+pub fn init_frame_allocator(mmap: MultibootMemoryMap) {
     let size = kernel_size();
     debug!("kernel is {} ({:#x}) bytes", size, size);
     assert!(
@@ -33,7 +36,7 @@ pub fn init_frame_allocator(mbi: &'static multiboot_info) {
         "kernel is bigger than 4MB, initial identity mapping is too small!"
     );
 
-    let allocator = DumbFrameAllocator::new(mbi);
+    let allocator = DumbFrameAllocator::new(mmap);
     unsafe {
         FRAME_ALLOCATOR.init(allocator);
     }
@@ -43,45 +46,80 @@ pub fn frame_allocator() -> &'static mut impl FrameAllocator {
     unsafe { FRAME_ALLOCATOR.get() }
 }
 
-impl DumbFrameAllocator {
-    fn new(mbi: &'static multiboot_info) -> Self {
-        let kernel_end = kernel_end();
+mod dumb {
+    use crate::memory::phys::physical_size::kernel_end;
+    use crate::memory::phys::{FrameAllocator, FrameFlags};
+    use crate::multiboot::{
+        multiboot_memory_map_t, MemoryRegion, MemoryRegionType, MultibootMemoryMap,
+    };
+    use log::*;
+    use utils::memory::address::PhysicalAddress;
+    use utils::memory::PhysicalFrame;
+    use utils::prelude::*;
+    use utils::{KernelError, KernelResult};
 
-        trace!("kernel ends at {:#x}", kernel_end);
-        DumbFrameAllocator {
-            multiboot: mbi,
-            next: 0,
-            start: kernel_end,
+    pub struct DumbFrameAllocator {
+        multiboot_mmap: MultibootMemoryMap,
+        next: usize,
+
+        /// First frame to dish out after the kernel
+        start: u64,
+    }
+
+    impl DumbFrameAllocator {
+        pub fn new(mmap: MultibootMemoryMap) -> Self {
+            let kernel_end = kernel_end();
+
+            trace!("kernel ends at {:#x}", kernel_end);
+            DumbFrameAllocator {
+                multiboot_mmap: mmap,
+                next: 0,
+                start: kernel_end,
+            }
+        }
+
+        fn all_frames(&self) -> impl Iterator<Item = PhysicalFrame> + '_ {
+            let min = self.start;
+
+            self.multiboot_mmap
+                .iter_regions()
+                .filter(|r| matches!(r.region_type, MemoryRegionType::Available))
+                .map(|r| (r.base_addr.0)..(r.base_addr.0 + r.length))
+                .flat_map(|range| range.step_by(4096))
+                .filter_map(move |addr| {
+                    if addr > min {
+                        Some(PhysicalFrame::new(PhysicalAddress(addr)))
+                    } else {
+                        // overlaps with kernel
+                        None
+                    }
+                })
         }
     }
 
-    fn all_frames(&self) -> impl Iterator<Item = PhysicalFrame> {
-        let min = self.start;
+    impl FrameAllocator for DumbFrameAllocator {
+        fn allocate(&mut self, flags: BitFlags<FrameFlags>) -> KernelResult<PhysicalFrame> {
+            // TODO separate allocator for low memory
+            if flags.contains(FrameFlags::Low) {
+                return Err(KernelError::NotImplemented);
+            }
 
-        MemoryRegion::iter_from_multiboot(self.multiboot)
-            .filter(|r| matches!(r.region_type, MemoryRegionType::Available))
-            .map(|r| (r.base_addr.0)..(r.base_addr.0 + r.length))
-            .flat_map(|range| range.step_by(4096))
-            .filter_map(move |addr| {
-                if addr > min {
-                    Some(PhysicalFrame::new(PhysicalAddress(addr)))
-                } else {
-                    // overlaps with kernel
-                    None
-                }
-            })
-    }
-}
+            let next = self.all_frames().nth(self.next);
+            self.next += 1;
+            next.ok_or(KernelError::NoFrame)
+        }
 
-impl FrameAllocator for DumbFrameAllocator {
-    fn allocate_any(&mut self) -> KernelResult<PhysicalFrame> {
-        let next = self.all_frames().nth(self.next);
-        self.next += 1;
-        next.ok_or(KernelError::NoFrame)
-    }
+        fn free(&mut self, _frame: PhysicalFrame) -> KernelResult<()> {
+            unimplemented!()
+        }
 
-    fn allocate_low(&mut self) -> KernelResult<PhysicalFrame> {
-        unimplemented!()
+        fn relocate_multiboot(&mut self, mmap: &'static multiboot_memory_map_t) {
+            let old_ptr = self.multiboot_mmap.pointer();
+            let new_ptr = mmap as *const multiboot_memory_map_t;
+            // panics if new ptr is not higher, which it never is
+            let offset = (new_ptr as u64) - (old_ptr as u64);
+            unsafe { self.multiboot_mmap.add_pointer_offset(offset) }
+        }
     }
 }
 

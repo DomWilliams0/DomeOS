@@ -1,3 +1,4 @@
+use crate::multiboot::Multiboot;
 use crate::vga;
 use enumflags2::BitFlags;
 use utils::memory::*;
@@ -5,7 +6,8 @@ use utils::memory::*;
 mod page_table;
 mod phys;
 
-pub fn init(multiboot: &'static crate::multiboot::multiboot_info) -> utils::KernelResult<()> {
+// TODO move and restructure this monster init function
+pub fn init(multiboot: Multiboot) -> utils::KernelResult<()> {
     use crate::memory::page_table::pml4;
     use crate::memory::phys::frame_allocator;
     use log::*;
@@ -14,21 +16,20 @@ pub fn init(multiboot: &'static crate::multiboot::multiboot_info) -> utils::Kern
     use utils::memory::address::VirtualAddress;
     use utils::memory::page_table::PageTable;
 
-    let regions = MemoryRegion::iter_from_multiboot(multiboot);
+    let memory_map = multiboot.memory_map().expect("memory map unavailable");
     debug!("memory map from multiboot: ");
-    for region in regions.clone() {
+    for region in memory_map.iter_regions() {
         debug!("* {:?}", region);
     }
 
     // init physical frame allocator
-    phys::init_frame_allocator(multiboot);
+    phys::init_frame_allocator(memory_map);
 
     // update existing page tables for kernel mappings
     let mut p4 = pml4();
 
     {
         // huge physical identity mapping
-        // TODO do this lazily?
         let base = VirtualAddress::new(VIRT_PHYSICAL_BASE);
         debug!("identity mapping physical memory from {:?}", base);
         let p3_count = (VIRT_PHYSICAL_SIZE / gigabytes(512)) as u16;
@@ -39,7 +40,7 @@ pub fn init(multiboot: &'static crate::multiboot::multiboot_info) -> utils::Kern
 
             // allocate new frame for p3 - will be early after the kernel image and there identity
             // mapped and writable already
-            let p3_frame = frame_allocator().allocate_any()?;
+            let p3_frame = frame_allocator().allocate(BitFlags::empty())?;
 
             let p3_table: &mut PageTable<P3> = unsafe { p3_frame.as_mut() };
 
@@ -67,6 +68,13 @@ pub fn init(multiboot: &'static crate::multiboot::multiboot_info) -> utils::Kern
                 .build();
         }
     }
+
+    // ensure frame allocator uses virtual multiboot pointer now
+    frame_allocator().relocate_multiboot(unsafe {
+        let phys = PhysicalAddress(memory_map.pointer() as u64);
+        let virt = VirtualAddress::from_physical(phys);
+        &*virt.as_ptr()
+    });
 
     // update VGA to use new offset address
     // safety: just mapped physical identity map
