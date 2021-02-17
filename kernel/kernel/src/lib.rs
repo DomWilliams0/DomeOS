@@ -30,6 +30,7 @@ mod vga;
 
 #[no_mangle]
 pub extern "C" fn kernel_main(magic: u32, multiboot: *mut c_void) -> ! {
+    zero_bss();
     serial::init(LevelFilter::Trace); // TODO configure this
 
     match multiboot::parse(magic, multiboot) {
@@ -51,4 +52,24 @@ pub fn hang() -> ! {
             llvm_asm!("hlt");
         }
     }
+}
+
+extern "C" {
+    #[link_name = "_bss"]
+    static mut BSS_START: usize;
+
+    #[link_name = "_bss_end"]
+    static mut BSS_END: usize;
+}
+
+fn zero_bss() {
+    let bss = unsafe {
+        let start = (&mut BSS_START) as *mut _ as *mut u8;
+        let end = (&mut BSS_END) as *mut _ as *mut u8;
+        let len = end.offset_from(start);
+
+        core::slice::from_raw_parts_mut(start, len as usize)
+    };
+
+    bss.fill(0);
 }

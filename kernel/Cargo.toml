@@ -11,4 +11,4 @@ members = [
 default-members = ["kernel"]
 
 [profile.dev]
-opt-level = 1
+#debug = 0 # symbols are manually patched in
