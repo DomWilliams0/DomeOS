@@ -10,7 +10,7 @@ pub struct FrameProvider;
 pub struct AddressSpace<'p>(RawAddressSpace<'p, FrameProvider>);
 
 impl MemoryProvider for FrameProvider {
-    fn new_frame(&self) -> KernelResult<PhysicalFrame> {
+    fn new_frame(&mut self) -> KernelResult<PhysicalFrame> {
         frame_allocator().allocate(BitFlags::empty())
     }
 }

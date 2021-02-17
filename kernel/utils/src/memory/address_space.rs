@@ -1,12 +1,12 @@
 use crate::memory::address::{PhysicalAddress, VirtualAddress};
 use crate::memory::page_table::PAGE_TABLE_ENTRY_COUNT;
-use crate::memory::{HasTable, PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P2, P3, P4};
+use crate::memory::{HasTable, PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P1, P2, P3, P4};
 use crate::KernelResult;
 use enumflags2::BitFlags;
 use log::*;
 
 pub trait MemoryProvider {
-    fn new_frame(&self) -> KernelResult<PhysicalFrame>;
+    fn new_frame(&mut self) -> KernelResult<PhysicalFrame>;
 }
 
 pub struct RawAddressSpace<'p, M> {
@@ -42,7 +42,10 @@ pub enum MapFlags {
 #[derive(Copy, Clone, Debug)]
 enum IterationRange {
     /// [start..end] in single table
-    Single(u16, u16),
+    SingleInclusive(u16, u16),
+
+    /// [start..end) in single table
+    SingleExclusive(u16, u16),
 
     /// [start..511]
     UntilEndFrom(u16),
@@ -62,11 +65,12 @@ impl IterationRange {
     {
         let this_start = P::entry_index(start);
         let this_end = P::entry_index(end);
-        assert!(this_end >= this_start);
+
+        // last level is off by one if it's inclusive?
+        let exclusive = P::NextLevel::NAME == P1::NAME;
 
         let next_start = P::NextLevel::entry_index(start);
         let next_end = P::NextLevel::entry_index(end);
-        assert!(next_end >= next_start);
 
         let mut cursor = this_start;
         core::iter::from_fn(move || {
@@ -75,22 +79,30 @@ impl IterationRange {
                 return None;
             }
 
-            // cursor=0, p4
             let ret = if cursor == this_end {
                 // final iteration
                 if this_start == this_end {
                     // special case, all within single table
-                    Self::Single(next_start, next_end)
+                    if exclusive {
+                        Self::SingleExclusive(next_start, next_end)
+                    } else {
+                        Self::SingleInclusive(next_start, next_end)
+                    }
                 } else {
+                    // fill final table up to final index
                     Self::FromStartUntil(next_end)
                 }
             } else if cursor == this_start {
-                // at the start when a!=b, at least 1 pages to cover
+                // at the start when a!=b, at least 1 page to cover
                 Self::UntilEndFrom(next_start)
             } else {
                 // cursor is in the middle, neither a or b, so must be a full page inbetween
                 Self::UntilEndFrom(0)
             };
+
+            if cfg!(test) {
+                trace!("{}: cursor={}, range={:?}", P::NAME, cursor, ret);
+            }
 
             cursor += 1;
             Some(ret)
@@ -99,7 +111,8 @@ impl IterationRange {
 
     fn iter(self) -> impl Iterator<Item = u16> {
         match self {
-            Self::Single(a, b) => a..(b + 1),
+            Self::SingleInclusive(a, b) => a..(b + 1),
+            Self::SingleExclusive(a, b) => a..b,
             Self::UntilEndFrom(a) => a..(PAGE_TABLE_ENTRY_COUNT as u16),
             Self::FromStartUntil(b) => 0..b,
         }
@@ -124,16 +137,29 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
     ) -> KernelResult<()> {
         let start = {
             let aligned = start.round_up_to(FRAME_SIZE);
-            trace!("aligned {:?} to {:?}", start, aligned);
+            trace!("aligned base {:?} to {:?}", start, aligned);
             aligned
         };
 
         let limit = {
             let limit = VirtualAddress::new_checked(start.0 + size);
             let aligned = limit.round_up_to(FRAME_SIZE);
-            trace!("aligned {:?} to {:?}", limit, aligned);
+            trace!("aligned limit {:?} to {:?}", limit, aligned);
             aligned
         };
+
+        #[cfg(test)]
+        trace!(
+            "mapping {}.{}.{}.{} => {}.{}.{}.{}",
+            start.pml4t_offset(),
+            start.pdp_offset(),
+            start.pd_offset(),
+            start.pt_offset(),
+            limit.pml4t_offset(),
+            limit.pdp_offset(),
+            limit.pd_offset(),
+            limit.pt_offset(),
+        );
 
         let mut total_count = 0_u64;
         let p4_range = start.pml4t_offset()..=limit.pml4t_offset();
@@ -168,6 +194,9 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
                                 Huge2M | Huge1G => todo!("huge pages ({:?})", flag),
                             }
                         }
+
+                        #[cfg(test)]
+                        trace!("mapping {}.{}.{}.{}", p4_idx, p3_idx, p2_idx, p1_idx);
 
                         // for qemu debugging only
                         // TODO mark as on-demand
@@ -238,30 +267,60 @@ mod tests {
     use super::*;
     use crate::memory::page_table::PageTable;
 
+    const FRAME_COUNT: usize = 512;
     struct Memory {
-        pages: [u8; 512 * FRAME_SIZE as usize],
+        pages: Box<[u8]>,
         next: usize,
     }
 
+    impl Memory {
+        fn new() -> Self {
+            Self {
+                pages: vec![0u8; FRAME_COUNT * FRAME_SIZE as usize].into_boxed_slice(),
+                next: 0,
+            }
+        }
+    }
+
     impl MemoryProvider for Memory {
-        fn new_frame(&self) -> KernelResult<PhysicalFrame> {
-            todo!();
-            unsafe { Ok(PhysicalFrame::new(PhysicalAddress(0))) }
+        fn new_frame(&mut self) -> KernelResult<PhysicalFrame> {
+            let idx = self.next;
+            assert!(idx < FRAME_COUNT, "all gone");
+            self.next += 1;
+
+            let frame = &self.pages[idx * FRAME_SIZE as usize..];
+            unsafe { Ok(PhysicalFrame::new(PhysicalAddress(frame.as_ptr() as u64))) }
         }
     }
 
     #[test]
     fn mapping() {
+        env_logger::builder()
+            .filter_level(LevelFilter::Trace)
+            .is_test(true)
+            .init();
+
         let mut p4 = PageTable::default();
-        let memory: Memory = unsafe { std::mem::zeroed() };
+        let memory = Memory::new();
 
         let mut space =
             unsafe { RawAddressSpace::with_existing(P4::with_initialized(&mut p4), memory) };
 
+        // a single page
         space
             .map_range(
                 VirtualAddress::new_checked(0x5000),
                 0x995, // aligned up to 0x1000
+                MapTarget::Any,
+                MapFlags::Writeable | MapFlags::User,
+            )
+            .expect("mapping failed");
+
+        // many pages across many tables
+        space
+            .map_range(
+                VirtualAddress::new_checked(0xaa3f0000),
+                0xf0000,
                 MapTarget::Any,
                 MapFlags::Writeable | MapFlags::User,
             )

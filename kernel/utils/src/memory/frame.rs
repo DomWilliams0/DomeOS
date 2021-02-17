@@ -22,8 +22,13 @@ impl PhysicalFrame {
     }
 
     pub fn zero(&self) {
-        let virt = VirtualAddress::from_physical(self.address());
-        let ptr: *mut u8 = virt.as_ptr();
+        let ptr = if cfg!(test) {
+            (self.0).0 as *mut u8
+        } else {
+            let virt = VirtualAddress::from_physical(self.address());
+            virt.as_ptr()
+        };
+
         let slice = unsafe { core::slice::from_raw_parts_mut(ptr, FRAME_SIZE as usize) };
 
         slice.fill(0);

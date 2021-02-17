@@ -17,3 +17,6 @@ log = "0.4"
 [features]
 default = []
 std = []
+
+[dev-dependencies]
+env_logger = "0.8"

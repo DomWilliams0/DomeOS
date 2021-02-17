@@ -89,6 +89,10 @@ impl VirtualAddress {
 
     /// Adds physical identity base
     pub fn from_physical(addr: PhysicalAddress) -> VirtualAddress {
+        if cfg!(test) {
+            return Self::new_checked(addr.0);
+        }
+
         let addr = addr.0.checked_add(VIRT_PHYSICAL_BASE).unwrap_or_else(|| {
             panic!(
                 "overflow calculating identity mapped address for {:?}",
@@ -216,6 +220,22 @@ mod tests {
         assert_eq!(
             addr.page_offset_1gb(),
             0b01_0010_1100_1010_1010_0011_1011_1011
+        );
+    }
+
+    #[test]
+    fn round_up() {
+        assert_eq!(
+            VirtualAddress::new_checked(0xeff00).round_up_to(0x1000).0,
+            0xf0000
+        );
+        assert_eq!(
+            VirtualAddress::new_checked(0x1000).round_up_to(0x1000).0,
+            0x1000
+        ); // no change
+        assert_eq!(
+            VirtualAddress::new_checked(0x5).round_up_to(0x1000).0,
+            0x1000
         );
     }
 }

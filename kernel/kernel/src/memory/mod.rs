@@ -97,10 +97,10 @@ pub fn init(multiboot: Multiboot) -> utils::KernelResult<()> {
     // mess around with new address space API, temporary
     let mut space = AddressSpace::current();
     space.map_range(
-        VirtualAddress::new_checked(0x8080000),
-        0x4343000,
+        VirtualAddress::new_checked(0xaa3f0000),
+        0xeff00,
         MapTarget::Any,
-        MapFlags::Executable | MapFlags::User,
+        MapFlags::Executable | MapFlags::Writeable,
     )?;
     Ok(())
 }
