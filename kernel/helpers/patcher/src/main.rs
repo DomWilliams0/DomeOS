@@ -42,7 +42,7 @@ fn patch_marker_range(file: &mut [u8], to_patch: &[u8]) -> (usize, usize) {
     let (base, len) = loop {
         let base = file[search_start..]
             .chunks_exact(marker_size)
-            .position(|val| val == &MARKER_BYTES)
+            .position(|val| val == MARKER_BYTES)
             .map(|x| x * marker_size)
             .unwrap_or_else(|| panic!("marker not found ({:#x})", MARKER));
 
@@ -51,7 +51,7 @@ fn patch_marker_range(file: &mut [u8], to_patch: &[u8]) -> (usize, usize) {
         let len = file[search_start..]
             .chunks_exact(marker_size)
             .skip(base / marker_size)
-            .position(|val| val != &MARKER_BYTES)
+            .position(|val| val != MARKER_BYTES)
             .map(|count| count * marker_size)
             .expect("marker end not found?");
 
