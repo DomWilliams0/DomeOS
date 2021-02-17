@@ -3,22 +3,17 @@ use core::ops::{Shl, Shr};
 
 use modular_bitfield::prelude::*;
 
+use crate::descriptor_tables::common::DescriptorTablePointer;
 use crate::irq;
-use crate::irq::{disable_interrupts, enable_interrupts};
+use utils::memory::address::VirtualAddress;
 
 static mut IDT: MaybeUninit<InterruptDescriptorTable> = MaybeUninit::uninit();
 
+// TODO this only needs to be temporary?
 #[export_name = "idt_descriptor"]
 pub(crate) static mut IDT_POINTER: MaybeUninit<DescriptorTablePointer> = MaybeUninit::uninit();
 
 const IDT_ENTRY_COUNT: usize = 256;
-
-#[repr(C, packed)]
-#[derive(Debug, Copy, Clone)]
-pub(crate) struct DescriptorTablePointer {
-    limit: u16,
-    base: u64,
-}
 
 #[bitfield]
 #[derive(Copy, Clone)]
@@ -91,9 +86,9 @@ impl IdtEntry {
     }
 
     fn addr(&self) -> u64 {
-        let low = self.get_base_low() as u64;
-        let mid = self.get_base_mid() as u64;
-        let high = self.get_base_high() as u64;
+        let low = self.base_low() as u64;
+        let mid = self.base_mid() as u64;
+        let high = self.base_high() as u64;
 
         low | mid.shl(16) | high.shl(32)
     }
@@ -177,9 +172,12 @@ impl Default for InterruptDescriptorTable {
 }
 
 impl InterruptDescriptorTable {
+    /// Handler must be a low early boot addr (e.g. around 1MB), will be offset to the kernel's
+    /// higher half range
     fn register(&mut self, index: usize, handler: InterruptHandler) {
         debug_assert!(index < IDT_ENTRY_COUNT);
-        self.entries[index] = IdtEntry::with_handler(handler as *const InterruptHandler);
+        self.entries[index] =
+            IdtEntry::with_handler(VirtualAddress::from_kernel_code(handler as *const _));
     }
 
     unsafe fn load(self) {
@@ -204,37 +202,6 @@ pub fn init() {
         let idt = InterruptDescriptorTable::default();
         idt.load()
     }
-}
-
-pub fn remap(offset: u64) {
-    disable_interrupts();
-
-    let idt: &mut InterruptDescriptorTable = unsafe { &mut *IDT.as_mut_ptr() };
-
-    idt.entries
-        .iter_mut()
-        .enumerate()
-        .filter(|(_, e)| e.get_present())
-        .for_each(|(i, e)| {
-            let addr = e.addr();
-            use log::*;
-            trace!(
-                "remapping IDT entry #{} from {:#x} to {:#x}",
-                i,
-                addr,
-                addr + offset
-            );
-            e.set_addr(addr + offset);
-        });
-
-    unsafe {
-        (*IDT_POINTER.as_mut_ptr()).base += offset;
-
-        let pointer = IDT_POINTER.as_ptr();
-        llvm_asm!("lidt ($0)" :: "r" (pointer) : "memory");
-    }
-
-    enable_interrupts();
 }
 
 mod externs {

@@ -7,6 +7,7 @@
 #![feature(abi_x86_interrupt)]
 #![feature(llvm_asm)]
 #![feature(panic_info_message)]
+#![feature(asm)]
 
 use core::ffi::c_void;
 
@@ -15,8 +16,8 @@ use log::*;
 use crate::irq::disable_interrupts;
 
 mod clock;
+mod descriptor_tables;
 mod exception;
-mod idt;
 mod io;
 mod irq;
 mod memory;

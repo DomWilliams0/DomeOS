@@ -1,14 +1,13 @@
 use crate::vga;
+use enumflags2::BitFlags;
 use utils::memory::*;
 
 mod page_table;
 mod phys;
-mod virt;
 
 pub fn init(multiboot: &'static crate::multiboot::multiboot_info) -> utils::KernelResult<()> {
     use crate::memory::page_table::pml4;
     use crate::memory::phys::frame_allocator;
-    use crate::multiboot::MemoryRegion;
     use log::*;
     use phys::FrameAllocator;
     use utils::memory::address::PhysicalAddress;

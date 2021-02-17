@@ -1,27 +1,33 @@
 use log::*;
 
 use utils::prelude::*;
+use utils::KernelResult;
 
 use crate::irq::{disable_interrupts, enable_interrupts};
 
 use crate::serial::LogMode;
 use crate::vga::{self, Color};
-use crate::{clock, idt, serial};
+use crate::{clock, descriptor_tables, serial};
 use crate::{memory, multiboot};
-use utils::KernelResult;
 
+// TODO guard page to detect and handle stack overflow
 pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     vga::init(Color::LightGreen, Color::Black);
     serial::set_log_mode(LogMode::SerialAndVga);
 
-    idt::init();
+    descriptor_tables::init();
     clock::init();
-    enable_interrupts();
 
     parse_multiboot(multiboot);
 
     let init_result = (|| -> KernelResult<()> {
+        // set up page tables for desired mapping
         memory::init(multiboot)?;
+
+        // finally enable interrupts now that the higher half mappings are in place, so the isrs are
+        // actually mapped
+        enable_interrupts();
+
         Ok(())
     })();
 

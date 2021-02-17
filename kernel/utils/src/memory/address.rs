@@ -1,7 +1,7 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
 use core::ops::{Add, AddAssign, Shl, Shr};
 
-use crate::memory::VIRT_PHYSICAL_BASE;
+use crate::memory::{VIRT_KERNEL_BASE, VIRT_PHYSICAL_BASE};
 use derive_more::*;
 
 /// Bottom 12 bits should be 0 from 4096 alignment
@@ -32,6 +32,17 @@ impl VirtualAddress {
         let sign_extend_mask = 1 << (SIGN_EXTEND - 1);
         let addr = (addr.wrapping_mul(sign_extend_mask) as i64 / sign_extend_mask as i64) as u64;
         Self(addr)
+    }
+
+    /// Panics if value changes from 48-bit sign extension
+    pub fn new_checked(addr: u64) -> Self {
+        let virt = Self::new(addr);
+        assert_eq!(
+            virt.0, addr,
+            "virtual address {:#x} is not representable (becomes {:?})",
+            addr, virt
+        );
+        virt
     }
 
     /// P4
@@ -78,7 +89,21 @@ impl VirtualAddress {
 
     /// Adds physical identity base
     pub fn from_physical(addr: PhysicalAddress) -> VirtualAddress {
-        Self::new(addr.0 + VIRT_PHYSICAL_BASE)
+        let addr = addr.0.checked_add(VIRT_PHYSICAL_BASE).unwrap_or_else(|| {
+            panic!(
+                "overflow calculating identity mapped address for {:?}",
+                addr
+            )
+        });
+        Self::new_checked(addr)
+    }
+
+    /// Adds kernel higher half base
+    pub fn from_kernel_code<T>(addr: *const T) -> *const T {
+        (addr as u64)
+            .checked_add(VIRT_KERNEL_BASE)
+            .unwrap_or_else(|| panic!("overflow adding virtual kernel base offset to {:?}", addr))
+            as *mut T
     }
 
     pub fn log_all_offsets(self) {
