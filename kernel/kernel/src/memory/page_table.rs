@@ -12,15 +12,15 @@ fn cr3() -> u64 {
     value
 }
 
-pub fn pml4() -> P4<'static> {
+pub fn pml4<'p>() -> P4<'p> {
     let addr = cr3().bit_range(51, 12);
     let ptr = PhysicalAddress::from_4096_aligned(addr);
-    let table = ptr.0 as *mut PageTable<'static, P3<'static>>;
+    let table = ptr.0 as *mut PageTable<'p, P3<'p>>;
     P4::with_initialized(unsafe { &mut *table })
 }
 
-pub fn set_pml4(mut p4: &P4<'static>) {
-    let ptr = PhysicalAddress((&**p4) as *const PageTable<'static, P3<'static>> as u64);
+pub fn set_pml4(p4: &P4<'static>) {
+    let ptr = PhysicalAddress((&***p4) as *const PageTable<'static, P3<'static>> as u64);
 
     let mut cr3 = cr3();
     cr3.set_bit_range(51, 12, ptr.to_4096_aligned());

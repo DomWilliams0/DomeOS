@@ -6,8 +6,11 @@ pub mod address;
 mod frame;
 pub mod page_table;
 
+mod address_space;
 mod constants;
 mod hierarchy;
+
+pub use address_space::{MapFlags, MapTarget, MemoryProvider, RawAddressSpace};
 
 pub const fn terabytes(n: u64) -> u64 {
     n * (1 << 40)

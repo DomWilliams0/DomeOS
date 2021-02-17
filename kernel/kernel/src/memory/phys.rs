@@ -49,9 +49,7 @@ pub fn frame_allocator() -> &'static mut impl FrameAllocator {
 mod dumb {
     use crate::memory::phys::physical_size::kernel_end;
     use crate::memory::phys::{FrameAllocator, FrameFlags};
-    use crate::multiboot::{
-        multiboot_memory_map_t, MemoryRegion, MemoryRegionType, MultibootMemoryMap,
-    };
+    use crate::multiboot::{multiboot_memory_map_t, MemoryRegionType, MultibootMemoryMap};
     use log::*;
     use utils::memory::address::PhysicalAddress;
     use utils::memory::PhysicalFrame;
@@ -88,7 +86,9 @@ mod dumb {
                 .flat_map(|range| range.step_by(4096))
                 .filter_map(move |addr| {
                     if addr > min {
-                        Some(PhysicalFrame::new(PhysicalAddress(addr)))
+                        // safety: physical addr calculated from multiboot
+                        let frame = unsafe { PhysicalFrame::new(PhysicalAddress(addr)) };
+                        Some(frame)
                     } else {
                         // overlaps with kernel
                         None
@@ -118,7 +118,9 @@ mod dumb {
             let new_ptr = mmap as *const multiboot_memory_map_t;
             // panics if new ptr is not higher, which it never is
             let offset = (new_ptr as u64) - (old_ptr as u64);
-            unsafe { self.multiboot_mmap.add_pointer_offset(offset) }
+            unsafe {
+                self.multiboot_mmap.add_pointer_offset(offset);
+            }
         }
     }
 }

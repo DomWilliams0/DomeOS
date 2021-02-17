@@ -12,12 +12,15 @@ pub const VIRT_KERNEL_SIZE: u64 = VIRT_KERNEL_MAX - VIRT_KERNEL_BASE;
 
 pub const PHYS_KERNEL_BASE: u64 = 0x10_0000;
 
+pub const FRAME_SIZE: u64 = 4096;
+
 #[derive(Copy, Clone)]
 pub enum VirtualMapping {
     PhysicalIdentity,
     KernelIdentity,
 }
 
+#[deprecated]
 pub fn mapping_for_address(addr: VirtualAddress) -> Option<VirtualMapping> {
     let ranges = [
         (

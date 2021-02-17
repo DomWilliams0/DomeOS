@@ -1,13 +1,16 @@
+#![allow(clippy::upper_case_acronyms)]
+
 use crate::memory::address::{PhysicalAddress, VirtualAddress};
 use crate::memory::page_table::PageTable;
 use crate::memory::PhysicalFrame;
 use crate::{KernelError, KernelResult};
-use core::ops::{Deref, DerefMut};
+use derive_more::{Deref, DerefMut};
 
-pub trait PageTableHierarchy<'p> {
+pub trait PageTableHierarchy<'p>: core::fmt::Debug {
     type NextLevel: PageTableHierarchy<'p>;
     const NAME: &'static str;
 
+    // TODO other traits e.g. WithTable, WithFrame
     fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> KernelResult<Self>
     where
         Self: Sized,
@@ -32,11 +35,11 @@ pub trait PageTableHierarchy<'p> {
 }
 
 /// PML4T
-#[derive(Debug)]
+#[derive(Deref, DerefMut)]
 pub struct P4<'p>(&'p mut PageTable<'p, P3<'p>>);
 
 /// PDPT
-#[derive(Debug)]
+#[derive(Deref, DerefMut)]
 pub struct P3<'p>(&'p mut PageTable<'p, P2<'p>>);
 
 #[derive(Debug)]
@@ -153,40 +156,12 @@ impl<'p> PageTableHierarchy<'p> for Frame {
         Ok(frame)
     }
 
-    fn entry_index(addr: VirtualAddress) -> u16 {
-        todo!()
+    fn entry_index(_addr: VirtualAddress) -> u16 {
+        unreachable!()
     }
 
     fn table_mut(&mut self) -> KernelResult<&mut PageTable<'p, Self::NextLevel>> {
         Err(KernelError::NoTableAvailable(Self::NAME, self.0))
-    }
-}
-
-impl<'p> Deref for P4<'p> {
-    type Target = PageTable<'p, P3<'p>>;
-
-    fn deref(&self) -> &Self::Target {
-        self.0
-    }
-}
-
-impl<'p> DerefMut for P4<'p> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0
-    }
-}
-
-impl<'p> Deref for P3<'p> {
-    type Target = PageTable<'p, P2<'p>>;
-
-    fn deref(&self) -> &Self::Target {
-        self.0
-    }
-}
-
-impl<'p> DerefMut for P3<'p> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0
     }
 }
 
@@ -204,5 +179,17 @@ impl<'p> P4<'p> {
         *table = core::mem::zeroed();
 
         Self(table)
+    }
+}
+
+impl core::fmt::Debug for P4<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "P4({:?})", self.0 as *const _)
+    }
+}
+
+impl core::fmt::Debug for P3<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "P3({:?})", self.0 as *const _)
     }
 }

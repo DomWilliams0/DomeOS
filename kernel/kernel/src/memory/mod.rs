@@ -1,8 +1,10 @@
+use crate::memory::address_space::AddressSpace;
 use crate::multiboot::Multiboot;
 use crate::vga;
 use enumflags2::BitFlags;
 use utils::memory::*;
 
+mod address_space;
 mod page_table;
 mod phys;
 
@@ -92,5 +94,13 @@ pub fn init(multiboot: Multiboot) -> utils::KernelResult<()> {
         p4[0].modify().not_present().build();
     }
 
+    // mess around with new address space API, temporary
+    let mut space = AddressSpace::current();
+    space.map_range(
+        VirtualAddress::new_checked(0x8080000),
+        0x4343000,
+        MapTarget::Any,
+        MapFlags::Executable | MapFlags::User,
+    )?;
     Ok(())
 }

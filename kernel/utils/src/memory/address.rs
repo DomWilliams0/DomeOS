@@ -106,6 +106,17 @@ impl VirtualAddress {
             as *mut T
     }
 
+    pub fn round_up_to(self, multiple: u64) -> Self {
+        assert!(multiple.is_power_of_two());
+        let val = (self.0 + multiple - 1) as i64 & -(multiple as i64);
+        Self::new_checked(val as u64)
+    }
+
+    pub fn round_down_to(self, multiple: u64) -> Self {
+        assert!(multiple.is_power_of_two());
+        Self::new_checked(self.0 & !(multiple - 1))
+    }
+
     pub fn log_all_offsets(self) {
         log::debug!(
             "{:?} -> {}, {}, {}, {}",

@@ -81,6 +81,10 @@ pub struct PageTable<'p, P: PageTableHierarchy<'p>> {
     _phantom: PhantomData<&'p P>,
 }
 
+pub trait EntryIndex<'p, P: PageTableHierarchy<'p>> {
+    fn index(self) -> u16;
+}
+
 impl<'p, P> Copy for CommonEntry<'p, P> {}
 
 impl<'p, P> Clone for CommonEntry<'p, P> {
@@ -96,6 +100,15 @@ impl<'p, P> Clone for CommonEntry<'p, P> {
 impl<'p, P: PageTableHierarchy<'p>> Default for CommonEntry<'p, P> {
     fn default() -> Self {
         Self::zeroed()
+    }
+}
+
+impl<'p, P: PageTableHierarchy<'p>> Default for PageTable<'p, P> {
+    fn default() -> Self {
+        Self {
+            entries: [CommonEntry::default(); PAGE_TABLE_ENTRY_COUNT],
+            _phantom: PhantomData,
+        }
     }
 }
 
@@ -327,36 +340,45 @@ impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
         self.entries.iter_mut()
     }
 
-    pub fn entry_mut(&mut self, addr: VirtualAddress) -> KernelResult<&mut CommonEntry<'p, P>> {
-        let e = P::entry_index(addr) as usize;
+    pub fn entry(&self, idx: impl EntryIndex<'p, P>) -> &CommonEntry<'p, P> {
+        let e = idx.index() as usize;
         debug_assert!(e < self.entries.len(), "entry index {} out of range", e);
 
         // safety: entry_index always returns value in range
-        Ok(unsafe { self.entries.get_unchecked_mut(e) })
+        unsafe { self.entries.get_unchecked(e) }
+    }
+
+    pub fn entry_mut(&mut self, idx: impl EntryIndex<'p, P>) -> &mut CommonEntry<'p, P> {
+        let e = idx.index() as usize;
+        debug_assert!(e < self.entries.len(), "entry index {} out of range", e);
+
+        // safety: entry_index always returns value in range
+        unsafe { self.entries.get_unchecked_mut(e) }
+    }
+}
+impl<'p, P: PageTableHierarchy<'p>> EntryIndex<'p, P> for u16 {
+    fn index(self) -> u16 {
+        self
     }
 }
 
-impl<'p, P: PageTableHierarchy<'p>> Index<u16> for PageTable<'p, P> {
+impl<'p, P: PageTableHierarchy<'p>> EntryIndex<'p, P> for VirtualAddress {
+    fn index(self) -> u16 {
+        P::entry_index(self)
+    }
+}
+
+impl<'p, P: PageTableHierarchy<'p>, E: EntryIndex<'p, P>> Index<E> for PageTable<'p, P> {
     type Output = CommonEntry<'p, P>;
 
-    fn index(&self, index: u16) -> &Self::Output {
-        debug_assert!(
-            index < PAGE_TABLE_ENTRY_COUNT as u16,
-            "table index {} out of range",
-            index
-        );
-        &self.entries[index as usize]
+    fn index(&self, index: E) -> &Self::Output {
+        self.entry(index)
     }
 }
 
-impl<'p, P: PageTableHierarchy<'p>> IndexMut<u16> for PageTable<'p, P> {
-    fn index_mut(&mut self, index: u16) -> &mut Self::Output {
-        debug_assert!(
-            index < PAGE_TABLE_ENTRY_COUNT as u16,
-            "table index {} out of range",
-            index
-        );
-        &mut self.entries[index as usize]
+impl<'p, P: PageTableHierarchy<'p>, E: EntryIndex<'p, P>> IndexMut<E> for PageTable<'p, P> {
+    fn index_mut(&mut self, index: E) -> &mut Self::Output {
+        self.entry_mut(index)
     }
 }
 

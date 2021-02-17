@@ -2,7 +2,9 @@
 .ycm_extra_conf.py*
 serial.log
 qemu-logfile
+vgcore*
 cmake-build-*
+
 
 # Created by .ignore support plugin (hsz.mobi)
 ### C template
