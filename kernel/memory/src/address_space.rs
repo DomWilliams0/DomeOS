@@ -128,7 +128,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
                     );
 
                     for p1_idx in tables[3]..tables[3] + pages_to_do {
-                        let mut entry = p1_table[p1_idx].replace();
+                        let mut entry = p1_table.entry_mut(p1_idx).replace();
 
                         // TODO calc flags once and copy each time
                         for flag in flags.iter() {

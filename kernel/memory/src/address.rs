@@ -1,7 +1,7 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
 use core::ops::{Add, AddAssign, Shl, Shr};
 
-use crate::{VIRT_KERNEL_BASE, VIRT_PHYSICAL_BASE};
+use crate::{VIRT_KERNEL_BASE, VIRT_PHYSICAL_BASE, VIRT_PHYSICAL_MAX};
 use common::*;
 
 /// Bottom 12 bits should be 0 from 4096 alignment
@@ -108,6 +108,25 @@ impl VirtualAddress {
             .checked_add(VIRT_KERNEL_BASE)
             .unwrap_or_else(|| panic!("overflow adding virtual kernel base offset to {:?}", addr))
             as *mut T
+    }
+
+    /// Subtracts physical identity base
+    pub fn to_physical(self) -> PhysicalAddress {
+        if cfg!(test) {
+            return PhysicalAddress(self.0);
+        }
+
+        let addr = self
+            .0
+            .checked_sub(VIRT_PHYSICAL_BASE)
+            .unwrap_or_else(|| panic!("overflow calculating physical address for {:?}", self));
+        PhysicalAddress(addr)
+    }
+
+    /// True if in the physical identity mapped range
+    pub fn is_identity_mapped_physical<T>(thing: &T) -> bool {
+        let addr = thing as *const T as u64;
+        (VIRT_PHYSICAL_BASE..VIRT_PHYSICAL_MAX).contains(&addr)
     }
 
     pub fn round_up_to(self, multiple: u64) -> Self {

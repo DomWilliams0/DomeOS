@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::entry::PageTableBits;
-use crate::{CommonEntry, PageTableHierarchy, PhysicalAddress};
+use crate::{CommonEntry, PageTableHierarchy, PhysicalAddress, VirtualAddress, VIRT_PHYSICAL_BASE};
 
 pub struct EntryBuilder<'e, 'p, P> {
     bits: PageTableBits,

@@ -13,6 +13,3 @@ default-members = ["kernel"]
 
 [profile.dev]
 debug = 0 # symbols are manually patched in
-
-[profile.dev.package.modular-bitfield]
-opt-level = 3 # no opt causes page faults when checking present bit

@@ -41,7 +41,7 @@ pub fn init(multiboot: Multiboot) -> KernelResult<()> {
         for i in 0..p3_count {
             let p4_offset = start_idx + i;
 
-            // allocate new frame for p3 - will be early after the kernel image and there identity
+            // allocate new frame for p3 - will be early after the kernel image and therefore identity
             // mapped and writable already
             let p3_frame = frame_allocator().allocate(BitFlags::empty())?;
 
@@ -61,7 +61,9 @@ pub fn init(multiboot: Multiboot) -> KernelResult<()> {
             }
 
             // point p4 entry at new p3
-            let p4_entry = &mut p4[p4_offset];
+            // safety: physical entry is accessible as comment above states
+            let p4_entry = unsafe { p4.entry_physical_mut(p4_offset) };
+
             p4_entry
                 .replace()
                 .writeable()
@@ -90,9 +92,9 @@ pub fn init(multiboot: Multiboot) -> KernelResult<()> {
 
     // now safe to remove low identity maps from early boot
     {
-        let mut p3 = p4[0].traverse()?;
-        p3[0].modify().not_present().build();
-        p4[0].modify().not_present().build();
+        let mut p3 = p4.entry_mut(0).traverse()?;
+        p3.entry_mut(0).replace().not_present().build();
+        p4.entry_mut(0).replace().not_present().build();
     }
 
     // mess around with new address space API, temporary

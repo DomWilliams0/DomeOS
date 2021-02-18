@@ -131,7 +131,7 @@ impl<'p, P: PageTableHierarchy<'p>> CommonEntry<'p, P> {
 
 impl<'p, P: PageTableHierarchy<'p>> Debug for CommonEntry<'p, P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        let this = PhysicalAddress(&self as *const _ as u64);
+        let this = self as *const _;
         write!(f, "[{:?} -> {:?} {:?}]", this, self.address(), self.bits)
     }
 }

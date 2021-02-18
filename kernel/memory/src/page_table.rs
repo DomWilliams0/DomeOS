@@ -67,11 +67,44 @@ impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
         let e = idx.index() as usize;
         debug_assert!(e < self.entries.len(), "entry index {} out of range", e);
 
-        // safety: entry_index always returns value in range
-        unsafe { self.entries.get_unchecked(e) }
+        let identity_mapped_physical = VirtualAddress::is_identity_mapped_physical(self);
+
+        // safety: not dereferencing physical memory
+        let entry = unsafe { self.entries.get_unchecked(e) };
+
+        if !identity_mapped_physical {
+            // is not currently accessible, needs to be offset into identity mapped region
+            let entry_virt =
+                VirtualAddress::from_physical(PhysicalAddress(entry as *const _ as u64));
+            unsafe { &*entry_virt.as_ptr() }
+        } else {
+            // already accessible
+            entry
+        }
     }
 
+    /// If this table is in physical memory, convert the entry address into accessible identity
+    /// mapped virtual memory. Otherwise returns it as-is
     pub fn entry_mut(&mut self, idx: impl EntryIndex<'p, P>) -> &mut CommonEntry<'p, P> {
+        let identity_mapped_physical = VirtualAddress::is_identity_mapped_physical(self);
+
+        // safety: not dereferencing physical memory
+        let entry = unsafe { self.entry_physical_mut(idx) };
+
+        if !identity_mapped_physical {
+            // is not currently accessible, needs to be offset into identity mapped region
+            let entry_virt = VirtualAddress::from_physical(PhysicalAddress(entry as *mut _ as u64));
+            unsafe { &mut *entry_virt.as_ptr() }
+        } else {
+            // already accessible
+            entry
+        }
+    }
+
+    pub unsafe fn entry_physical_mut(
+        &mut self,
+        idx: impl EntryIndex<'p, P>,
+    ) -> &mut CommonEntry<'p, P> {
         let e = idx.index() as usize;
         debug_assert!(e < self.entries.len(), "entry index {} out of range", e);
 
@@ -88,20 +121,6 @@ impl<'p, P: PageTableHierarchy<'p>> EntryIndex<'p, P> for u16 {
 impl<'p, P: HasTable<'p>> EntryIndex<'p, P> for VirtualAddress {
     fn index(self) -> u16 {
         P::entry_index(self)
-    }
-}
-
-impl<'p, P: PageTableHierarchy<'p>, E: EntryIndex<'p, P>> Index<E> for PageTable<'p, P> {
-    type Output = CommonEntry<'p, P>;
-
-    fn index(&self, index: E) -> &Self::Output {
-        self.entry(index)
-    }
-}
-
-impl<'p, P: PageTableHierarchy<'p>, E: EntryIndex<'p, P>> IndexMut<E> for PageTable<'p, P> {
-    fn index_mut(&mut self, index: E) -> &mut Self::Output {
-        self.entry_mut(index)
     }
 }
 
