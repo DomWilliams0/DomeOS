@@ -1,7 +1,8 @@
 #![allow(clippy::upper_case_acronyms)]
 
 use crate::address::{PhysicalAddress, VirtualAddress};
-use crate::{PageTable, PhysicalFrame};
+use crate::page_table::PageTable;
+use crate::PhysicalFrame;
 use common::*;
 
 pub trait PageTableHierarchy<'p>: core::fmt::Debug {

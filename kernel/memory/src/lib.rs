@@ -5,11 +5,15 @@
 pub use address::{PhysicalAddress, VirtualAddress};
 pub use address_space::{MapFlags, MapTarget, MemoryProvider, RawAddressSpace};
 pub use constants::*;
+pub use entry::{CommonEntry, PageTableBits, PageTableFlag};
+pub use entry_builder::EntryBuilder;
 pub use frame::PhysicalFrame;
 pub use hierarchy::*;
-pub use page_table::{CommonEntry, EntryIndex, PageTable, PageTableFlags, PAGE_TABLE_ENTRY_COUNT};
+pub use page_table::{EntryIndex, PageTable, PAGE_TABLE_ENTRY_COUNT};
 
 mod address;
+mod entry;
+mod entry_builder;
 mod frame;
 mod page_table;
 
