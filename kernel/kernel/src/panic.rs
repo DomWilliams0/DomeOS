@@ -83,21 +83,22 @@ pub fn backtrace(mut per_frame: impl FnMut(Frame)) {
 
     let mut idx = 0;
     while !rbp.is_null() {
-        let symbol = {
+        let (addr, symbol) = {
             // deref +8 bytes to get function return address is contained in
             let ret_addr = unsafe { *rbp.offset(1) };
-            symbols
+            let symbol = symbols
                 .clone()
                 .and_then(|symbols| ld_link_map::packed::resolve_entry(symbols, ret_addr))
                 .map(|entry| {
                     let offset = ret_addr - entry.address;
                     (offset, entry.name)
-                })
+                });
+            (ret_addr, symbol)
         };
 
         per_frame(Frame {
             idx,
-            ptr: rbp,
+            ptr: addr as *const _,
             symbol,
         });
 
