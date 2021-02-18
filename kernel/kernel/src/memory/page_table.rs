@@ -1,8 +1,6 @@
+use bitfield::BitRange;
 use log::*;
-use utils::memory::address::PhysicalAddress;
-use utils::memory::page_table::PageTable;
-use utils::memory::{P1, P2, P3, P4};
-use utils::prelude::*;
+use memory::{PageTable, PhysicalAddress, P1, P2, P3, P4};
 
 fn cr3() -> u64 {
     let value: u64;

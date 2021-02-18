@@ -1,12 +1,11 @@
+use crate::error::KernelResult;
 use crate::memory::phys::dumb::DumbFrameAllocator;
 use crate::memory::phys::physical_size::kernel_size;
 use crate::multiboot::{multiboot_memory_map_t, MultibootMemoryMap};
+use common::InitializedGlobal;
 use enumflags2::BitFlags;
 use log::*;
-
-use utils::memory::PhysicalFrame;
-use utils::prelude::*;
-use utils::{InitializedGlobal, KernelResult};
+use memory::PhysicalFrame;
 
 #[derive(BitFlags, Debug, Copy, Clone)]
 #[repr(u16)]
@@ -47,14 +46,13 @@ pub fn frame_allocator() -> &'static mut impl FrameAllocator {
 }
 
 mod dumb {
+    use crate::error::{KernelError, KernelResult};
     use crate::memory::phys::physical_size::kernel_end;
     use crate::memory::phys::{FrameAllocator, FrameFlags};
     use crate::multiboot::{multiboot_memory_map_t, MemoryRegionType, MultibootMemoryMap};
+    use enumflags2::BitFlags;
     use log::*;
-    use utils::memory::address::PhysicalAddress;
-    use utils::memory::PhysicalFrame;
-    use utils::prelude::*;
-    use utils::{KernelError, KernelResult};
+    use memory::{MemoryError, PhysicalAddress, PhysicalFrame};
 
     pub struct DumbFrameAllocator {
         multiboot_mmap: MultibootMemoryMap,
@@ -106,7 +104,7 @@ mod dumb {
 
             let next = self.all_frames().nth(self.next);
             self.next += 1;
-            next.ok_or(KernelError::NoFrame)
+            Ok(next.ok_or(MemoryError::NoFrame)?)
         }
 
         fn free(&mut self, _frame: PhysicalFrame) -> KernelResult<()> {

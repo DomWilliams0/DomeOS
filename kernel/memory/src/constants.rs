@@ -1,4 +1,4 @@
-use crate::memory::address::VirtualAddress;
+use crate::address::VirtualAddress;
 
 pub const VIRT_USERSPACE_MAX: u64 = 0x2000_0000_0000;
 

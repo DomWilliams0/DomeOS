@@ -2,8 +2,9 @@
 
 members = [
     "kernel",
-    "utils",
-
+    "common",
+    "memory",
+    # build helpers
     "helpers/ld-link-map",
     "helpers/patcher",
 ]
@@ -11,4 +12,4 @@ members = [
 default-members = ["kernel"]
 
 [profile.dev]
-#debug = 0 # symbols are manually patched in
+debug = 0 # symbols are manually patched in

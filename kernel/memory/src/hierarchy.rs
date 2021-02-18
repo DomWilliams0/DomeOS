@@ -1,30 +1,29 @@
 #![allow(clippy::upper_case_acronyms)]
 
-use crate::memory::address::{PhysicalAddress, VirtualAddress};
-use crate::memory::page_table::PageTable;
-use crate::memory::PhysicalFrame;
-use crate::{KernelError, KernelResult};
-use derive_more::{Deref, DerefMut};
+use crate::address::{PhysicalAddress, VirtualAddress};
+use crate::error::MemoryResult;
+use crate::{MemoryError, PageTable, PhysicalFrame};
+use common::*;
 
 pub trait PageTableHierarchy<'p>: core::fmt::Debug {
     type NextLevel: PageTableHierarchy<'p>;
     const NAME: &'static str;
 
-    fn with_table(_table: &'p mut PageTable<'p, Self::NextLevel>) -> KernelResult<Self>
+    fn with_table(_table: &'p mut PageTable<'p, Self::NextLevel>) -> MemoryResult<Self>
     where
         Self: Sized,
     {
-        Err(KernelError::TableNotSupported(Self::NAME))
+        Err(MemoryError::TableNotSupported(Self::NAME))
     }
 
-    fn with_frame(_frame: Frame) -> KernelResult<Self>
+    fn with_frame(_frame: Frame) -> MemoryResult<Self>
     where
         Self: Sized,
     {
-        Err(KernelError::FrameNotSupported(Self::NAME))
+        Err(MemoryError::FrameNotSupported(Self::NAME))
     }
 
-    fn table_mut(&mut self) -> KernelResult<&mut PageTable<'p, Self::NextLevel>>;
+    fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>>;
 }
 
 pub trait HasTable<'p>: PageTableHierarchy<'p> {
@@ -58,11 +57,11 @@ impl<'p> PageTableHierarchy<'p> for P4<'p> {
     type NextLevel = P3<'p>;
     const NAME: &'static str = "PML4";
 
-    fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> KernelResult<Self> {
+    fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> MemoryResult<Self> {
         Ok(Self(table))
     }
 
-    fn table_mut(&mut self) -> KernelResult<&mut PageTable<'p, Self::NextLevel>> {
+    fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>> {
         Ok(self.0)
     }
 }
@@ -77,11 +76,11 @@ impl<'p> PageTableHierarchy<'p> for P3<'p> {
     type NextLevel = P2<'p>;
     const NAME: &'static str = "PDP";
 
-    fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> KernelResult<Self> {
+    fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> MemoryResult<Self> {
         Ok(Self(table))
     }
 
-    fn table_mut(&mut self) -> KernelResult<&mut PageTable<'p, Self::NextLevel>> {
+    fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>> {
         Ok(self.0)
     }
 }
@@ -96,21 +95,21 @@ impl<'p> PageTableHierarchy<'p> for P2<'p> {
     type NextLevel = P1<'p>;
     const NAME: &'static str = "PD";
 
-    fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> KernelResult<Self> {
+    fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> MemoryResult<Self> {
         Ok(Self::PDT(table))
     }
 
-    fn with_frame(frame: Frame) -> KernelResult<Self>
+    fn with_frame(frame: Frame) -> MemoryResult<Self>
     where
         Self: Sized,
     {
         Ok(Self::Huge1GPage(frame))
     }
 
-    fn table_mut(&mut self) -> KernelResult<&mut PageTable<'p, Self::NextLevel>> {
+    fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>> {
         match self {
             P2::PDT(table) => Ok(*table),
-            P2::Huge1GPage(frame) => Err(KernelError::NoTableAvailable(Self::NAME, frame.0)),
+            P2::Huge1GPage(frame) => Err(MemoryError::NoTableAvailable(Self::NAME, frame.0)),
         }
     }
 }
@@ -125,21 +124,21 @@ impl<'p> PageTableHierarchy<'p> for P1<'p> {
     type NextLevel = Frame;
     const NAME: &'static str = "PT";
 
-    fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> KernelResult<Self> {
+    fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> MemoryResult<Self> {
         Ok(Self::PT(table))
     }
 
-    fn with_frame(frame: Frame) -> KernelResult<Self>
+    fn with_frame(frame: Frame) -> MemoryResult<Self>
     where
         Self: Sized,
     {
         Ok(Self::Huge2MPage(frame))
     }
 
-    fn table_mut(&mut self) -> KernelResult<&mut PageTable<'p, Self::NextLevel>> {
+    fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>> {
         match self {
             P1::PT(table) => Ok(*table),
-            P1::Huge2MPage(frame) => Err(KernelError::NoTableAvailable(Self::NAME, frame.0)),
+            P1::Huge2MPage(frame) => Err(MemoryError::NoTableAvailable(Self::NAME, frame.0)),
         }
     }
 }
@@ -154,15 +153,15 @@ impl<'p> PageTableHierarchy<'p> for Frame {
     type NextLevel = Self;
     const NAME: &'static str = "Page";
 
-    fn with_frame(frame: Frame) -> KernelResult<Self>
+    fn with_frame(frame: Frame) -> MemoryResult<Self>
     where
         Self: Sized,
     {
         Ok(frame)
     }
 
-    fn table_mut(&mut self) -> KernelResult<&mut PageTable<'p, Self::NextLevel>> {
-        Err(KernelError::NoTableAvailable(Self::NAME, self.0))
+    fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>> {
+        Err(MemoryError::NoTableAvailable(Self::NAME, self.0))
     }
 }
 

@@ -1,11 +1,12 @@
 use core::convert::TryFrom;
 use core::fmt::Debug;
 
-use utils::memory::address::VirtualAddress;
-use utils::prelude::*;
+use common::*;
 
 use crate::exception::page_fault::PageFaultException;
 use crate::irq::InterruptContext;
+use enumflags2::BitFlags;
+use memory::VirtualAddress;
 
 #[derive(Display)]
 pub enum ExceptionError {

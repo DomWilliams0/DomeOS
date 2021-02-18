@@ -1,8 +1,8 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
 use core::ops::{Add, AddAssign, Shl, Shr};
 
-use crate::memory::{VIRT_KERNEL_BASE, VIRT_PHYSICAL_BASE};
-use derive_more::*;
+use crate::{VIRT_KERNEL_BASE, VIRT_PHYSICAL_BASE};
+use common::*;
 
 /// Bottom 12 bits should be 0 from 4096 alignment
 const ADDRESS_SHIFT: u64 = 12;
@@ -122,7 +122,7 @@ impl VirtualAddress {
     }
 
     pub fn log_all_offsets(self) {
-        log::debug!(
+        debug!(
             "{:?} -> {}, {}, {}, {}",
             self,
             self.pml4t_offset(),
@@ -197,7 +197,7 @@ impl AddAssign<u64> for VirtualAddress {
 
 #[cfg(test)]
 mod tests {
-    use crate::memory::address::VirtualAddress;
+    use crate::address::VirtualAddress;
 
     #[test]
     fn virtaddr_offsets() {

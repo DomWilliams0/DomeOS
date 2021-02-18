@@ -1,8 +1,7 @@
 use core::fmt::{Debug, Error, Formatter};
 
-use log::*;
-use utils::memory::address::VirtualAddress;
-use utils::prelude::BitFlags;
+use enumflags2::BitFlags;
+use memory::VirtualAddress;
 
 #[derive(Debug)]
 pub struct PageFaultException(pub PageFaultFlags, pub VirtualAddress);

@@ -1,10 +1,10 @@
-use crate::memory::address::PhysicalAddress;
-use displaydoc::Display;
+use crate::PhysicalAddress;
+use common::*;
 
-pub type KernelResult<T> = Result<T, KernelError>;
+pub type MemoryResult<T> = Result<T, MemoryError>;
 
 #[derive(Display, Debug)]
-pub enum KernelError {
+pub enum MemoryError {
     /// No physical frames available
     NoFrame,
 
@@ -19,7 +19,4 @@ pub enum KernelError {
 
     /// Page table of type {0} at {1:?} does not have a page table available
     NoTableAvailable(&'static str, PhysicalAddress),
-
-    /// Not implemented
-    NotImplemented,
 }

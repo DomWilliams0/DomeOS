@@ -1,0 +1,36 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+// #![feature(maybe_uninit_ref)]
+// #![feature(const_fn)]
+
+pub use address::{PhysicalAddress, VirtualAddress};
+pub use address_space::{MapFlags, MapTarget, MemoryProvider, RawAddressSpace};
+pub use constants::*;
+pub use error::MemoryError;
+pub use frame::PhysicalFrame;
+pub use hierarchy::*;
+pub use page_table::{CommonEntry, EntryIndex, PageTable, PageTableFlags, PAGE_TABLE_ENTRY_COUNT};
+
+mod address;
+mod error;
+mod frame;
+mod page_table;
+
+mod address_space;
+mod constants;
+mod hierarchy;
+
+pub const fn terabytes(n: u64) -> u64 {
+    n * (1 << 40)
+}
+
+pub const fn gigabytes(n: u64) -> u64 {
+    n * (1 << 30)
+}
+
+pub const fn megabytes(n: u64) -> u64 {
+    n * (1 << 20)
+}
+
+pub const fn kilobytes(n: u64) -> u64 {
+    n * (1 << 10)
+}

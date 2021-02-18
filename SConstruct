@@ -76,7 +76,8 @@ env.Depends(run_qemu, iso)
 # really crappy host testing
 def host_tests(target, source, env):
     modules = [
-        ("kernel/utils", ["--features", "std"]),
+        ("kernel/memory", ["--features", "std"]),
+        ("kernel/common", ["--features", "std"]),
         "kernel/helpers/ld-link-map",
         "kernel/helpers/patcher"]
 

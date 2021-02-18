@@ -1,22 +1,23 @@
+use crate::error::KernelResult;
 use crate::memory::address_space::AddressSpace;
 use crate::multiboot::Multiboot;
 use crate::vga;
 use enumflags2::BitFlags;
-use utils::memory::*;
+use memory::{
+    gigabytes, MapFlags, MapTarget, PageTable, PhysicalAddress, VirtualAddress, P3,
+    VIRT_PHYSICAL_BASE, VIRT_PHYSICAL_SIZE,
+};
 
 mod address_space;
 mod page_table;
 mod phys;
 
 // TODO move and restructure this monster init function
-pub fn init(multiboot: Multiboot) -> utils::KernelResult<()> {
+pub fn init(multiboot: Multiboot) -> KernelResult<()> {
     use crate::memory::page_table::pml4;
     use crate::memory::phys::frame_allocator;
     use log::*;
     use phys::FrameAllocator;
-    use utils::memory::address::PhysicalAddress;
-    use utils::memory::address::VirtualAddress;
-    use utils::memory::page_table::PageTable;
 
     let memory_map = multiboot.memory_map().expect("memory map unavailable");
     debug!("memory map from multiboot: ");

@@ -1,8 +1,8 @@
 pub use generated::*;
 pub use memory_map::{MemoryRegion, MemoryRegionType, MultibootMemoryMap};
-use utils::prelude::*;
 
 use crate::multiboot::ctypes::c_void;
+use common::Bit;
 use core::fmt::{Display, Formatter};
 use core::marker::PhantomData;
 

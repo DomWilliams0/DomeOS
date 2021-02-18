@@ -1,15 +1,14 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
 use core::ops::Range;
 
-use utils::memory::address::PhysicalAddress;
-use utils::prelude::Bit;
-
 use crate::multiboot::memory_map::MemoryRegionType::{
     Acpi, Available, Defective, PreserveOnHibernation, Reserved,
 };
 use crate::multiboot::{multiboot_info, multiboot_memory_map_t, multiboot_mmap_entry};
+use common::Bit;
 use core::iter;
 use core::mem;
+use memory::PhysicalAddress;
 
 #[derive(Debug)]
 pub enum MemoryRegionType {

@@ -1,5 +1,5 @@
-use crate::memory::address::{PhysicalAddress, VirtualAddress};
-use crate::memory::FRAME_SIZE;
+use crate::address::{PhysicalAddress, VirtualAddress};
+use crate::FRAME_SIZE;
 
 #[derive(Copy, Clone)]
 pub struct PhysicalFrame(PhysicalAddress);

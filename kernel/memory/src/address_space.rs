@@ -1,12 +1,12 @@
-use crate::memory::address::{PhysicalAddress, VirtualAddress};
-use crate::memory::page_table::PAGE_TABLE_ENTRY_COUNT;
-use crate::memory::{PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4};
-use crate::KernelResult;
+use crate::address::{PhysicalAddress, VirtualAddress};
+use crate::error::MemoryResult;
+use crate::{PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4, PAGE_TABLE_ENTRY_COUNT};
+use common::*;
 use enumflags2::BitFlags;
-use log::*;
 
 pub trait MemoryProvider {
-    fn new_frame(&mut self) -> KernelResult<PhysicalFrame>;
+    type Error: core::fmt::Debug;
+    fn new_frame(&mut self) -> Result<PhysicalFrame, Self::Error>;
 }
 
 pub struct RawAddressSpace<'p, M> {
@@ -54,7 +54,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         size: u64,
         target: MapTarget,
         flags: BitFlags<MapFlags>,
-    ) -> KernelResult<()> {
+    ) -> MemoryResult<()> {
         let start = {
             let aligned = start.round_up_to(FRAME_SIZE);
             trace!("aligned base {:?} to {:?}", start, aligned);
@@ -122,7 +122,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
                     trace!(
                         "mapping {} {}s from {}.{}.{}.{}",
                         pages_to_do,
-                        crate::memory::hierarchy::Frame::NAME, // TODO get from generic parameter instead
+                        crate::Frame::NAME, // TODO get from generic parameter instead
                         tables[0],
                         tables[1],
                         tables[2],
@@ -170,7 +170,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         idx: u16,
         flags: BitFlags<MapFlags>,
         memory: &mut M,
-    ) -> KernelResult<(PhysicalAddress, P::NextLevel)> {
+    ) -> MemoryResult<(PhysicalAddress, P::NextLevel)> {
         let entry = current.table_mut()?.entry_mut(idx);
         let phys = if entry.present() {
             // already present
@@ -178,12 +178,12 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             entry.address()
         } else {
             // need a new frame
-            let frame = memory.new_frame()?;
-            // trace!(
-            //     "allocated new {} at {:?}",
-            //     P::NextLevel::NAME,
-            //     frame.address()
-            // );
+            let frame = memory.new_frame().unwrap(); // TODO convert error type!
+                                                     // trace!(
+                                                     //     "allocated new {} at {:?}",
+                                                     //     P::NextLevel::NAME,
+                                                     //     frame.address()
+                                                     // );
 
             // ensure its cleared
             frame.zero();
@@ -271,7 +271,8 @@ fn iter_all_pages(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::memory::page_table::PageTable;
+    use crate::address::{PhysicalAddress, VirtualAddress};
+    use crate::{PageTable, PhysicalFrame, FRAME_SIZE, P4};
 
     const FRAME_COUNT: usize = 4096;
     struct Memory {
@@ -289,7 +290,9 @@ mod tests {
     }
 
     impl MemoryProvider for Memory {
-        fn new_frame(&mut self) -> KernelResult<PhysicalFrame> {
+        type Error = ();
+
+        fn new_frame(&mut self) -> Result<PhysicalFrame, ()> {
             let idx = self.next;
             assert!(idx < FRAME_COUNT, "all gone");
             self.next += 1;

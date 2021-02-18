@@ -5,8 +5,7 @@ use modular_bitfield::prelude::*;
 
 use crate::descriptor_tables::common::DescriptorTablePointer;
 use crate::irq;
-
-use utils::memory::VIRT_KERNEL_BASE;
+use memory::VIRT_KERNEL_BASE;
 
 static mut IDT: MaybeUninit<InterruptDescriptorTable> = MaybeUninit::uninit();
 

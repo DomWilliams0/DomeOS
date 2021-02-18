@@ -1,7 +1,6 @@
 use log::*;
 
-use utils::KernelResult;
-
+use crate::error::KernelResult;
 use crate::irq::{disable_interrupts, enable_interrupts};
 use crate::multiboot::Multiboot;
 use crate::serial::LogMode;

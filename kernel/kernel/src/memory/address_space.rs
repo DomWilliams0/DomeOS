@@ -1,17 +1,19 @@
+use crate::error::KernelError;
 use crate::memory::page_table::pml4;
-use crate::memory::phys::{frame_allocator, FrameAllocator};
 use core::ops::{Deref, DerefMut};
-use enumflags2::BitFlags;
-use utils::memory::{MemoryProvider, PhysicalFrame, RawAddressSpace};
-use utils::KernelResult;
+use memory::{MemoryProvider, PhysicalFrame, RawAddressSpace};
 
 pub struct FrameProvider;
 
 pub struct AddressSpace<'p>(RawAddressSpace<'p, FrameProvider>);
 
 impl MemoryProvider for FrameProvider {
-    fn new_frame(&mut self) -> KernelResult<PhysicalFrame> {
-        frame_allocator().allocate(BitFlags::empty())
+    type Error = KernelError;
+
+    fn new_frame(&mut self) -> Result<PhysicalFrame, Self::Error> {
+        // frame_allocator().allocate(BitFlags::empty())
+        // TODO TEMPORARY
+        Err(KernelError::NotImplemented)
     }
 }
 

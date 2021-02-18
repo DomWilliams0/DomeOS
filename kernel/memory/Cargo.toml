@@ -1,5 +1,5 @@
 [package]
-name = "utils"
+name = "memory"
 version = "0.1.0"
 authors = ["Dom Williams <me@domwillia.ms>"]
 edition = "2018"
@@ -7,12 +7,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+common = { path = "../common" }
+
 enumflags2 = "^0.6"
-bitfield = "^0.13"
-derive_more = "^0.99"
 c2rust-bitfields = { version = "^0.3", features = ["no_std"] }
-displaydoc = { version = "0.1", default-features = false }
-log = "0.4"
 
 [features]
 default = []

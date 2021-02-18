@@ -2,13 +2,11 @@ use core::fmt::{Debug, Error as FmtError, Formatter};
 use core::marker::PhantomData;
 use core::ops::{Index, IndexMut};
 
-use c2rust_bitfields::BitfieldStruct;
+use crate::address::{PhysicalAddress, VirtualAddress};
+use crate::error::MemoryResult;
+use crate::{Frame, HasTable, PageTableHierarchy};
+use c2rust_bitfields::*;
 use enumflags2::BitFlags;
-
-use crate::memory::address::{PhysicalAddress, VirtualAddress};
-use crate::memory::hierarchy::PageTableHierarchy;
-use crate::memory::{Frame, HasTable};
-use crate::KernelResult;
 
 pub const PAGE_TABLE_ENTRY_COUNT: usize = 512;
 
@@ -287,7 +285,7 @@ impl<'p, P: PageTableHierarchy<'p>> CommonEntry<'p, P> {
         self.flags.0.contains(PageTableFlag::HugePages)
     }
 
-    pub fn traverse(&self) -> KernelResult<P> {
+    pub fn traverse(&self) -> MemoryResult<P> {
         assert!(self.present());
 
         let address = self.address();
@@ -430,9 +428,8 @@ impl Debug for PageTableFlags {
 mod tests {
     use std::mem::size_of;
 
-    use crate::memory::hierarchy::{Frame, P1, P2, P3};
-    use crate::memory::page_table::{CommonEntry, PageTable};
-    use crate::memory::P4;
+    use crate::{CommonEntry, PageTable};
+    use crate::{Frame, P1, P2, P3, P4};
 
     #[test]
     fn assert_sizes() {

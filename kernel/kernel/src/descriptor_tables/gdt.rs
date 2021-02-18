@@ -1,6 +1,6 @@
 use crate::descriptor_tables::common::DescriptorTablePointer;
+use common::InitializedGlobal;
 use modular_bitfield::prelude::*;
-use utils::InitializedGlobal;
 
 static mut GDT: InitializedGlobal<GlobalDescriptorTable> = InitializedGlobal::uninit();
 

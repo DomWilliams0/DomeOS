@@ -17,6 +17,7 @@ use crate::irq::disable_interrupts;
 
 mod clock;
 mod descriptor_tables;
+mod error;
 mod exception;
 mod io;
 mod irq;

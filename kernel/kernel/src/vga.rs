@@ -3,8 +3,9 @@ use core::fmt;
 use crate::spinlock::SpinLock;
 use core::ops::{Deref, DerefMut};
 use log::*;
-use utils::memory::address::VirtualAddress;
-use utils::InitializedGlobalChecked;
+
+use common::InitializedGlobalChecked;
+use memory::VirtualAddress;
 use volatile::Volatile;
 
 const WIDTH: usize = 80;
