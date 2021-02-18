@@ -1,6 +1,6 @@
 use crate::memory::address::{PhysicalAddress, VirtualAddress};
 use crate::memory::page_table::PAGE_TABLE_ENTRY_COUNT;
-use crate::memory::{HasTable, PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P1, P2, P3, P4};
+use crate::memory::{PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4};
 use crate::KernelResult;
 use enumflags2::BitFlags;
 use log::*;
@@ -38,86 +38,6 @@ pub enum MapFlags {
 }
 
 // TODO CoW variants, recursively free pages on drop if owned
-
-#[derive(Copy, Clone, Debug)]
-enum IterationRange {
-    /// [start..end] in single table
-    SingleInclusive(u16, u16),
-
-    /// [start..end) in single table
-    SingleExclusive(u16, u16),
-
-    /// [start..511]
-    UntilEndFrom(u16),
-
-    /// [0..end]
-    FromStartUntil(u16),
-}
-
-impl IterationRange {
-    fn from_range<'p, P, N>(
-        start: VirtualAddress,
-        end: VirtualAddress,
-    ) -> impl Iterator<Item = Self>
-    where
-        P: PageTableHierarchy<'p, NextLevel = N> + HasTable<'p>,
-        N: PageTableHierarchy<'p> + HasTable<'p>,
-    {
-        let this_start = P::entry_index(start);
-        let this_end = P::entry_index(end);
-
-        // last level is off by one if it's inclusive?
-        let exclusive = P::NextLevel::NAME == P1::NAME;
-
-        let next_start = P::NextLevel::entry_index(start);
-        let next_end = P::NextLevel::entry_index(end);
-
-        let mut cursor = this_start;
-        core::iter::from_fn(move || {
-            if cursor > this_end {
-                // finished
-                return None;
-            }
-
-            let ret = if cursor == this_end {
-                // final iteration
-                if this_start == this_end {
-                    // special case, all within single table
-                    if exclusive {
-                        Self::SingleExclusive(next_start, next_end)
-                    } else {
-                        Self::SingleInclusive(next_start, next_end)
-                    }
-                } else {
-                    // fill final table up to final index
-                    Self::FromStartUntil(next_end)
-                }
-            } else if cursor == this_start {
-                // at the start when a!=b, at least 1 page to cover
-                Self::UntilEndFrom(next_start)
-            } else {
-                // cursor is in the middle, neither a or b, so must be a full page inbetween
-                Self::UntilEndFrom(0)
-            };
-
-            if cfg!(test) {
-                trace!("{}: cursor={}, range={:?}", P::NAME, cursor, ret);
-            }
-
-            cursor += 1;
-            Some(ret)
-        })
-    }
-
-    fn iter(self) -> impl Iterator<Item = u16> {
-        match self {
-            Self::SingleInclusive(a, b) => a..(b + 1),
-            Self::SingleExclusive(a, b) => a..b,
-            Self::UntilEndFrom(a) => a..(PAGE_TABLE_ENTRY_COUNT as u16),
-            Self::FromStartUntil(b) => 0..b,
-        }
-    }
-}
 
 impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
     /// # Safety
@@ -161,30 +81,58 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             limit.pt_offset(),
         );
 
-        let mut total_count = 0_u64;
-        let p4_range = start.pml4t_offset()..=limit.pml4t_offset();
-        let mut p3_range = IterationRange::from_range::<P4, _>(start, limit);
-        let mut p2_range = IterationRange::from_range::<P3, _>(start, limit);
-        let mut p1_range = IterationRange::from_range::<P2, _>(start, limit);
+        const KEEP_LOOPING: u16 = 4;
 
-        fn iter_once(
-            range: &mut impl Iterator<Item = IterationRange>,
-        ) -> impl Iterator<Item = u16> {
-            range.next().map(|iter| iter.iter()).into_iter().flatten()
-        }
+        let mut unroll = KEEP_LOOPING;
 
-        for p4_idx in p4_range {
-            let (_, mut p3) = Self::get_entry(&mut self.pml4, p4_idx, flags, &mut self.memory)?;
-            for p3_idx in iter_once(&mut p3_range) {
-                let (_, mut p2) = Self::get_entry(&mut p3, p3_idx, flags, &mut self.memory)?;
+        // entry index into each table
+        let mut tables = [
+            start.pml4t_offset(),
+            start.pdp_offset(),
+            start.pd_offset(),
+            start.pt_offset(),
+        ];
 
-                for p2_idx in iter_once(&mut p2_range) {
-                    let (_, mut p1) = Self::get_entry(&mut p2, p2_idx, flags, &mut self.memory)?;
+        let mut total_count = 0;
+        let mut things = iter_all_pages(start, limit);
+
+        'outer: while unroll > 0 {
+            let (_, mut p3) = Self::get_entry(&mut self.pml4, tables[0], flags, &mut self.memory)?;
+
+            unroll = KEEP_LOOPING;
+            while unroll > 1 {
+                let (_, mut p2) = Self::get_entry(&mut p3, tables[1], flags, &mut self.memory)?;
+
+                unroll = KEEP_LOOPING;
+                while unroll > 2 {
+                    let (_, mut p1) = Self::get_entry(&mut p2, tables[2], flags, &mut self.memory)?;
                     let p1_table = p1.table_mut()?;
 
-                    for p1_idx in iter_once(&mut p1_range) {
+                    let (pages_to_do, new_tables) = match things.next() {
+                        Some((n, to_unroll, new_indices)) => {
+                            unroll = to_unroll;
+                            (n, new_indices)
+                        }
+                        None => {
+                            // finished
+                            break 'outer;
+                        }
+                    };
+                    #[cfg(test)]
+                    trace!(
+                        "mapping {} {}s from {}.{}.{}.{}",
+                        pages_to_do,
+                        crate::memory::hierarchy::Frame::NAME, // TODO get from generic parameter instead
+                        tables[0],
+                        tables[1],
+                        tables[2],
+                        tables[3],
+                    );
+
+                    for p1_idx in tables[3]..tables[3] + pages_to_do {
                         let mut entry = p1_table[p1_idx].replace();
 
+                        // TODO calc flags once and copy each time
                         for flag in flags.iter() {
                             use MapFlags::*;
                             entry = match flag {
@@ -195,21 +143,20 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
                             }
                         }
 
-                        #[cfg(test)]
-                        trace!("mapping {}.{}.{}.{}", p4_idx, p3_idx, p2_idx, p1_idx);
-
-                        // for qemu debugging only
                         // TODO mark as on-demand
-                        entry = entry.present();
+                        // for qemu debugging only
+                        // entry = entry.present();
 
                         entry.build();
-
-                        total_count += 1;
                     }
+
+                    total_count += pages_to_do as u64;
+                    tables = new_tables;
                 }
             }
         }
 
+        // ensure we mapped the exact amount of pages
         let expected_page_count = (limit.0 - start.0) / FRAME_SIZE;
         assert_eq!(expected_page_count, total_count);
 
@@ -232,11 +179,11 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         } else {
             // need a new frame
             let frame = memory.new_frame()?;
-            trace!(
-                "allocated new {} at {:?}",
-                P::NextLevel::NAME,
-                frame.address()
-            );
+            // trace!(
+            //     "allocated new {} at {:?}",
+            //     P::NextLevel::NAME,
+            //     frame.address()
+            // );
 
             // ensure its cleared
             frame.zero();
@@ -262,12 +209,71 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
     }
 }
 
+/// (number of pt entries to do, new unwind value, new tables values)
+fn iter_all_pages(
+    start: VirtualAddress,
+    end: VirtualAddress,
+) -> impl Iterator<Item = (u16, u16, [u16; 4])> {
+    const LIMIT: u16 = PAGE_TABLE_ENTRY_COUNT as u16;
+
+    // number of pages to map
+    let real_count = (end.0 - start.0) / FRAME_SIZE;
+
+    let mut tables = [
+        start.pml4t_offset(),
+        start.pdp_offset(),
+        start.pd_offset(),
+        start.pt_offset(),
+    ];
+
+    let mut remaining = real_count;
+
+    core::iter::from_fn(move || {
+        let pages = remaining.min((LIMIT - tables[3]) as u64);
+
+        if pages == 0 {
+            // all done
+            return None;
+        }
+
+        remaining -= pages;
+
+        let mut unwind = 0;
+
+        if remaining > 0 {
+            // only try to increment indices if there's another iteration after this
+
+            unwind = 3;
+
+            // wrap digits around
+            tables[3] = 0;
+            tables[2] += 1;
+
+            if tables[2] == LIMIT {
+                unwind -= 1;
+
+                tables[2] = 0;
+                tables[1] += 1;
+                if tables[1] == LIMIT {
+                    unwind -= 1;
+
+                    tables[1] = 0;
+                    tables[0] += 1;
+                    assert_ne!(tables[0], LIMIT); // p4 can't wrap around
+                }
+            }
+        }
+
+        Some((pages as u16, unwind, tables))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::memory::page_table::PageTable;
 
-    const FRAME_COUNT: usize = 512;
+    const FRAME_COUNT: usize = 4096;
     struct Memory {
         pages: Box<[u8]>,
         next: usize,
@@ -295,6 +301,8 @@ mod tests {
 
     #[test]
     fn mapping() {
+        // main testing is done by the asserts in map_range e.g. exact number of pages is mapped
+
         env_logger::builder()
             .filter_level(LevelFilter::Trace)
             .is_test(true)
@@ -321,6 +329,16 @@ mod tests {
             .map_range(
                 VirtualAddress::new_checked(0xaa3f0000),
                 0xf0000,
+                MapTarget::Any,
+                MapFlags::Writeable | MapFlags::User,
+            )
+            .expect("mapping failed");
+
+        // stupid amount of pages
+        space
+            .map_range(
+                VirtualAddress::new_checked(0xaa3f0000),
+                0x9ae20000,
                 MapTarget::Any,
                 MapFlags::Writeable | MapFlags::User,
             )
