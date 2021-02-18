@@ -1,8 +1,7 @@
 #![allow(clippy::upper_case_acronyms)]
 
 use crate::address::{PhysicalAddress, VirtualAddress};
-use crate::error::MemoryResult;
-use crate::{MemoryError, PageTable, PhysicalFrame};
+use crate::{PageTable, PhysicalFrame};
 use common::*;
 
 pub trait PageTableHierarchy<'p>: core::fmt::Debug {
@@ -109,7 +108,9 @@ impl<'p> PageTableHierarchy<'p> for P2<'p> {
     fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>> {
         match self {
             P2::PDT(table) => Ok(*table),
-            P2::Huge1GPage(frame) => Err(MemoryError::NoTableAvailable(Self::NAME, frame.0)),
+            P2::Huge1GPage(frame) => {
+                Err(MemoryError::NoTableAvailable(Self::NAME, frame.0.address()))
+            }
         }
     }
 }
@@ -138,7 +139,9 @@ impl<'p> PageTableHierarchy<'p> for P1<'p> {
     fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>> {
         match self {
             P1::PT(table) => Ok(*table),
-            P1::Huge2MPage(frame) => Err(MemoryError::NoTableAvailable(Self::NAME, frame.0)),
+            P1::Huge2MPage(frame) => {
+                Err(MemoryError::NoTableAvailable(Self::NAME, frame.0.address()))
+            }
         }
     }
 }
@@ -161,7 +164,7 @@ impl<'p> PageTableHierarchy<'p> for Frame {
     }
 
     fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>> {
-        Err(MemoryError::NoTableAvailable(Self::NAME, self.0))
+        Err(MemoryError::NoTableAvailable(Self::NAME, self.0.address()))
     }
 }
 

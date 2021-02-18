@@ -1,8 +1,7 @@
-use crate::error::KernelResult;
 use crate::memory::phys::dumb::DumbFrameAllocator;
 use crate::memory::phys::physical_size::kernel_size;
 use crate::multiboot::{multiboot_memory_map_t, MultibootMemoryMap};
-use common::InitializedGlobal;
+use common::{InitializedGlobal, KernelResult};
 use enumflags2::BitFlags;
 use log::*;
 use memory::PhysicalFrame;
@@ -46,13 +45,13 @@ pub fn frame_allocator() -> &'static mut impl FrameAllocator {
 }
 
 mod dumb {
-    use crate::error::{KernelError, KernelResult};
     use crate::memory::phys::physical_size::kernel_end;
     use crate::memory::phys::{FrameAllocator, FrameFlags};
     use crate::multiboot::{multiboot_memory_map_t, MemoryRegionType, MultibootMemoryMap};
+    use common::{KernelError, KernelResult, MemoryError};
     use enumflags2::BitFlags;
     use log::*;
-    use memory::{MemoryError, PhysicalAddress, PhysicalFrame};
+    use memory::{PhysicalAddress, PhysicalFrame};
 
     pub struct DumbFrameAllocator {
         multiboot_mmap: MultibootMemoryMap,

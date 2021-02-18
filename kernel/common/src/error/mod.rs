@@ -1,7 +1,13 @@
-use common::*;
-use memory::MemoryError;
+use displaydoc::Display;
 
 pub type KernelResult<T> = Result<T, KernelError>;
+
+// it's not ideal having all error types in this crate, but until we have allocation to box a dyn
+// trait they need to be here to be accessible
+
+pub use memory::{MemoryError, MemoryResult};
+
+mod memory;
 
 #[derive(Display, Debug)]
 pub enum KernelError {

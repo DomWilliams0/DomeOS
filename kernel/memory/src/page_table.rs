@@ -3,9 +3,9 @@ use core::marker::PhantomData;
 use core::ops::{Index, IndexMut};
 
 use crate::address::{PhysicalAddress, VirtualAddress};
-use crate::error::MemoryResult;
 use crate::{Frame, HasTable, PageTableHierarchy};
 use c2rust_bitfields::*;
+use common::*;
 use enumflags2::BitFlags;
 
 pub const PAGE_TABLE_ENTRY_COUNT: usize = 512;

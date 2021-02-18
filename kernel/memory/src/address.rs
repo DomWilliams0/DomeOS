@@ -131,6 +131,10 @@ impl VirtualAddress {
             self.pt_offset()
         );
     }
+
+    pub fn address(self) -> u64 {
+        self.0
+    }
 }
 
 #[derive(Eq, PartialEq, Copy, Clone, Add)]
@@ -152,6 +156,10 @@ impl PhysicalAddress {
     /// they use the null case for None/null detection!
     pub unsafe fn cast_mut<'a, T>(self) -> &'a mut T {
         &mut *(self.0 as *mut T)
+    }
+
+    pub fn address(self) -> u64 {
+        self.0
     }
 }
 

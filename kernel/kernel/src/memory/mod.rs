@@ -1,7 +1,7 @@
-use crate::error::KernelResult;
 use crate::memory::address_space::AddressSpace;
 use crate::multiboot::Multiboot;
 use crate::vga;
+use common::KernelResult;
 use enumflags2::BitFlags;
 use memory::{
     gigabytes, MapFlags, MapTarget, PageTable, PhysicalAddress, VirtualAddress, P3,

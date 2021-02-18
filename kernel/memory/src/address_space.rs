@@ -1,12 +1,10 @@
 use crate::address::{PhysicalAddress, VirtualAddress};
-use crate::error::MemoryResult;
 use crate::{PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4, PAGE_TABLE_ENTRY_COUNT};
 use common::*;
 use enumflags2::BitFlags;
 
 pub trait MemoryProvider {
-    type Error: core::fmt::Debug;
-    fn new_frame(&mut self) -> Result<PhysicalFrame, Self::Error>;
+    fn new_frame(&mut self) -> KernelResult<PhysicalFrame>;
 }
 
 pub struct RawAddressSpace<'p, M> {
@@ -54,7 +52,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         size: u64,
         target: MapTarget,
         flags: BitFlags<MapFlags>,
-    ) -> MemoryResult<()> {
+    ) -> KernelResult<()> {
         let start = {
             let aligned = start.round_up_to(FRAME_SIZE);
             trace!("aligned base {:?} to {:?}", start, aligned);
@@ -170,7 +168,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         idx: u16,
         flags: BitFlags<MapFlags>,
         memory: &mut M,
-    ) -> MemoryResult<(PhysicalAddress, P::NextLevel)> {
+    ) -> KernelResult<(PhysicalAddress, P::NextLevel)> {
         let entry = current.table_mut()?.entry_mut(idx);
         let phys = if entry.present() {
             // already present
@@ -178,12 +176,13 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             entry.address()
         } else {
             // need a new frame
-            let frame = memory.new_frame().unwrap(); // TODO convert error type!
-                                                     // trace!(
-                                                     //     "allocated new {} at {:?}",
-                                                     //     P::NextLevel::NAME,
-                                                     //     frame.address()
-                                                     // );
+            let frame = memory.new_frame()?;
+
+            // trace!(
+            //     "allocated new {} at {:?}",
+            //     P::NextLevel::NAME,
+            //     frame.address()
+            // );
 
             // ensure its cleared
             frame.zero();
@@ -290,9 +289,7 @@ mod tests {
     }
 
     impl MemoryProvider for Memory {
-        type Error = ();
-
-        fn new_frame(&mut self) -> Result<PhysicalFrame, ()> {
+        fn new_frame(&mut self) -> KernelResult<PhysicalFrame> {
             let idx = self.next;
             assert!(idx < FRAME_COUNT, "all gone");
             self.next += 1;
