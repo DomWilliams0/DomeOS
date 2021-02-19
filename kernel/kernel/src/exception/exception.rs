@@ -110,7 +110,7 @@ impl Exception {
         use Exception::*;
 
         match self {
-            // PageFault(pf) => pf.handle(),
+            PageFault(pf) => pf.handle(),
             _ => panic!("unhandled exception {:?}\n{:?}", self, ctx),
         }
     }

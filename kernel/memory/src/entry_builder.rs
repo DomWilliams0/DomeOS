@@ -1,35 +1,36 @@
 use core::marker::PhantomData;
 
 use crate::entry::PageTableBits;
-use crate::{CommonEntry, PageTableHierarchy, PhysicalAddress, VirtualAddress, VIRT_PHYSICAL_BASE};
+use crate::{CommonEntry, PageTableHierarchy, PhysicalAddress, VirtualAddress, P4};
 
-pub struct EntryBuilder<'e, 'p, P> {
+pub struct EntryBuilder<'e> {
     bits: PageTableBits,
-    entry: Option<&'e mut CommonEntry<'p, P>>,
+    /// &mut CommonEntry
+    entry: Option<VirtualAddress>,
+
+    _phantom: PhantomData<&'e ()>,
 }
 
-impl<'e, 'p, P> Default for EntryBuilder<'e, 'p, P> {
-    fn default() -> Self {
+impl<'e> EntryBuilder<'e> {
+    pub fn with_entry_and_bits<'p, P: PageTableHierarchy<'p>>(
+        current: &'e mut CommonEntry<'p, P>,
+        bits: PageTableBits,
+    ) -> Self {
         Self {
-            bits: Default::default(),
-            entry: None,
-        }
-    }
-}
-
-impl<'e, 'p, P: PageTableHierarchy<'p>> EntryBuilder<'e, 'p, P> {
-    pub fn with_entry(current: &'e mut CommonEntry<'p, P>) -> Self {
-        Self {
-            bits: **current,
-            entry: Some(current),
+            bits,
+            entry: Some(VirtualAddress::new(current as *mut _ as u64)),
+            _phantom: PhantomData,
         }
     }
 
-    pub fn with_zeroed_entry(current: &'e mut CommonEntry<'p, P>) -> Self {
-        Self {
-            entry: Some(current),
-            ..Self::default()
-        }
+    pub fn with_entry<'p, P: PageTableHierarchy<'p>>(current: &'e mut CommonEntry<'p, P>) -> Self {
+        Self::with_entry_and_bits(current, **current)
+    }
+
+    pub fn with_zeroed_entry<'p, P: PageTableHierarchy<'p>>(
+        current: &'e mut CommonEntry<'p, P>,
+    ) -> Self {
+        Self::with_entry_and_bits(current, PageTableBits::default())
     }
 
     pub fn writeable(mut self) -> Self {
@@ -140,14 +141,16 @@ impl<'e, 'p, P: PageTableHierarchy<'p>> EntryBuilder<'e, 'p, P> {
         self
     }
 
-    /// If [with_entry] was used then the reference is written to as well
-    pub fn build(self) -> CommonEntry<'e, P> {
-        let entry = CommonEntry::new(self.bits);
+    /// Writes to given entry reference as if it was a CommonEntry<P4>
+    pub fn apply<'p>(self) -> CommonEntry<'p, P4<'p>> {
+        let entry = {
+            let addr = self.entry.expect("no reference provided");
+            // safety: pointer was a 'e reference passed in the constructor, and so is still valid
+            unsafe { &mut *addr.as_ptr() }
+        };
 
-        if let Some(e) = self.entry {
-            *e = entry;
-        }
-
-        entry
+        let new_entry = CommonEntry::<P4>::new(self.bits);
+        *entry = new_entry;
+        new_entry
     }
 }

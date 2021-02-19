@@ -18,4 +18,10 @@ pub enum MemoryError {
 
     /// Page table of type {0} at {1:#x} does not have a page table available
     NoTableAvailable(&'static str, u64),
+
+    /// Physical page {0:#x} is not mapped in
+    NotMapped(u64),
+
+    /// Physical page {0:#x} is already mapped
+    AlreadyMapped(u64),
 }

@@ -11,10 +11,7 @@ pub trait PageTableHierarchy<'p>: core::fmt::Debug {
 
     fn with_table(_table: &'p mut PageTable<'p, Self::NextLevel>) -> MemoryResult<Self>
     where
-        Self: Sized,
-    {
-        Err(MemoryError::TableNotSupported(Self::NAME))
-    }
+        Self: Sized;
 
     fn with_frame(_frame: Frame) -> MemoryResult<Self>
     where
@@ -23,11 +20,21 @@ pub trait PageTableHierarchy<'p>: core::fmt::Debug {
         Err(MemoryError::FrameNotSupported(Self::NAME))
     }
 
+    fn table(&self) -> MemoryResult<&PageTable<'p, Self::NextLevel>>;
+
     fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>>;
 }
 
 pub trait HasTable<'p>: PageTableHierarchy<'p> {
     fn entry_index(addr: VirtualAddress) -> u16;
+}
+
+pub enum AnyLevel {
+    P1,
+    P2,
+    P3,
+    P4,
+    Frame,
 }
 
 /// PML4T
@@ -61,6 +68,10 @@ impl<'p> PageTableHierarchy<'p> for P4<'p> {
         Ok(Self(table))
     }
 
+    fn table(&self) -> MemoryResult<&PageTable<'p, Self::NextLevel>> {
+        Ok(self.0)
+    }
+
     fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>> {
         Ok(self.0)
     }
@@ -78,6 +89,10 @@ impl<'p> PageTableHierarchy<'p> for P3<'p> {
 
     fn with_table(table: &'p mut PageTable<'p, Self::NextLevel>) -> MemoryResult<Self> {
         Ok(Self(table))
+    }
+
+    fn table(&self) -> MemoryResult<&PageTable<'p, Self::NextLevel>> {
+        Ok(self.0)
     }
 
     fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>> {
@@ -106,6 +121,17 @@ impl<'p> PageTableHierarchy<'p> for P2<'p> {
         Ok(Self::Huge1GPage(frame))
     }
 
+    //noinspection DuplicatedCode
+    fn table(&self) -> MemoryResult<&PageTable<'p, Self::NextLevel>> {
+        match self {
+            P2::PDT(table) => Ok(*table),
+            P2::Huge1GPage(frame) => {
+                Err(MemoryError::NoTableAvailable(Self::NAME, frame.0.address()))
+            }
+        }
+    }
+
+    //noinspection DuplicatedCode
     fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>> {
         match self {
             P2::PDT(table) => Ok(*table),
@@ -137,6 +163,17 @@ impl<'p> PageTableHierarchy<'p> for P1<'p> {
         Ok(Self::Huge2MPage(frame))
     }
 
+    //noinspection DuplicatedCode
+    fn table(&self) -> MemoryResult<&PageTable<'p, Self::NextLevel>> {
+        match self {
+            P1::PT(table) => Ok(*table),
+            P1::Huge2MPage(frame) => {
+                Err(MemoryError::NoTableAvailable(Self::NAME, frame.0.address()))
+            }
+        }
+    }
+
+    //noinspection DuplicatedCode
     fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>> {
         match self {
             P1::PT(table) => Ok(*table),
@@ -157,11 +194,22 @@ impl<'p> PageTableHierarchy<'p> for Frame {
     type NextLevel = Self;
     const NAME: &'static str = "Page";
 
+    fn with_table(_table: &'p mut PageTable<'p, Self::NextLevel>) -> MemoryResult<Self>
+    where
+        Self: Sized,
+    {
+        Err(MemoryError::TableNotSupported(Self::NAME))
+    }
+
     fn with_frame(frame: Frame) -> MemoryResult<Self>
     where
         Self: Sized,
     {
         Ok(frame)
+    }
+
+    fn table(&self) -> MemoryResult<&PageTable<'p, Self::NextLevel>> {
+        Err(MemoryError::NoTableAvailable(Self::NAME, self.0.address()))
     }
 
     fn table_mut(&mut self) -> MemoryResult<&mut PageTable<'p, Self::NextLevel>> {

@@ -52,10 +52,10 @@ enable_paging:
 	or eax, 1 << 5
 	mov cr4, eax
 
-	; long bit in EFER
+	; long bit and nx-enable bit in EFER
 	mov ecx, 0xC0000080
 	rdmsr
-	or eax, 1 << 8
+	or eax, (1 << 8) | (1 << 11)
 	wrmsr
 
 	; paging bit and write-protect

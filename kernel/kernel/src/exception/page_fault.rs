@@ -1,10 +1,15 @@
+use common::*;
 use core::fmt::{Debug, Error, Formatter};
 
+use crate::memory::{frame_allocator, AddressSpace, FrameAllocator};
 use enumflags2::BitFlags;
-use memory::VirtualAddress;
+use memory::{AbsentPageEntry, CustomPageEntry, DemandMapping, VirtualAddress};
 
 #[derive(Debug)]
-pub struct PageFaultException(pub PageFaultFlags, pub VirtualAddress);
+pub struct PageFaultException {
+    pub flags: PageFaultFlags,
+    pub addr: VirtualAddress,
+}
 
 #[derive(BitFlags, Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u8)]
@@ -16,14 +21,49 @@ pub enum PageFaultFlag {
     InstrFetch = 0b10000,
 }
 
+#[derive(Deref)]
 pub struct PageFaultFlags(BitFlags<PageFaultFlag>);
 
 impl PageFaultException {
     pub fn new(flags: BitFlags<PageFaultFlag>, cr2: VirtualAddress) -> Self {
-        PageFaultException(PageFaultFlags(flags), cr2)
+        PageFaultException {
+            flags: PageFaultFlags(flags),
+            addr: cr2,
+        }
     }
 
-    // TODO pub fn handle(self) { }
+    pub fn handle(self) {
+        // TODO get from current process block instead
+        // TODO on error, either kill process or kernel panic
+
+        let mut addr_space = AddressSpace::current();
+
+        if self.flags.contains(PageFaultFlag::Present) {
+            panic!("page fault on present page: {:?}", self);
+        }
+
+        // fetch mapping
+        let (level, mapping) = addr_space
+            .get_absent_mapping::<CustomPageEntry>(self.addr)
+            .expect("nonsensical page fault");
+
+        match mapping.on_demand() {
+            DemandMapping::Anonymous => {
+                // TODO reuse same physical page and CoW
+                // TODO what do if frame allocation fails?
+                let frame = frame_allocator()
+                    .allocate(BitFlags::empty())
+                    .expect("failed to allocate frame");
+
+                // rewrite mapping
+                mapping
+                    .as_builder()
+                    .address(frame.address())
+                    .present()
+                    .apply();
+            }
+        };
+    }
 }
 
 impl Debug for PageFaultFlags {

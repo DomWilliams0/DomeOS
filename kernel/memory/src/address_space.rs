@@ -1,5 +1,8 @@
 use crate::address::{PhysicalAddress, VirtualAddress};
-use crate::{PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4, PAGE_TABLE_ENTRY_COUNT};
+use crate::custom_entry::{AbsentPageEntry, CustomPageEntry, DemandMapping};
+use crate::{
+    AnyLevel, Frame, PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4, PAGE_TABLE_ENTRY_COUNT,
+};
 use common::*;
 use enumflags2::BitFlags;
 
@@ -37,6 +40,12 @@ pub enum MapFlags {
 
 // TODO CoW variants, recursively free pages on drop if owned
 
+
+enum Either<A, B> {
+    Left(A),
+    Right(B),
+}
+
 impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
     /// # Safety
     /// Table must be mapped in and writeable already
@@ -46,7 +55,19 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
 
     // TODO constructor to allocate new possibly unmapped frame for p4, then access through id map
 
+    #[inline]
     pub fn map_range(
+        &mut self,
+        start: VirtualAddress,
+        size: u64,
+        target: MapTarget,
+        flags: impl Into<BitFlags<MapFlags>>,
+    ) -> KernelResult<()> {
+        self.map_range_impl(start, size, target, flags.into())
+    }
+
+    /// Actual implementation with no generic params to avoid huge code duplication
+    fn map_range_impl(
         &mut self,
         start: VirtualAddress,
         size: u64,
@@ -64,6 +85,26 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             let aligned = limit.round_up_to(FRAME_SIZE);
             trace!("aligned limit {:?} to {:?}", limit, aligned);
             aligned
+        };
+
+        let template_entry = {
+            let mut entry = CustomPageEntry::default();
+            entry.set_nx(true); // default to not executable
+
+            for flag in flags.iter() {
+                use MapFlags::*;
+                match flag {
+                    Writeable => entry.set_writeable(true),
+                    Executable => entry.set_nx(false),
+                    User => entry.set_user(true),
+                    Huge2M | Huge1G => todo!("huge pages ({:?})", flag),
+                }
+            }
+
+            // TODO depends on flags and target
+            entry.set_on_demand(DemandMapping::Anonymous);
+
+            entry
         };
 
         #[cfg(test)]
@@ -95,15 +136,18 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         let mut things = iter_all_pages(start, limit);
 
         'outer: while unroll > 0 {
-            let (_, mut p3) = Self::get_entry(&mut self.pml4, tables[0], flags, &mut self.memory)?;
+            let (_, mut p3) =
+                Self::get_or_create_entry_mut(&mut self.pml4, tables[0], flags, &mut self.memory)?;
 
             unroll = KEEP_LOOPING;
             while unroll > 1 {
-                let (_, mut p2) = Self::get_entry(&mut p3, tables[1], flags, &mut self.memory)?;
+                let (_, mut p2) =
+                    Self::get_or_create_entry_mut(&mut p3, tables[1], flags, &mut self.memory)?;
 
                 unroll = KEEP_LOOPING;
                 while unroll > 2 {
-                    let (_, mut p1) = Self::get_entry(&mut p2, tables[2], flags, &mut self.memory)?;
+                    let (_, mut p1) =
+                        Self::get_or_create_entry_mut(&mut p2, tables[2], flags, &mut self.memory)?;
                     let p1_table = p1.table_mut()?;
 
                     let (pages_to_do, new_tables) = match things.next() {
@@ -128,24 +172,13 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
                     );
 
                     for p1_idx in tables[3]..tables[3] + pages_to_do {
-                        let mut entry = p1_table.entry_mut(p1_idx).replace();
+                        let new_entry = template_entry;
 
-                        // TODO calc flags once and copy each time
-                        for flag in flags.iter() {
-                            use MapFlags::*;
-                            entry = match flag {
-                                Writeable => entry.writeable(),
-                                Executable => entry.executable(),
-                                User => entry.user(),
-                                Huge2M | Huge1G => todo!("huge pages ({:?})", flag),
-                            }
-                        }
+                        // safety: blatting it entirely with new custom entry
+                        let entry = unsafe { p1_table.entry_mut(p1_idx).as_custom_unchecked_mut() };
 
-                        // TODO mark as on-demand
-                        // for qemu debugging only
-                        // entry = entry.present();
-
-                        entry.build();
+                        *entry = new_entry;
+                        debug_assert!(!core::mem::needs_drop::<CustomPageEntry>());
                     }
 
                     total_count += pages_to_do as u64;
@@ -163,7 +196,8 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         Ok(())
     }
 
-    fn get_entry<'pt, P: PageTableHierarchy<'pt> + 'pt>(
+    /// Allocates a new physical frame if not already present
+    fn get_or_create_entry_mut<'pt, P: PageTableHierarchy<'pt> + 'pt>(
         current: &mut P,
         idx: u16,
         flags: BitFlags<MapFlags>,
@@ -191,10 +225,10 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             entry
                 .replace()
                 .address(frame.address())
-                .writeable()
+                .writeable() // TODO depends on flags
                 .present()
-                .supervisor()
-                .build();
+                .supervisor() // TODO depends on flags
+                .apply();
 
             frame.address()
         };
@@ -205,6 +239,69 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         // safety: type safety from page table types
         let next_table = P::NextLevel::with_table(unsafe { &mut *virt.as_ptr() })?;
         Ok((phys, next_table))
+    }
+
+    fn get_existing_entry_mut<P: PageTableHierarchy<'p> + 'p, A: AbsentPageEntry>(
+        current: &mut P,
+        idx: u16,
+    ) -> KernelResult<Either<P::NextLevel, *mut A>> {
+        let entry = match current.table_mut() {
+            Ok(table) => table.entry_mut(idx),
+            Err(MemoryError::NoTableAvailable(_, addr)) => {
+                return Err(MemoryError::AlreadyMapped(addr).into())
+            }
+            Err(err) => return Err(err.into()),
+        };
+
+        if entry.present() {
+            let next_level = if entry.huge_pages() {
+                P::NextLevel::with_frame(Frame(entry.address()))?
+            } else {
+                // get accessible virtual address for table
+                let virt = VirtualAddress::from_physical(entry.address());
+                P::NextLevel::with_table(unsafe { &mut *virt.as_ptr() })?
+            };
+
+            Ok(Either::Left(next_level))
+        } else if let Some(custom) = entry.as_custom_mut::<A>() {
+            // great, custom
+            Ok(Either::Right(custom as *mut _))
+        } else {
+            // not mapped
+            Err(MemoryError::NotMapped(entry as *mut _ as u64).into())
+        }
+    }
+
+    pub fn get_absent_mapping<A: AbsentPageEntry>(
+        &mut self,
+        addr: VirtualAddress,
+    ) -> KernelResult<(AnyLevel, &mut A)> {
+        // TODO support big absent pages
+        let (p4_idx, p3_idx, p2_idx, p1_idx) = (
+            addr.pml4t_offset(),
+            addr.pdp_offset(),
+            addr.pd_offset(),
+            addr.pt_offset(),
+        );
+
+        use Either::*;
+        let ptr = match Self::get_existing_entry_mut(&mut self.pml4, p4_idx)? {
+            Left(mut p3) => match Self::get_existing_entry_mut(&mut p3, p3_idx)? {
+                Left(mut p2) => match Self::get_existing_entry_mut(&mut p2, p2_idx)? {
+                    Left(mut p1) => match Self::get_existing_entry_mut(&mut p1, p1_idx)? {
+                        Left(frame) => Err(MemoryError::AlreadyMapped(frame.0.address()).into()),
+                        Right(mapping) => Ok((AnyLevel::Frame, mapping)),
+                    },
+                    Right(mapping) => Ok((AnyLevel::P1, mapping)),
+                },
+                Right(mapping) => Ok((AnyLevel::P2, mapping)),
+            },
+            Right(mapping) => Ok((AnyLevel::P3, mapping)),
+        };
+
+        // safety: cant return reference from "borrowed" page tables, but everything lives in
+        // physical memory and so is actually present still
+        ptr.map(|(level, ptr)| (level, unsafe { &mut *ptr }))
     }
 }
 

@@ -1,23 +1,25 @@
-use crate::memory::address_space::AddressSpace;
-use crate::multiboot::Multiboot;
-use crate::vga;
-use common::KernelResult;
 use enumflags2::BitFlags;
+
+use common::KernelResult;
 use memory::{
     gigabytes, MapFlags, MapTarget, PageTable, PhysicalAddress, VirtualAddress, P3,
     VIRT_PHYSICAL_BASE, VIRT_PHYSICAL_SIZE,
 };
 
+use crate::multiboot::Multiboot;
+use crate::vga;
+
 mod address_space;
 mod page_table;
 mod phys;
 
+pub use address_space::AddressSpace;
+pub use phys::{frame_allocator, FrameAllocator, FrameFlags};
+
 // TODO move and restructure this monster init function
 pub fn init(multiboot: Multiboot) -> KernelResult<()> {
     use crate::memory::page_table::pml4;
-    use crate::memory::phys::frame_allocator;
     use log::*;
-    use phys::FrameAllocator;
 
     let memory_map = multiboot.memory_map().expect("memory map unavailable");
     debug!("memory map from multiboot: ");
@@ -57,12 +59,11 @@ pub fn init(multiboot: Multiboot) -> KernelResult<()> {
                     .address(PhysicalAddress(addr))
                     .present()
                     .global()
-                    .build();
+                    .apply();
             }
 
             // point p4 entry at new p3
-            // safety: physical entry is accessible as comment above states
-            let p4_entry = unsafe { p4.entry_physical_mut(p4_offset) };
+            let p4_entry = p4.entry_physical_mut(p4_offset);
 
             p4_entry
                 .replace()
@@ -70,7 +71,7 @@ pub fn init(multiboot: Multiboot) -> KernelResult<()> {
                 .present()
                 .global()
                 .address(p3_frame.address())
-                .build();
+                .apply();
         }
     }
 
@@ -93,8 +94,8 @@ pub fn init(multiboot: Multiboot) -> KernelResult<()> {
     // now safe to remove low identity maps from early boot
     {
         let mut p3 = p4.entry_mut(0).traverse()?;
-        p3.entry_mut(0).replace().not_present().build();
-        p4.entry_mut(0).replace().not_present().build();
+        p3.entry_mut(0).replace().not_present().apply();
+        p4.entry_mut(0).replace().not_present().apply();
     }
 
     // mess around with new address space API, temporary
@@ -103,7 +104,17 @@ pub fn init(multiboot: Multiboot) -> KernelResult<()> {
         VirtualAddress::new_checked(0xaa3f0000),
         0xeff00,
         MapTarget::Any,
-        MapFlags::Executable | MapFlags::Writeable,
+        MapFlags::Writeable,
     )?;
+
+    // trigger page fault
+    unsafe {
+        let ptr = 0xaa3f8020 as *mut u64;
+        ptr.write_volatile(0xbeef_face);
+
+        let beef = ptr.read_volatile();
+        assert_eq!(beef, 0xbeef_face);
+    }
+
     Ok(())
 }

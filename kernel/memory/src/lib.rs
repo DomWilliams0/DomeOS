@@ -5,6 +5,7 @@
 pub use address::{PhysicalAddress, VirtualAddress};
 pub use address_space::{MapFlags, MapTarget, MemoryProvider, RawAddressSpace};
 pub use constants::*;
+pub use custom_entry::{AbsentPageEntry, CustomPageEntry, DemandMapping};
 pub use entry::{CommonEntry, PageTableBits, PageTableFlag};
 pub use entry_builder::EntryBuilder;
 pub use frame::PhysicalFrame;
@@ -19,6 +20,7 @@ mod page_table;
 
 mod address_space;
 mod constants;
+mod custom_entry;
 mod hierarchy;
 
 pub const fn terabytes(n: u64) -> u64 {

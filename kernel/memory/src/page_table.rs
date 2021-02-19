@@ -1,14 +1,9 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
 use core::marker::PhantomData;
-use core::ops::{Index, IndexMut};
-
-use enumflags2::BitFlags;
-
-use common::*;
 
 use crate::address::{PhysicalAddress, VirtualAddress};
-use crate::entry::{CommonEntry, PageTableBits, PageTableFlag};
-use crate::{Frame, HasTable, PageTableHierarchy};
+use crate::entry::CommonEntry;
+use crate::{HasTable, PageTableHierarchy};
 
 pub const PAGE_TABLE_ENTRY_COUNT: usize = 512;
 
@@ -48,13 +43,6 @@ impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
         self.entries().enumerate().filter(|(_, e)| e.present())
     }
 
-    #[deprecated]
-    pub fn copy_to(&self, other: &mut Self) {
-        self.entries()
-            .zip(other.entries.iter_mut())
-            .for_each(|(src, dst)| *dst = src);
-    }
-
     pub fn entries(&self) -> impl Iterator<Item = CommonEntry<'p, P>> + '_ {
         self.entries.iter().copied()
     }
@@ -88,8 +76,8 @@ impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
     pub fn entry_mut(&mut self, idx: impl EntryIndex<'p, P>) -> &mut CommonEntry<'p, P> {
         let identity_mapped_physical = VirtualAddress::is_identity_mapped_physical(self);
 
-        // safety: not dereferencing physical memory
-        let entry = unsafe { self.entry_physical_mut(idx) };
+        // entry may be an inaccessible physical reference but we're not dereferencing it
+        let entry = self.entry_physical_mut(idx);
 
         if !identity_mapped_physical {
             // is not currently accessible, needs to be offset into identity mapped region
@@ -101,10 +89,7 @@ impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
         }
     }
 
-    pub unsafe fn entry_physical_mut(
-        &mut self,
-        idx: impl EntryIndex<'p, P>,
-    ) -> &mut CommonEntry<'p, P> {
+    pub fn entry_physical_mut(&mut self, idx: impl EntryIndex<'p, P>) -> &mut CommonEntry<'p, P> {
         let e = idx.index() as usize;
         debug_assert!(e < self.entries.len(), "entry index {} out of range", e);
 

@@ -6,6 +6,7 @@ use modular_bitfield::prelude::*;
 
 use common::*;
 
+use crate::custom_entry::AbsentPageEntry;
 use crate::entry_builder::EntryBuilder;
 use crate::{Frame, PageTableHierarchy, PhysicalAddress};
 
@@ -91,13 +92,47 @@ impl<'p, P: PageTableHierarchy<'p>> CommonEntry<'p, P> {
         }
     }
 
+    pub fn as_custom_mut<T: AbsentPageEntry>(&mut self) -> Option<&mut T> {
+        let as_u64 = u64::from_le_bytes(self.bits.into_bytes());
+        if T::is_self(as_u64) {
+            // safety: not present so all other bits are ours for the taking
+            Some(unsafe { self.as_custom_unchecked_mut() })
+        } else {
+            None
+        }
+    }
+
+    pub fn as_custom<T: AbsentPageEntry>(&self) -> Option<&T> {
+        let as_u64 = u64::from_le_bytes(self.bits.into_bytes());
+        if T::is_self(as_u64) {
+            // safety: not present so all other bits are ours for the taking
+            Some(unsafe { self.as_custom_unchecked() })
+        } else {
+            None
+        }
+    }
+
+    /// # Safety
+    /// Present bit must be unset
+    pub unsafe fn as_custom_unchecked_mut<T>(&mut self) -> &mut T {
+        assert!(core::mem::size_of::<T>() <= core::mem::size_of::<Self>());
+        &mut *(self as *mut _ as *mut T)
+    }
+
+    /// # Safety
+    /// Present bit must be unset
+    pub unsafe fn as_custom_unchecked<T>(&self) -> &T {
+        assert!(core::mem::size_of::<T>() <= core::mem::size_of::<Self>());
+        &*(self as *const _ as *const T)
+    }
+
     /// Keeps existing flags
-    pub fn modify<'e>(&'e mut self) -> EntryBuilder<'e, 'p, P> {
+    pub fn modify(&mut self) -> EntryBuilder {
         EntryBuilder::with_entry(self)
     }
 
     /// Clears all bits
-    pub fn replace<'e>(&'e mut self) -> EntryBuilder<'e, 'p, P> {
+    pub fn replace(&mut self) -> EntryBuilder {
         EntryBuilder::with_zeroed_entry(self)
     }
 
@@ -132,7 +167,11 @@ impl<'p, P: PageTableHierarchy<'p>> CommonEntry<'p, P> {
 impl<'p, P: PageTableHierarchy<'p>> Debug for CommonEntry<'p, P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let this = self as *const _;
-        write!(f, "[{:?} -> {:?} {:?}]", this, self.address(), self.bits)
+        write!(f, "[{:?} -> {:?} {:?}", this, self.address(), self.bits)?;
+        if f.alternate() {
+            write!(f, " ({:064b})", u64::from_le_bytes(self.bits.into_bytes()))?;
+        }
+        write!(f, "]")
     }
 }
 
@@ -173,6 +212,10 @@ impl Debug for PageTableBits {
 
         if self.huge() {
             write!(f, " | HUGE")?;
+        }
+
+        if f.alternate() {
+            write!(f, " [{:064b}]", u64::from_le_bytes(self.into_bytes()))?;
         }
 
         write!(f, ")")?;
