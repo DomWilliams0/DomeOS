@@ -51,14 +51,52 @@ mod dumb {
     use common::{KernelError, KernelResult, MemoryError};
     use enumflags2::BitFlags;
     use log::*;
-    use memory::{PhysicalAddress, PhysicalFrame};
+    use memory::{PhysicalAddress, PhysicalFrame, FRAME_SIZE};
 
     pub struct DumbFrameAllocator {
+        frames: Frames,
+    }
+
+    struct Frames {
+        region_idx: usize,
+        frame_idx: u64,
+
         multiboot_mmap: MultibootMemoryMap,
-        next: usize,
 
         /// First frame to dish out after the kernel
         start: u64,
+    }
+
+    impl Iterator for Frames {
+        type Item = PhysicalFrame;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            loop {
+                let region = self
+                    .multiboot_mmap
+                    .iter_regions()
+                    .filter(|r| matches!(r.region_type, MemoryRegionType::Available))
+                    .nth(self.region_idx)?;
+
+                let frame = region.base_addr.address() + (self.frame_idx * FRAME_SIZE);
+                if frame >= (region.base_addr.address() + region.length) {
+                    // next region
+                    self.region_idx += 1;
+                    self.frame_idx = 0;
+                    continue;
+                }
+
+                self.frame_idx += 1;
+
+                if frame <= self.start {
+                    // overlaps with kernel
+                    continue;
+                }
+
+                // safety: physical addr calculated from multiboot
+                return Some(unsafe { PhysicalFrame::new(PhysicalAddress(frame)) });
+            }
+        }
     }
 
     impl DumbFrameAllocator {
@@ -67,30 +105,13 @@ mod dumb {
 
             trace!("kernel ends at {:#x}", kernel_end);
             DumbFrameAllocator {
-                multiboot_mmap: mmap,
-                next: 0,
-                start: kernel_end,
+                frames: Frames {
+                    multiboot_mmap: mmap,
+                    region_idx: 0,
+                    frame_idx: 0,
+                    start: kernel_end,
+                },
             }
-        }
-
-        fn all_frames(&self) -> impl Iterator<Item = PhysicalFrame> + '_ {
-            let min = self.start;
-
-            self.multiboot_mmap
-                .iter_regions()
-                .filter(|r| matches!(r.region_type, MemoryRegionType::Available))
-                .map(|r| (r.base_addr.0)..(r.base_addr.0 + r.length))
-                .flat_map(|range| range.step_by(4096))
-                .filter_map(move |addr| {
-                    if addr > min {
-                        // safety: physical addr calculated from multiboot
-                        let frame = unsafe { PhysicalFrame::new(PhysicalAddress(addr)) };
-                        Some(frame)
-                    } else {
-                        // overlaps with kernel
-                        None
-                    }
-                })
         }
     }
 
@@ -101,8 +122,7 @@ mod dumb {
                 return Err(KernelError::NotImplemented);
             }
 
-            let next = self.all_frames().nth(self.next);
-            self.next += 1;
+            let next = self.frames.next();
             Ok(next.ok_or(MemoryError::NoFrame)?)
         }
 
@@ -111,12 +131,12 @@ mod dumb {
         }
 
         fn relocate_multiboot(&mut self, mmap: &'static multiboot_memory_map_t) {
-            let old_ptr = self.multiboot_mmap.pointer();
+            let old_ptr = self.frames.multiboot_mmap.pointer();
             let new_ptr = mmap as *const multiboot_memory_map_t;
             // panics if new ptr is not higher, which it never is
             let offset = (new_ptr as u64) - (old_ptr as u64);
             unsafe {
-                self.multiboot_mmap.add_pointer_offset(offset);
+                self.frames.multiboot_mmap.add_pointer_offset(offset);
             }
         }
     }
