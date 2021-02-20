@@ -1,5 +1,3 @@
-use crate::panic::is_panicking;
-
 pub struct SpinLock<T>(spin::Mutex<T>);
 
 impl<T> SpinLock<T> {
@@ -12,7 +10,7 @@ impl<T> SpinLock<T> {
         #[cfg(debug_assertions)]
         {
             // avoid nested panics, we're already screwed
-            if !is_panicking() {
+            if !crate::panic::is_panicking() {
                 assert!(
                     !crate::irq::is_in_interrupt(),
                     "shouldn't take a lock in an interrupt handler"

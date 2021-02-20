@@ -6,7 +6,7 @@ use crate::irq::{disable_interrupts, enable_interrupts};
 use crate::logging::LogMode;
 use crate::multiboot::Multiboot;
 use crate::vga::{self, Color};
-use crate::{clock, descriptor_tables, logging, serial};
+use crate::{clock, descriptor_tables, logging};
 use crate::{memory, multiboot};
 
 // TODO guard page to detect and handle stack overflow

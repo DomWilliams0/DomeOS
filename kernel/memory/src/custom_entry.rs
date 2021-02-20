@@ -77,7 +77,7 @@ impl AbsentPageEntry for CustomPageEntry {
 
         // safety: this maps to a common entry but when present=false. treat it as a P4 entry for
         // no reason beside it needs a type and all tables use the same entries
-        let entry= unsafe { &mut *(self as *mut _ as *mut CommonEntry<P4>)};
+        let entry = unsafe { &mut *(self as *mut _ as *mut CommonEntry<P4>) };
         EntryBuilder::with_entry_and_bits(entry, bits)
     }
 }

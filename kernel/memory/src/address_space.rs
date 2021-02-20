@@ -40,7 +40,6 @@ pub enum MapFlags {
 
 // TODO CoW variants, recursively free pages on drop if owned
 
-
 enum Either<A, B> {
     Left(A),
     Right(B),
@@ -132,6 +131,8 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             start.pt_offset(),
         ];
 
+        // TODO allocate a single CoW frame for template entry and point everything at it
+
         let mut total_count = 0;
         let mut things = iter_all_pages(start, limit);
 
@@ -174,11 +175,13 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
                     for p1_idx in tables[3]..tables[3] + pages_to_do {
                         let new_entry = template_entry;
 
-                        // safety: blatting it entirely with new custom entry
-                        let entry = unsafe { p1_table.entry_mut(p1_idx).as_custom_unchecked_mut() };
-
-                        *entry = new_entry;
-                        debug_assert!(!core::mem::needs_drop::<CustomPageEntry>());
+                        // safety: blatting it entirely with new custom entry, and not running any
+                        // drop on probably uninitialized entry by writing through a pointer
+                        unsafe {
+                            let entry = p1_table.entry_mut(p1_idx).as_custom_unchecked_mut()
+                                as *mut CustomPageEntry;
+                            entry.write(new_entry);
+                        }
                     }
 
                     total_count += pages_to_do as u64;

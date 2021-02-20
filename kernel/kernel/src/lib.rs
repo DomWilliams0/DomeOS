@@ -45,9 +45,9 @@ pub extern "C" fn kernel_main(magic: u32, multiboot: *mut c_void) -> ! {
 }
 
 pub fn hang() -> ! {
-    warn!("hanging forever");
     unsafe {
         disable_interrupts();
+        warn!("hanging forever");
 
         loop {
             llvm_asm!("hlt");
