@@ -6,6 +6,9 @@ A toy x86_64 OS in Rust.
 * 20 Feb 2021: <em>A basic kernel heap</em>
 <p style="margin: auto"><img src=".progress/2021-02-20-heap.jpg"/></p>
 
+* 20 Feb 2021: <em>Manual stack walking and resolution of symbols on panic. Involves packing the linker map into a binary format and patching it into the binary after build</em>
+<p style="margin: auto"><img src=".progress/2021-02-20-backtrace.jpg"/></p>
+
 * 20 Feb 2021: <em>Startup in QEMU (it doesn't do anything yet)</em>
 <p style="margin: auto"><img src=".progress/2021-02-20-init.jpg"/></p>
 
@@ -14,6 +17,7 @@ A toy x86_64 OS in Rust.
 * [X] x64 long mode
 * [X] Basic interrupt handling (exceptions and clock IRQ)
 * [X] Logging through serial port and VGA
+* [X] Properly resolved backtraces on panic
 * Memory management
   * [X] Physical frame allocation
   * [X] Mapping regions of virtual memory into current address space
