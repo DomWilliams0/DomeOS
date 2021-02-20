@@ -1,17 +1,18 @@
 use log::*;
 
-use crate::irq::{disable_interrupts, enable_interrupts};
-use crate::multiboot::Multiboot;
-use crate::serial::LogMode;
-use crate::vga::{self, Color};
-use crate::{clock, descriptor_tables, serial};
-use crate::{memory, multiboot};
 use common::KernelResult;
+
+use crate::irq::{disable_interrupts, enable_interrupts};
+use crate::logging::LogMode;
+use crate::multiboot::Multiboot;
+use crate::vga::{self, Color};
+use crate::{clock, descriptor_tables, logging, serial};
+use crate::{memory, multiboot};
 
 // TODO guard page to detect and handle stack overflow
 pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     vga::init(Color::LightGreen, Color::Black);
-    serial::set_log_mode(LogMode::SerialAndVga);
+    logging::set_log_mode(LogMode::SerialAndVga);
 
     descriptor_tables::init();
     clock::init();

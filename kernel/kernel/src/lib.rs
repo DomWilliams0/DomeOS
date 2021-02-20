@@ -20,6 +20,7 @@ mod descriptor_tables;
 mod exception;
 mod io;
 mod irq;
+mod logging;
 mod memory;
 mod multiboot;
 mod panic;
@@ -31,7 +32,7 @@ mod vga;
 #[no_mangle]
 pub extern "C" fn kernel_main(magic: u32, multiboot: *mut c_void) -> ! {
     zero_bss();
-    serial::init(LevelFilter::Trace); // TODO configure this
+    logging::init(LevelFilter::Trace); // TODO configure this
 
     match multiboot::parse(magic, multiboot) {
         Ok(multiboot) => {
