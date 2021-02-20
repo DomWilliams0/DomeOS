@@ -6,9 +6,8 @@ use modular_bitfield::prelude::*;
 
 use common::*;
 
-use crate::custom_entry::AbsentPageEntry;
 use crate::entry_builder::EntryBuilder;
-use crate::{Frame, PageTableHierarchy, PhysicalAddress};
+use crate::{CustomPageEntry, Frame, PageTableHierarchy, PhysicalAddress};
 
 #[bitfield]
 #[derive(Copy, Clone, Default, Deref, DerefMut)]
@@ -92,9 +91,9 @@ impl<'p, P: PageTableHierarchy<'p>> CommonEntry<'p, P> {
         }
     }
 
-    pub fn as_custom_mut<T: AbsentPageEntry>(&mut self) -> Option<&mut T> {
+    pub fn as_custom_mut(&mut self) -> Option<&mut CustomPageEntry> {
         let as_u64 = u64::from_le_bytes(self.bits.into_bytes());
-        if T::is_self(as_u64) {
+        if CustomPageEntry::is_self(as_u64) {
             // safety: not present so all other bits are ours for the taking
             Some(unsafe { self.as_custom_unchecked_mut() })
         } else {
@@ -102,9 +101,9 @@ impl<'p, P: PageTableHierarchy<'p>> CommonEntry<'p, P> {
         }
     }
 
-    pub fn as_custom<T: AbsentPageEntry>(&self) -> Option<&T> {
+    pub fn as_custom(&self) -> Option<&CustomPageEntry> {
         let as_u64 = u64::from_le_bytes(self.bits.into_bytes());
-        if T::is_self(as_u64) {
+        if CustomPageEntry::is_self(as_u64) {
             // safety: not present so all other bits are ours for the taking
             Some(unsafe { self.as_custom_unchecked() })
         } else {

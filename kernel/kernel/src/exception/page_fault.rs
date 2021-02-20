@@ -3,7 +3,7 @@ use core::fmt::{Debug, Error, Formatter};
 
 use crate::memory::{frame_allocator, AddressSpace, FrameAllocator};
 use enumflags2::BitFlags;
-use memory::{AbsentPageEntry, CustomPageEntry, DemandMapping, VirtualAddress};
+use memory::{CustomPageEntry, DemandMapping, VirtualAddress};
 
 #[derive(Debug)]
 pub struct PageFaultException {
@@ -44,7 +44,7 @@ impl PageFaultException {
 
         // fetch mapping
         let (level, mapping) = addr_space
-            .get_absent_mapping::<CustomPageEntry>(self.addr)
+            .get_absent_mapping(self.addr)
             .expect("nonsensical page fault");
 
         match mapping.on_demand() {

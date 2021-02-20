@@ -1,5 +1,5 @@
 use crate::address::{PhysicalAddress, VirtualAddress};
-use crate::custom_entry::{AbsentPageEntry, CustomPageEntry, DemandMapping};
+use crate::custom_entry::{CustomPageEntry, DemandMapping};
 use crate::{
     AnyLevel, Frame, PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4, PAGE_TABLE_ENTRY_COUNT,
 };
@@ -244,10 +244,10 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         Ok((phys, next_table))
     }
 
-    fn get_existing_entry_mut<P: PageTableHierarchy<'p> + 'p, A: AbsentPageEntry>(
+    fn get_existing_entry_mut<P: PageTableHierarchy<'p> + 'p>(
         current: &mut P,
         idx: u16,
-    ) -> KernelResult<Either<P::NextLevel, *mut A>> {
+    ) -> KernelResult<Either<P::NextLevel, *mut CustomPageEntry>> {
         let entry = match current.table_mut() {
             Ok(table) => table.entry_mut(idx),
             Err(MemoryError::NoTableAvailable(_, addr)) => {
@@ -266,7 +266,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             };
 
             Ok(Either::Left(next_level))
-        } else if let Some(custom) = entry.as_custom_mut::<A>() {
+        } else if let Some(custom) = entry.as_custom_mut() {
             // great, custom
             Ok(Either::Right(custom as *mut _))
         } else {
@@ -275,10 +275,10 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         }
     }
 
-    pub fn get_absent_mapping<A: AbsentPageEntry>(
+    pub fn get_absent_mapping(
         &mut self,
         addr: VirtualAddress,
-    ) -> KernelResult<(AnyLevel, &mut A)> {
+    ) -> KernelResult<(AnyLevel, &mut CustomPageEntry)> {
         // TODO support big absent pages
         let (p4_idx, p3_idx, p2_idx, p1_idx) = (
             addr.pml4t_offset(),

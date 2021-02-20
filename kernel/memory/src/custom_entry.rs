@@ -1,13 +1,6 @@
 use crate::{CommonEntry, EntryBuilder, PageTableBits, P4};
 use modular_bitfield::prelude::*;
 
-/// A page table entry where the present bit is not set, so all other bits are available
-pub trait AbsentPageEntry: Copy {
-    fn is_self(entry: u64) -> bool;
-
-    fn as_builder(&mut self) -> EntryBuilder;
-}
-
 const MARKER: u32 = 0xcc_cc_cc;
 
 #[derive(BitfieldSpecifier, Debug, Copy, Clone)]
@@ -18,6 +11,7 @@ pub enum DemandMapping {
     // TODO Mapped file(fd in process)
 }
 
+/// A page table entry where the present bit is not set, so all other bits are available
 #[bitfield]
 #[derive(Copy, Clone, Debug)]
 pub struct CustomPageEntry {
@@ -56,13 +50,13 @@ impl Default for CustomPageEntry {
     }
 }
 
-impl AbsentPageEntry for CustomPageEntry {
-    fn is_self(entry: u64) -> bool {
+impl CustomPageEntry {
+    pub fn is_self(entry: u64) -> bool {
         let possibly_entry: Self = unsafe { core::mem::transmute(entry) };
         possibly_entry._reserved() == 0 && possibly_entry.marker() == MARKER
     }
 
-    fn as_builder(&mut self) -> EntryBuilder {
+    pub fn as_builder(&mut self) -> EntryBuilder {
         // transfer bits without extra custom ones
         let bits = PageTableBits::new()
             .with_writeable(self.writeable())

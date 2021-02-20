@@ -5,7 +5,7 @@
 pub use address::{PhysicalAddress, VirtualAddress};
 pub use address_space::{MapFlags, MapTarget, MemoryProvider, RawAddressSpace};
 pub use constants::*;
-pub use custom_entry::{AbsentPageEntry, CustomPageEntry, DemandMapping};
+pub use custom_entry::{CustomPageEntry, DemandMapping};
 pub use entry::{CommonEntry, PageTableBits, PageTableFlag};
 pub use entry_builder::EntryBuilder;
 pub use frame::PhysicalFrame;
