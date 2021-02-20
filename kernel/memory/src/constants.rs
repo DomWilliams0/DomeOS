@@ -10,6 +10,8 @@ pub const VIRT_KERNEL_BASE: u64 = 0xffff_ffff_8000_0000;
 pub const VIRT_KERNEL_MAX: u64 = 0xffff_ffff_c000_0000;
 pub const VIRT_KERNEL_SIZE: u64 = VIRT_KERNEL_MAX - VIRT_KERNEL_BASE;
 
+pub const VIRT_KERNEL_HEAP_BASE: u64 = 0xffff_d000_0000_0000;
+
 pub const PHYS_KERNEL_BASE: u64 = 0x10_0000;
 
 pub const FRAME_SIZE: u64 = 4096;

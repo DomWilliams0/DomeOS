@@ -1,12 +1,12 @@
 use crate::memory::page_table::pml4;
-use crate::memory::{frame_allocator, phys, AddressSpace, FrameAllocator};
+use crate::memory::{frame_allocator, heap, phys, FrameAllocator};
 use crate::multiboot::{Multiboot, MultibootMemoryMap};
 use crate::vga;
 use common::*;
 use enumflags2::BitFlags;
 use memory::{
-    gigabytes, MapFlags, MapTarget, PageTable, PhysicalAddress, VirtualAddress, P3,
-    VIRT_PHYSICAL_BASE, VIRT_PHYSICAL_SIZE,
+    gigabytes, PageTable, PhysicalAddress, VirtualAddress, P3, VIRT_PHYSICAL_BASE,
+    VIRT_PHYSICAL_SIZE,
 };
 
 pub fn init(multiboot: Multiboot) -> KernelResult<()> {
@@ -24,23 +24,8 @@ pub fn init(multiboot: Multiboot) -> KernelResult<()> {
     init_physical_identity_mapping()?;
     post_init_physical_identity_mapping(&memory_map)?;
 
-    // mess around with new address space API, temporary
-    let mut space = AddressSpace::current();
-    space.map_range(
-        VirtualAddress::new_checked(0xaa3f0000),
-        0xeff00,
-        MapTarget::Any,
-        MapFlags::Writeable,
-    )?;
-
-    // trigger page fault
-    unsafe {
-        let ptr = 0xaa3f8020 as *mut u64;
-        ptr.write_volatile(0xbeef_face);
-
-        let beef = ptr.read_volatile();
-        assert_eq!(beef, 0xbeef_face);
-    }
+    // init heap
+    heap::init()?;
 
     Ok(())
 }

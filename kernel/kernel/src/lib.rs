@@ -8,6 +8,9 @@
 #![feature(llvm_asm)]
 #![feature(panic_info_message)]
 #![feature(asm)]
+#![feature(alloc_error_handler)]
+
+extern crate alloc;
 
 use core::ffi::c_void;
 

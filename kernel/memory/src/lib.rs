@@ -1,6 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-pub use address::{PhysicalAddress, VirtualAddress};
+pub use address::{round_down_to, round_up_to, PhysicalAddress, VirtualAddress};
 pub use address_space::{MapFlags, MapTarget, MemoryProvider, RawAddressSpace};
 pub use constants::*;
 pub use custom_entry::{CustomPageEntry, DemandMapping};

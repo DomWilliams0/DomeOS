@@ -20,4 +20,8 @@ modular-bitfield = "0.11"
 log = "0.4"
 enumflags2 = "0.6"
 bitfield = "0.13"
-buddy-alloc = "0.4"
+buddy_system_allocator = "0.7"
+
+[features]
+default = []
+log-heap = []

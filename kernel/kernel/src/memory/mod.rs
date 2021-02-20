@@ -1,4 +1,5 @@
 mod address_space;
+mod heap;
 mod init;
 mod page_table;
 mod phys;

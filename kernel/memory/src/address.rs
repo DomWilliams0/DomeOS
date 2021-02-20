@@ -28,7 +28,7 @@ impl Debug for VirtualAddress {
 }
 
 impl VirtualAddress {
-    pub fn new(addr: u64) -> Self {
+    pub const fn new(addr: u64) -> Self {
         let sign_extend_mask = 1 << (SIGN_EXTEND - 1);
         let addr = (addr.wrapping_mul(sign_extend_mask) as i64 / sign_extend_mask as i64) as u64;
         Self(addr)
@@ -148,14 +148,11 @@ impl VirtualAddress {
     }
 
     pub fn round_up_to(self, multiple: u64) -> Self {
-        assert!(multiple.is_power_of_two());
-        let val = (self.0 + multiple - 1) as i64 & -(multiple as i64);
-        Self::new_checked(val as u64)
+        Self::new_checked(round_up_to(self.0, multiple))
     }
 
     pub fn round_down_to(self, multiple: u64) -> Self {
-        assert!(multiple.is_power_of_two());
-        Self::new_checked(self.0 & !(multiple - 1))
+        Self::new_checked(round_down_to(self.0, multiple))
     }
 
     pub fn log_all_offsets(self) {
@@ -172,6 +169,17 @@ impl VirtualAddress {
     pub fn address(self) -> u64 {
         self.0
     }
+}
+
+pub fn round_up_to(value: u64, multiple: u64) -> u64 {
+    assert!(multiple.is_power_of_two());
+    let val = (value + multiple - 1) as i64 & -(multiple as i64);
+    val as u64
+}
+
+pub fn round_down_to(value: u64, multiple: u64) -> u64 {
+    assert!(multiple.is_power_of_two());
+    value & !(multiple - 1)
 }
 
 #[derive(Eq, PartialEq, Copy, Clone, Add)]
