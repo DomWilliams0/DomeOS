@@ -43,3 +43,15 @@ pub fn mapping_for_address(addr: VirtualAddress) -> Option<VirtualMapping> {
         }
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{gigabytes, terabytes};
+
+    #[test]
+    fn sizes_sanity_check() {
+        assert_eq!(VIRT_PHYSICAL_SIZE, terabytes(64));
+        assert_eq!(VIRT_KERNEL_SIZE, gigabytes(1));
+    }
+}

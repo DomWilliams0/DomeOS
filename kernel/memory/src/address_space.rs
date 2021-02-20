@@ -1,9 +1,11 @@
 use crate::address::{PhysicalAddress, VirtualAddress};
 use crate::custom_entry::{CustomPageEntry, DemandMapping};
 use crate::{
-    AnyLevel, Frame, PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4, PAGE_TABLE_ENTRY_COUNT,
+    AnyLevel, Frame, HasTable, PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4,
+    PAGE_TABLE_ENTRY_COUNT,
 };
 use common::*;
+use core::ops::Range;
 use enumflags2::BitFlags;
 
 pub trait MemoryProvider {
@@ -45,6 +47,10 @@ enum Either<A, B> {
     Right(B),
 }
 
+/// First call to iter(): [given index..512)
+/// Future calls        : [0..512)
+struct OneTimeEntryRange(Range<u16>);
+
 impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
     /// # Safety
     /// Table must be mapped in and writeable already
@@ -66,6 +72,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
     }
 
     /// Actual implementation with no generic params to avoid huge code duplication
+    #[allow(clippy::let_and_return)]
     fn map_range_impl(
         &mut self,
         start: VirtualAddress,
@@ -75,6 +82,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
     ) -> KernelResult<()> {
         let start = {
             let aligned = start.round_up_to(FRAME_SIZE);
+            #[cfg(feature = "log-paging")]
             trace!("aligned base {:?} to {:?}", start, aligned);
             aligned
         };
@@ -82,6 +90,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         let limit = {
             let limit = VirtualAddress::new_checked(start.0 + size);
             let aligned = limit.round_up_to(FRAME_SIZE);
+            #[cfg(feature = "log-paging")]
             trace!("aligned limit {:?} to {:?}", limit, aligned);
             aligned
         };
@@ -106,7 +115,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             entry
         };
 
-        #[cfg(test)]
+        #[cfg(feature = "log-paging")]
         trace!(
             "mapping {}.{}.{}.{} => {}.{}.{}.{}",
             start.pml4t_offset(),
@@ -209,17 +218,19 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         let entry = current.table_mut()?.entry_mut(idx);
         let phys = if entry.present() {
             // already present
+            #[cfg(feature = "log-paging")]
             trace!("already present: {:?}", entry.address());
             entry.address()
         } else {
             // need a new frame
             let frame = memory.new_frame()?;
 
-            // trace!(
-            //     "allocated new {} at {:?}",
-            //     P::NextLevel::NAME,
-            //     frame.address()
-            // );
+            #[cfg(feature = "log-paging")]
+            trace!(
+                "allocated new {} at {:?}",
+                P::NextLevel::NAME,
+                frame.address()
+            );
 
             // ensure its cleared
             frame.zero();
@@ -244,7 +255,11 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         Ok((phys, next_table))
     }
 
-    fn get_existing_entry_mut<P: PageTableHierarchy<'p> + 'p>(
+    /// Returns mutable reference to entry but makes no changes.
+    /// Errors:
+    ///     * AlreadyMapped
+    ///     * NotMapped
+    fn get_existing_entry<P: PageTableHierarchy<'p> + 'p>(
         current: &mut P,
         idx: u16,
     ) -> KernelResult<Either<P::NextLevel, *mut CustomPageEntry>> {
@@ -288,10 +303,10 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         );
 
         use Either::*;
-        let ptr = match Self::get_existing_entry_mut(&mut self.pml4, p4_idx)? {
-            Left(mut p3) => match Self::get_existing_entry_mut(&mut p3, p3_idx)? {
-                Left(mut p2) => match Self::get_existing_entry_mut(&mut p2, p2_idx)? {
-                    Left(mut p1) => match Self::get_existing_entry_mut(&mut p1, p1_idx)? {
+        let ptr = match Self::get_existing_entry(&mut self.pml4, p4_idx)? {
+            Left(mut p3) => match Self::get_existing_entry(&mut p3, p3_idx)? {
+                Left(mut p2) => match Self::get_existing_entry(&mut p2, p2_idx)? {
+                    Left(mut p1) => match Self::get_existing_entry(&mut p1, p1_idx)? {
                         Left(frame) => Err(MemoryError::AlreadyMapped(frame.0.address()).into()),
                         Right(mapping) => Ok((AnyLevel::Frame, mapping)),
                     },
@@ -305,6 +320,231 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         // safety: cant return reference from "borrowed" page tables, but everything lives in
         // physical memory and so is actually present still
         ptr.map(|(level, ptr)| (level, unsafe { &mut *ptr }))
+    }
+
+    /// Unmapped page returned as `Ok(Either::Right())`
+    fn get_unmapped_entry<P, N>(table: &mut P, idx: u16) -> KernelResult<Either<N, ()>>
+    where
+        P: PageTableHierarchy<'p, NextLevel = N> + 'p,
+        N: HasTable<'p>,
+    {
+        match Self::get_existing_entry(table, idx) {
+            Ok(Either::Left(next)) => {
+                // already mapped as a table, traverse to next level
+                Ok(Either::Left(next))
+            }
+            Ok(Either::Right(ptr)) => {
+                // already mapped but absent
+                Err(MemoryError::AlreadyMapped(ptr as u64).into())
+            }
+            Err(KernelError::Memory(MemoryError::NotMapped(_))) => {
+                // not mapped, success
+                Ok(Either::Right(()))
+            }
+            Err(other) => {
+                // any other error
+                Err(other)
+            }
+        }
+    }
+
+    fn iter_unmapped_foreach(
+        p4: &mut P4<'p>,
+        start_addr: VirtualAddress,
+        mut todo: impl FnMut(AnyLevel, VirtualAddress) -> bool,
+    ) {
+        const ENTRY_MAX: u16 = PAGE_TABLE_ENTRY_COUNT as u16;
+
+        let mut p3_range = OneTimeEntryRange::new_from(start_addr.pdp_offset());
+        let mut p2_range = OneTimeEntryRange::new_from(start_addr.pd_offset());
+        let mut p1_range = OneTimeEntryRange::new_from(start_addr.pt_offset());
+
+        // im so sorry... maybe eventually we'll have a non-generic page table
+        // representation and could iterate instead
+        for p4_idx in start_addr.pml4t_offset()..ENTRY_MAX {
+            match Self::get_unmapped_entry(p4, p4_idx) {
+                Ok(Either::Right(_)) => {
+                    if !todo(
+                        AnyLevel::P4,
+                        VirtualAddress::from_indices(
+                            p4_idx,
+                            p3_range.start(),
+                            p2_range.start(),
+                            p1_range.start(),
+                        ),
+                    ) {
+                        return;
+                    }
+                }
+                Ok(Either::Left(mut p3)) => {
+                    for p3_idx in p3_range.iter() {
+                        match Self::get_unmapped_entry(&mut p3, p3_idx) {
+                            Ok(Either::Right(_)) => {
+                                if !todo(
+                                    AnyLevel::P3,
+                                    VirtualAddress::from_indices(
+                                        p4_idx,
+                                        p3_idx,
+                                        p2_range.start(),
+                                        p1_range.start(),
+                                    ),
+                                ) {
+                                    return;
+                                }
+                            }
+                            Ok(Either::Left(mut p2)) => {
+                                for p2_idx in p2_range.iter() {
+                                    match Self::get_unmapped_entry(&mut p2, p2_idx) {
+                                        Ok(Either::Right(_)) => {
+                                            if !todo(
+                                                AnyLevel::P2,
+                                                VirtualAddress::from_indices(
+                                                    p4_idx,
+                                                    p3_idx,
+                                                    p2_idx,
+                                                    p1_range.start(),
+                                                ),
+                                            ) {
+                                                return;
+                                            }
+                                        }
+                                        Ok(Either::Left(mut p1)) => {
+                                            let p1_table = match p1.table_mut() {
+                                                Ok(p1) => p1,
+                                                Err(_) => {
+                                                    // not a table
+                                                    continue;
+                                                }
+                                            };
+                                            for p1_idx in p1_range.iter() {
+                                                let entry = p1_table.entry_mut(p1_idx);
+                                                if entry.present()
+                                                    || entry.as_custom_mut().is_some()
+                                                {
+                                                    // mapped
+                                                    continue;
+                                                }
+
+                                                if !todo(
+                                                    AnyLevel::P1,
+                                                    VirtualAddress::from_indices(
+                                                        p4_idx, p3_idx, p2_idx, p1_idx,
+                                                    ),
+                                                ) {
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                _ => {}
+            };
+        }
+    }
+
+    #[allow(clippy::let_and_return)]
+    pub fn find_free_space(
+        &mut self,
+        start: VirtualAddress,
+        n_contiguous: usize,
+    ) -> KernelResult<VirtualAddress> {
+        let n_to_find = n_contiguous as u64;
+
+        let mut last_addr = None;
+        let mut contiguous_start = None;
+
+        // for checking no mappings exist, safe because table walking functions modify nothing
+        // even though they're mutable (to return a mutable reference)
+        #[cfg(debug_assertions)]
+        let other_self = unsafe { &mut *(self as *mut Self) };
+
+        Self::iter_unmapped_foreach(&mut self.pml4, start, |level, addr| {
+            let is_consecutive = {
+                last_addr
+                    .map(|last: VirtualAddress| {
+                        let consecutive = are_consecutive(last, addr, level);
+
+                        #[cfg(feature = "log-paging")]
+                        trace!(
+                            " considering {:?}, diff={:#x}, level={:?}, consecutive={:?} (last={:?})",
+                            addr,
+                            diff,
+                            level,
+                            consecutive,last
+                        );
+
+                        consecutive
+                    })
+                    .unwrap_or(true)
+            };
+
+            last_addr = Some(addr);
+
+            if !is_consecutive || contiguous_start.is_none() {
+                // restart search from here
+                #[cfg(feature = "log-paging")]
+                trace!(" restarting search from {:?}", addr);
+                contiguous_start = Some(addr);
+            }
+
+            #[cfg(debug_assertions)]
+            if let Ok((_, entry)) = other_self.get_absent_mapping(addr) {
+                panic!("\"unmapped\" page is actually mapped: {:?}", entry)
+            }
+
+            // calculate number of consecutive pages we have
+            let contiguous_start = contiguous_start.unwrap(); // unconditionally initialized above
+            let contiguous_count = (addr.address() - contiguous_start.address()) / FRAME_SIZE;
+
+            // keep going only if not done yet
+            contiguous_count < n_to_find
+        });
+
+        contiguous_start.ok_or_else(|| {
+            KernelError::Memory(MemoryError::NoContiguousVirtualRegion(
+                start.address(),
+                n_to_find,
+            ))
+        })
+    }
+}
+
+fn are_consecutive(a: VirtualAddress, b: VirtualAddress, level: AnyLevel) -> bool {
+    const ENTRY_COUNT: u64 = PAGE_TABLE_ENTRY_COUNT as u64;
+
+    const DIFF_P1: u64 = FRAME_SIZE;
+    const DIFF_P2: u64 = FRAME_SIZE * ENTRY_COUNT;
+    const DIFF_P3: u64 = FRAME_SIZE * ENTRY_COUNT.pow(2);
+    const DIFF_P4: u64 = FRAME_SIZE * ENTRY_COUNT.pow(3);
+
+    let diff = b.address() - a.address();
+    match diff {
+        DIFF_P1 => true,
+        DIFF_P2 if level == AnyLevel::P2 || level == AnyLevel::P3 => true,
+        DIFF_P3 if level == AnyLevel::P3 || level == AnyLevel::P4 => true,
+        DIFF_P4 if level == AnyLevel::P4 => true,
+        _ => false,
+    }
+}
+
+impl OneTimeEntryRange {
+    fn new_from(start: u16) -> Self {
+        Self(start..PAGE_TABLE_ENTRY_COUNT as u16)
+    }
+
+    fn start(&self) -> u16 {
+        self.0.start
+    }
+
+    fn iter(&mut self) -> impl Iterator<Item = u16> {
+        let new_range = 0..PAGE_TABLE_ENTRY_COUNT as u16;
+        core::mem::replace(&mut self.0, new_range)
     }
 }
 

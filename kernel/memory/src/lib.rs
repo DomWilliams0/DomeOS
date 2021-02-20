@@ -1,6 +1,4 @@
 #![cfg_attr(not(feature = "std"), no_std)]
-// #![feature(maybe_uninit_ref)]
-// #![feature(const_fn)]
 
 pub use address::{PhysicalAddress, VirtualAddress};
 pub use address_space::{MapFlags, MapTarget, MemoryProvider, RawAddressSpace};

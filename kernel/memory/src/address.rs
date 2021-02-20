@@ -45,6 +45,24 @@ impl VirtualAddress {
         virt
     }
 
+    pub fn from_indices(p4: u16, p3: u16, p2: u16, p1: u16) -> Self {
+        let p4_masked = p4 as u64 & OFFSET_MASK;
+        let p3_masked = p3 as u64 & OFFSET_MASK;
+        let p2_masked = p2 as u64 & OFFSET_MASK;
+        let p1_masked = p1 as u64 & OFFSET_MASK;
+
+        if cfg!(debug_assertions) {
+            assert_eq!(p4 as u64, p4_masked);
+            assert_eq!(p3 as u64, p3_masked);
+            assert_eq!(p2 as u64, p2_masked);
+            assert_eq!(p1 as u64, p1_masked);
+        }
+
+        VirtualAddress::new(
+            (p4_masked << 39) | (p3_masked << 30) | (p2_masked << 21) | (p1_masked << 12),
+        )
+    }
+
     /// P4
     pub fn pml4t_offset(self) -> u16 {
         ((self.0 >> 39) & OFFSET_MASK) as u16
@@ -224,7 +242,8 @@ impl AddAssign<u64> for VirtualAddress {
 
 #[cfg(test)]
 mod tests {
-    use crate::address::VirtualAddress;
+    use crate::address::{VirtualAddress, ADDRESS_SHIFT, OFFSET_MASK, OFFSET_SHIFT};
+    use crate::FRAME_SIZE;
 
     #[test]
     fn virtaddr_offsets() {
@@ -247,6 +266,21 @@ mod tests {
         assert_eq!(
             addr.page_offset_1gb(),
             0b01_0010_1100_1010_1010_0011_1011_1011
+        );
+
+        let addr = addr.round_down_to(FRAME_SIZE);
+        let from_indices = VirtualAddress::from_indices(
+            addr.pml4t_offset(),
+            addr.pdp_offset(),
+            addr.pd_offset(),
+            addr.pt_offset(),
+        );
+        assert_eq!(
+            from_indices.address(),
+            addr.address(),
+            "expected={:#x}, actual={:#x}",
+            addr.address(),
+            from_indices.address()
         );
     }
 

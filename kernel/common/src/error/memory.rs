@@ -7,6 +7,9 @@ pub enum MemoryError {
     /// No physical frames available
     NoFrame,
 
+    /// No contiguous region of virtual memory of {0:#x} pages available from addr {1:#?}
+    NoContiguousVirtualRegion(u64, u64 /* pages */),
+
     /// Index {1} is invalid for page table at {0:#x}
     InvalidPageTableIndex(u64, u16),
 
