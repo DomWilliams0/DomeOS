@@ -1,4 +1,3 @@
-use common::*;
 use core::marker::PhantomData;
 
 use byte::ctx::Bytes;
@@ -8,7 +7,7 @@ use byte::{
     BytesExt, TryRead,
 };
 
-use crate::address::{Address, FileOffset, VirtualAddress};
+use crate::address::{Address, FileOffset};
 use crate::error::{PeError, PeResult};
 
 #[derive(Clone)]

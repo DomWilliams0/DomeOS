@@ -1,7 +1,7 @@
 use crate::address::{Address, FileOffset};
 use crate::cursor::Cursor;
 use crate::error::{PeError, PeResult};
-use crate::types::{Characteristics, CoffHeader, OptionalHeader, SectionHeader};
+use crate::types::{CoffHeader, OptionalHeader, SectionHeader};
 
 pub struct Pe<'pe> {
     buf: &'pe [u8],
@@ -18,7 +18,7 @@ impl<'pe> Pe<'pe> {
         cursor.read_magic(0x0000_4550_u32, "PE signature")?;
 
         let coff_offset = cursor.file_position();
-        let mut pe = Pe {
+        let pe = Pe {
             buf: buffer,
             coff: coff_offset,
         };
