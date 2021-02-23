@@ -1,7 +1,7 @@
 use crate::hang;
+use common::*;
 use core::fmt::{Display, Formatter};
 use core::panic::PanicInfo;
-use log::*;
 use memory::kilobytes;
 
 static mut PANICKED: bool = false;

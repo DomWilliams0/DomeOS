@@ -1,16 +1,15 @@
 use crate::memory::page_table::pml4;
 use crate::memory::phys::{frame_allocator, FrameAllocator};
-use common::KernelResult;
 use core::ops::{Deref, DerefMut};
 use enumflags2::BitFlags;
-use memory::{MemoryProvider, PhysicalFrame, RawAddressSpace};
+use memory::{MemoryError, MemoryProvider, PhysicalFrame, RawAddressSpace};
 
 pub struct FrameProvider;
 
 pub struct AddressSpace<'p>(RawAddressSpace<'p, FrameProvider>);
 
 impl MemoryProvider for FrameProvider {
-    fn new_frame(&mut self) -> KernelResult<PhysicalFrame> {
+    fn new_frame(&mut self) -> Result<PhysicalFrame, MemoryError> {
         frame_allocator().allocate(BitFlags::empty())
     }
 }

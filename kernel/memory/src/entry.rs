@@ -7,6 +7,7 @@ use modular_bitfield::prelude::*;
 use common::*;
 
 use crate::entry_builder::EntryBuilder;
+use crate::error::MemoryResult;
 use crate::{CustomPageEntry, Frame, PageTableHierarchy, PhysicalAddress};
 
 #[bitfield]

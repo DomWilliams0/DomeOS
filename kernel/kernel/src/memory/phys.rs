@@ -1,10 +1,10 @@
 use crate::memory::phys::dumb::DumbFrameAllocator;
 use crate::memory::phys::physical_size::kernel_size;
 use crate::multiboot::{multiboot_memory_map_t, MultibootMemoryMap};
-use common::{InitializedGlobal, KernelResult};
+use common::InitializedGlobal;
+use common::*;
 use enumflags2::BitFlags;
-use log::*;
-use memory::PhysicalFrame;
+use memory::{MemoryError, PhysicalFrame};
 
 #[derive(BitFlags, Debug, Copy, Clone)]
 #[repr(u16)]
@@ -17,9 +17,9 @@ pub enum FrameFlags {
 
 /// Allocates physical pages
 pub trait FrameAllocator {
-    fn allocate(&mut self, flags: BitFlags<FrameFlags>) -> KernelResult<PhysicalFrame>;
+    fn allocate(&mut self, flags: BitFlags<FrameFlags>) -> Result<PhysicalFrame, MemoryError>;
 
-    fn free(&mut self, frame: PhysicalFrame) -> KernelResult<()>;
+    fn free(&mut self, frame: PhysicalFrame) -> Result<(), MemoryError>;
 
     fn relocate_multiboot(&mut self, mbi: &'static multiboot_memory_map_t);
 }
@@ -48,10 +48,9 @@ mod dumb {
     use crate::memory::phys::physical_size::kernel_end;
     use crate::memory::phys::{FrameAllocator, FrameFlags};
     use crate::multiboot::{multiboot_memory_map_t, MemoryRegionType, MultibootMemoryMap};
-    use common::{KernelError, KernelResult, MemoryError};
+    use common::*;
     use enumflags2::BitFlags;
-    use log::*;
-    use memory::{PhysicalAddress, PhysicalFrame, FRAME_SIZE};
+    use memory::{MemoryError, PhysicalAddress, PhysicalFrame, FRAME_SIZE};
 
     pub struct DumbFrameAllocator {
         frames: Frames,
@@ -116,17 +115,18 @@ mod dumb {
     }
 
     impl FrameAllocator for DumbFrameAllocator {
-        fn allocate(&mut self, flags: BitFlags<FrameFlags>) -> KernelResult<PhysicalFrame> {
+        fn allocate(&mut self, flags: BitFlags<FrameFlags>) -> Result<PhysicalFrame, MemoryError> {
             // TODO separate allocator for low memory
             if flags.contains(FrameFlags::Low) {
-                return Err(KernelError::NotImplemented);
+                todo!()
+                // return Err(KernelError::NotImplemented);
             }
 
             let next = self.frames.next();
-            Ok(next.ok_or(MemoryError::NoFrame)?)
+            next.ok_or(MemoryError::NoFrame)
         }
 
-        fn free(&mut self, _frame: PhysicalFrame) -> KernelResult<()> {
+        fn free(&mut self, _frame: PhysicalFrame) -> Result<(), MemoryError> {
             unimplemented!()
         }
 

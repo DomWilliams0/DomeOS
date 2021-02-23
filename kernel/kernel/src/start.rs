@@ -1,13 +1,11 @@
-use log::*;
-
-use common::KernelResult;
+use common::*;
 
 use crate::irq::{disable_interrupts, enable_interrupts};
 use crate::logging::LogMode;
+use crate::multiboot;
 use crate::multiboot::Multiboot;
 use crate::vga::{self, Color};
 use crate::{clock, descriptor_tables, logging};
-use crate::{memory, multiboot};
 
 // TODO guard page to detect and handle stack overflow
 pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
@@ -19,19 +17,27 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
 
     let multiboot = Multiboot::new(multiboot);
 
-    let init_result = (|| -> KernelResult<()> {
-        // set up page tables for desired mapping
-        memory::init(multiboot)?;
+    // init memory and get ourselves a heap
+    if let Err(err) = crate::memory::init(multiboot) {
+        error!("early memory setup failed: {}", err);
+        hang();
+    }
 
-        // finally enable interrupts now that the higher half mappings are in place, so the isrs are
-        // actually mapped
-        enable_interrupts();
+    // now we have a heap we can start using boxed error types
+
+    // finally enable interrupts now that the higher half mappings are in place, so the isrs are
+    // actually mapped
+    enable_interrupts();
+
+    // other kernel init
+    let init_result = (|| -> anyhow::Result<()> {
+        // TODO
 
         Ok(())
     })();
 
     if let Err(err) = init_result {
-        error!("setup failed: {}", err);
+        error!("init failed: {:#}", err);
     }
 
     info!("goodbye!");

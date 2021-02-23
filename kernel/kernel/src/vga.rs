@@ -1,8 +1,8 @@
 use core::fmt;
 
 use crate::spinlock::SpinLock;
+use common::*;
 use core::ops::{Deref, DerefMut};
-use log::*;
 
 use common::InitializedGlobalChecked;
 use memory::VirtualAddress;

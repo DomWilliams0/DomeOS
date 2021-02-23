@@ -1,5 +1,5 @@
 use crate::descriptor_tables::common::DescriptorTablePointer;
-use common::InitializedGlobal;
+use common::*;
 use modular_bitfield::prelude::*;
 
 static mut GDT: InitializedGlobal<GlobalDescriptorTable> = InitializedGlobal::uninit();
@@ -77,7 +77,7 @@ impl GlobalDescriptorTable {
         self.entries[idx] = descriptor.into_u64();
 
         let selector = SegmentSelector::new().with_rpl(rpl).with_idx(idx as u8);
-        log::trace!(
+        trace!(
             "gdt[{} ({:#x})] = {:#x}",
             idx,
             selector.into_u8(),

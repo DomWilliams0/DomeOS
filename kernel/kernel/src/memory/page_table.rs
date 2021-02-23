@@ -1,5 +1,5 @@
 use bitfield::BitRange;
-use log::*;
+use common::*;
 use memory::{PageTable, PhysicalAddress, P1, P2, P3, P4};
 
 fn cr3() -> u64 {

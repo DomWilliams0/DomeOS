@@ -56,6 +56,7 @@ pub fn init(log_level: LevelFilter) {
         *logger = LockedSerialLogger(SpinLock::new(()), log_level, LogMode::SerialOnly);
 
         // safety: interrupts are disabled at this point, so can use racy variant
+        use common::log;
         log::set_logger_racy(logger).unwrap();
         log::set_max_level(log_level);
     }

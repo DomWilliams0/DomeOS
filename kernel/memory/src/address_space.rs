@@ -1,7 +1,8 @@
 use crate::address::{PhysicalAddress, VirtualAddress};
 use crate::custom_entry::{CustomPageEntry, DemandMapping};
+use crate::error::MemoryResult;
 use crate::{
-    AnyLevel, Frame, HasTable, PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4,
+    AnyLevel, Frame, HasTable, MemoryError, PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4,
     PAGE_TABLE_ENTRY_COUNT,
 };
 use common::*;
@@ -9,7 +10,7 @@ use core::ops::Range;
 use enumflags2::BitFlags;
 
 pub trait MemoryProvider {
-    fn new_frame(&mut self) -> KernelResult<PhysicalFrame>;
+    fn new_frame(&mut self) -> Result<PhysicalFrame, MemoryError>;
 }
 
 pub struct RawAddressSpace<'p, M> {
@@ -67,7 +68,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         size: u64,
         target: MapTarget,
         flags: impl Into<BitFlags<MapFlags>>,
-    ) -> KernelResult<()> {
+    ) -> MemoryResult<()> {
         self.map_range_impl(start, size, target, flags.into())
     }
 
@@ -79,7 +80,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         size: u64,
         target: MapTarget,
         flags: BitFlags<MapFlags>,
-    ) -> KernelResult<()> {
+    ) -> MemoryResult<()> {
         let start = {
             let aligned = start.round_up_to(FRAME_SIZE);
             #[cfg(feature = "log-paging")]
@@ -214,7 +215,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         idx: u16,
         flags: BitFlags<MapFlags>,
         memory: &mut M,
-    ) -> KernelResult<(PhysicalAddress, P::NextLevel)> {
+    ) -> MemoryResult<(PhysicalAddress, P::NextLevel)> {
         let entry = current.table_mut()?.entry_mut(idx);
         let phys = if entry.present() {
             // already present
@@ -262,13 +263,13 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
     fn get_existing_entry<P: PageTableHierarchy<'p> + 'p>(
         current: &mut P,
         idx: u16,
-    ) -> KernelResult<Either<P::NextLevel, *mut CustomPageEntry>> {
+    ) -> MemoryResult<Either<P::NextLevel, *mut CustomPageEntry>> {
         let entry = match current.table_mut() {
             Ok(table) => table.entry_mut(idx),
             Err(MemoryError::NoTableAvailable(_, addr)) => {
-                return Err(MemoryError::AlreadyMapped(addr).into())
+                return Err(MemoryError::AlreadyMapped(addr))
             }
-            Err(err) => return Err(err.into()),
+            Err(err) => return Err(err),
         };
 
         if entry.present() {
@@ -286,14 +287,14 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             Ok(Either::Right(custom as *mut _))
         } else {
             // not mapped
-            Err(MemoryError::NotMapped(entry as *mut _ as u64).into())
+            Err(MemoryError::NotMapped(entry as *mut _ as u64))
         }
     }
 
     pub fn get_absent_mapping(
         &mut self,
         addr: VirtualAddress,
-    ) -> KernelResult<(AnyLevel, &mut CustomPageEntry)> {
+    ) -> MemoryResult<(AnyLevel, &mut CustomPageEntry)> {
         // TODO support big absent pages
         let (p4_idx, p3_idx, p2_idx, p1_idx) = (
             addr.pml4t_offset(),
@@ -307,7 +308,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             Left(mut p3) => match Self::get_existing_entry(&mut p3, p3_idx)? {
                 Left(mut p2) => match Self::get_existing_entry(&mut p2, p2_idx)? {
                     Left(mut p1) => match Self::get_existing_entry(&mut p1, p1_idx)? {
-                        Left(frame) => Err(MemoryError::AlreadyMapped(frame.0.address()).into()),
+                        Left(frame) => Err(MemoryError::AlreadyMapped(frame.0.address())),
                         Right(mapping) => Ok((AnyLevel::Frame, mapping)),
                     },
                     Right(mapping) => Ok((AnyLevel::P1, mapping)),
@@ -323,7 +324,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
     }
 
     /// Unmapped page returned as `Ok(Either::Right())`
-    fn get_unmapped_entry<P, N>(table: &mut P, idx: u16) -> KernelResult<Either<N, ()>>
+    fn get_unmapped_entry<P, N>(table: &mut P, idx: u16) -> MemoryResult<Either<N, ()>>
     where
         P: PageTableHierarchy<'p, NextLevel = N> + 'p,
         N: HasTable<'p>,
@@ -335,9 +336,9 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             }
             Ok(Either::Right(ptr)) => {
                 // already mapped but absent
-                Err(MemoryError::AlreadyMapped(ptr as u64).into())
+                Err(MemoryError::AlreadyMapped(ptr as u64))
             }
-            Err(KernelError::Memory(MemoryError::NotMapped(_))) => {
+            Err(MemoryError::NotMapped(_)) => {
                 // not mapped, success
                 Ok(Either::Right(()))
             }
@@ -453,7 +454,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         &mut self,
         start: VirtualAddress,
         n_contiguous: usize,
-    ) -> KernelResult<VirtualAddress> {
+    ) -> MemoryResult<VirtualAddress> {
         let n_to_find = n_contiguous as u64;
 
         let mut last_addr = None;
@@ -506,12 +507,8 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             contiguous_count < n_to_find
         });
 
-        contiguous_start.ok_or_else(|| {
-            KernelError::Memory(MemoryError::NoContiguousVirtualRegion(
-                start.address(),
-                n_to_find,
-            ))
-        })
+        contiguous_start
+            .ok_or_else(|| MemoryError::NoContiguousVirtualRegion(start.address(), n_to_find))
     }
 }
 
@@ -611,6 +608,7 @@ fn iter_all_pages(
 mod tests {
     use super::*;
     use crate::address::{PhysicalAddress, VirtualAddress};
+    use crate::error::MemoryResult;
     use crate::{PageTable, PhysicalFrame, FRAME_SIZE, P4};
 
     const FRAME_COUNT: usize = 4096;
@@ -629,7 +627,7 @@ mod tests {
     }
 
     impl MemoryProvider for Memory {
-        fn new_frame(&mut self) -> KernelResult<PhysicalFrame> {
+        fn new_frame(&mut self) -> Result<PhysicalFrame, MemoryError> {
             let idx = self.next;
             assert!(idx < FRAME_COUNT, "all gone");
             self.next += 1;

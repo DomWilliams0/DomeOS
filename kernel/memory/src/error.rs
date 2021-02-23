@@ -1,6 +1,8 @@
-use displaydoc::Display;
+use common::Display;
 
 pub type MemoryResult<T> = Result<T, MemoryError>;
+
+// TODO virtualaddress struct
 
 #[derive(Display, Debug)]
 pub enum MemoryError {

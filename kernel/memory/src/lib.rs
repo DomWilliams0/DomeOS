@@ -6,20 +6,21 @@ pub use constants::*;
 pub use custom_entry::{CustomPageEntry, DemandMapping};
 pub use entry::{CommonEntry, PageTableBits, PageTableFlag};
 pub use entry_builder::EntryBuilder;
+pub use error::MemoryError;
 pub use frame::PhysicalFrame;
 pub use hierarchy::*;
 pub use page_table::{EntryIndex, PageTable, PAGE_TABLE_ENTRY_COUNT};
 
 mod address;
-mod entry;
-mod entry_builder;
-mod frame;
-mod page_table;
-
 mod address_space;
 mod constants;
 mod custom_entry;
+mod entry;
+mod entry_builder;
+mod error;
+mod frame;
 mod hierarchy;
+mod page_table;
 
 pub const fn terabytes(n: u64) -> u64 {
     n * (1 << 40)

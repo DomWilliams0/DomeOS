@@ -4,8 +4,8 @@ use core::alloc::{GlobalAlloc, Layout};
 use core::cell::RefCell;
 use core::ptr::{null_mut, NonNull};
 use memory::{
-    gigabytes, kilobytes, round_up_to, MapFlags, MapTarget, VirtualAddress, FRAME_SIZE,
-    VIRT_KERNEL_HEAP_BASE,
+    gigabytes, kilobytes, round_up_to, MapFlags, MapTarget, MemoryError, VirtualAddress,
+    FRAME_SIZE, VIRT_KERNEL_HEAP_BASE,
 };
 
 #[global_allocator]
@@ -16,7 +16,7 @@ const MAX_HEAP_ALLOC: u64 = gigabytes(1);
 
 struct Heap(RefCell<buddy_system_allocator::Heap>);
 
-pub fn init() -> KernelResult<()> {
+pub fn init() -> Result<(), MemoryError> {
     assert!(MIN_HEAP_ALLOC.is_power_of_two() && MAX_HEAP_ALLOC.is_power_of_two());
 
     debug!("initializing kernel heap");
@@ -26,7 +26,7 @@ pub fn init() -> KernelResult<()> {
 
 /// Parameter is rounded up to nearest number of frames
 /// (start addr, length in bytes)
-fn grow_heap(bytes: u64) -> KernelResult<(VirtualAddress, u64)> {
+fn grow_heap(bytes: u64) -> Result<(VirtualAddress, u64), MemoryError> {
     let mut space = AddressSpace::current();
 
     let length = round_up_to(bytes, FRAME_SIZE);

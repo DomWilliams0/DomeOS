@@ -1,6 +1,6 @@
 use core::fmt::{Debug, Error, Formatter};
 
-use log::*;
+use common::*;
 
 use crate::exception::Exception;
 use crate::io::Port;

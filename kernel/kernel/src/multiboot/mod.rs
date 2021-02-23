@@ -2,7 +2,7 @@ pub use generated::*;
 pub use memory_map::{MemoryRegion, MemoryRegionType, MultibootMemoryMap};
 
 use crate::multiboot::ctypes::c_void;
-use common::Bit;
+use common::*;
 use core::fmt::{Display, Formatter};
 use core::marker::PhantomData;
 
@@ -85,15 +85,15 @@ impl Display for CommandLine<'_> {
 
 impl Multiboot {
     pub fn new(mbi: &'static multiboot_info) -> Self {
-        log::trace!("multiboot flags: {:#b}", mbi.flags);
+        trace!("multiboot flags: {:#b}", mbi.flags);
 
         if mbi.flags.bit(0) {
-            log::trace!("memory range: {}KiB -> {}KiB", mbi.mem_lower, mbi.mem_upper);
+            trace!("memory range: {}KiB -> {}KiB", mbi.mem_lower, mbi.mem_upper);
         }
 
         match CommandLine::init(mbi) {
-            None => log::debug!("no command line args given"),
-            Some(args) => log::debug!("command line: '{}'", args),
+            None => debug!("no command line args given"),
+            Some(args) => debug!("command line: '{}'", args),
         }
 
         Self(mbi)

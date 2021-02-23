@@ -5,11 +5,11 @@ use crate::vga;
 use common::*;
 use enumflags2::BitFlags;
 use memory::{
-    gigabytes, PageTable, PhysicalAddress, VirtualAddress, P3, VIRT_PHYSICAL_BASE,
+    gigabytes, MemoryError, PageTable, PhysicalAddress, VirtualAddress, P3, VIRT_PHYSICAL_BASE,
     VIRT_PHYSICAL_SIZE,
 };
 
-pub fn init(multiboot: Multiboot) -> KernelResult<()> {
+pub fn init(multiboot: Multiboot) -> Result<(), MemoryError> {
     // extract mmap from multiboot
     let memory_map = multiboot.memory_map().expect("memory map unavailable");
     debug!("memory map from multiboot: ");
@@ -31,7 +31,7 @@ pub fn init(multiboot: Multiboot) -> KernelResult<()> {
 }
 
 /// Setup huge physical identity mapping
-fn init_physical_identity_mapping() -> KernelResult<()> {
+fn init_physical_identity_mapping() -> Result<(), MemoryError> {
     let mut p4 = pml4();
     let base = VirtualAddress::new(VIRT_PHYSICAL_BASE);
     debug!("identity mapping physical memory from {:?}", base);
@@ -75,7 +75,7 @@ fn init_physical_identity_mapping() -> KernelResult<()> {
     Ok(())
 }
 
-fn post_init_physical_identity_mapping(memory_map: &MultibootMemoryMap) -> KernelResult<()> {
+fn post_init_physical_identity_mapping(memory_map: &MultibootMemoryMap) -> Result<(), MemoryError> {
     // ensure frame allocator uses virtual multiboot pointer now
     frame_allocator().relocate_multiboot(unsafe {
         let phys = PhysicalAddress(memory_map.pointer() as u64);

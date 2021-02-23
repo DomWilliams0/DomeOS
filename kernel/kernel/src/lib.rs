@@ -14,7 +14,7 @@ extern crate alloc;
 
 use core::ffi::c_void;
 
-use log::*;
+use common::*;
 
 use crate::irq::disable_interrupts;
 
