@@ -1,3 +1,4 @@
+use crate::cursor::Reinterpret;
 use crate::error::{PeError, PeResult};
 use bitflags::bitflags;
 
@@ -156,3 +157,6 @@ impl SectionHeader {
         })
     }
 }
+
+// safety: raw PE type
+unsafe impl Reinterpret for SectionHeader {}

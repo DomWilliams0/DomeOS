@@ -21,6 +21,11 @@ pub struct Cursor<'b> {
     file_pointer: usize,
 }
 
+/// # Safety
+/// Contains no references or pointers, and a reference to this type can be safely constructed
+/// from a &[u8] in [Cursor::read_reference]
+pub unsafe trait Reinterpret {}
+
 impl<'b> From<&'b [u8]> for Cursor<'b> {
     fn from(bytes: &'b [u8]) -> Self {
         Self {
@@ -54,7 +59,7 @@ impl<'b> Cursor<'b> {
             Ok(core::slice::from_raw_parts(slice_ptr, n))
         }
     }
-    pub fn read_reference<T>(&mut self) -> PeResult<&'b T> {
+    pub fn read_reference<T: Reinterpret>(&mut self) -> PeResult<&'b T> {
         let size = core::mem::size_of::<T>();
         let slice = self.read_slice::<u8>(size)?;
 

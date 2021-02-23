@@ -1,3 +1,5 @@
+use crate::cursor::Reinterpret;
+
 /// PE32+ only
 #[derive(Debug)]
 #[repr(C)]
@@ -48,3 +50,6 @@ impl OptionalHeader {
         }
     }
 }
+
+// safety: raw PE type
+unsafe impl Reinterpret for OptionalHeader {}

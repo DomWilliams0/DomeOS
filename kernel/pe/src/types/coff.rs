@@ -2,6 +2,7 @@ use std::num::NonZeroU16;
 
 use enumflags2::BitFlags;
 
+use crate::cursor::Reinterpret;
 use crate::error::{PeError, PeResult};
 
 #[derive(BitFlags, Copy, Clone, Debug)]
@@ -100,3 +101,6 @@ impl CoffHeader {
         }
     }
 }
+
+// safety: raw PE type
+unsafe impl Reinterpret for CoffHeader {}
