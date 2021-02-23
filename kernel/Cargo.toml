@@ -4,6 +4,7 @@ members = [
     "kernel",
     "common",
     "memory",
+    "pe",
     # build helpers
     "helpers/ld-link-map",
     "helpers/patcher",

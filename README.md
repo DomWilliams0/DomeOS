@@ -23,6 +23,7 @@ A toy x86_64 OS in Rust.
   * [X] Mapping regions of virtual memory into current address space
   * [X] Kernel heap
   * [X] Demand paging - physical pages only allocated when accessed
+  * [ ] Guard pages to detect stack overflow
   * [ ] CoW pages
   * [ ] Mmaped files
 * Processes
