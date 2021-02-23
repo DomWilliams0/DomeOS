@@ -1,3 +1,4 @@
+use crate::types::DataDirectoryType;
 use byte::Error;
 use common::Display;
 use core::char::DecodeUtf16Error;
@@ -58,6 +59,9 @@ pub enum PeError {
 
     /// Long section names not implemented
     LongSectionName,
+
+    /// Data directory {0:?} not present
+    MissingDataDirectory(DataDirectoryType),
 }
 
 impl From<byte::Error> for PeError {

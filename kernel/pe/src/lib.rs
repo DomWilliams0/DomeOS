@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod address;
 mod cursor;
 mod error;
@@ -29,6 +31,10 @@ mod tests {
                     Err(e) => println!("flags {}", e),
                 }
             }
+        }
+
+        for dd in pe.data_directories().unwrap() {
+            println!("{:?}", dd);
         }
     }
 

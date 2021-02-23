@@ -1,7 +1,10 @@
 use crate::address::{Address, FileOffset};
 use crate::cursor::Cursor;
 use crate::error::{PeError, PeResult};
-use crate::types::{CoffHeader, OptionalHeader, SectionHeader};
+use crate::types::{
+    CoffHeader, DataDirectory, DataDirectoryDescriptor, DataDirectoryType, OptionalHeader,
+    SectionDescriptor,
+};
 
 pub struct Pe<'pe> {
     buf: &'pe [u8],
@@ -41,28 +44,14 @@ impl<'pe> Pe<'pe> {
     }
 
     pub fn coff(&self) -> PeResult<&'pe CoffHeader> {
-        let mut cursor = self.coff_cursor()?;
-        cursor.read_reference()
+        self.coff_n_cursor().map(|(coff, _)| coff)
     }
 
     pub fn optional_header(&self) -> PeResult<&'pe OptionalHeader> {
-        let mut cursor = self.coff_cursor()?;
-        let coff: &CoffHeader = cursor.read_reference()?;
-
-        let size = match coff.optional_header_size() {
-            Some(sz) => sz.get(),
-            None => return Err(PeError::NoOptionalHeader),
-        };
-
-        let mut header_cursor = cursor.sub_buffer(size as usize)?;
-        let optional_header: &OptionalHeader = header_cursor.read_reference()?;
-        optional_header
-            .image_type()
-            .map_err(PeError::UnsupportedImage)?;
-        Ok(optional_header)
+        self.optional_header_n_cursor().map(|(header, _, _)| header)
     }
 
-    pub fn sections(&self) -> PeResult<impl Iterator<Item = PeResult<&'pe SectionHeader>>> {
+    pub fn sections(&self) -> PeResult<impl Iterator<Item = PeResult<&'pe SectionDescriptor>>> {
         let mut cursor = self.coff_cursor()?;
         let coff: &CoffHeader = cursor.read_reference()?;
 
@@ -71,10 +60,66 @@ impl<'pe> Pe<'pe> {
         // skip optional header
         cursor.skip(coff.optional_header_size().map(|sz| sz.get()).unwrap_or(0) as usize)?;
 
-        Ok((0..section_count).map(move |_| cursor.read_reference::<SectionHeader>()))
+        Ok((0..section_count).map(move |_| cursor.read_reference::<SectionDescriptor>()))
+    }
+
+    pub fn data_directories(
+        &self,
+    ) -> PeResult<impl Iterator<Item = PeResult<(DataDirectoryType, &'pe DataDirectoryDescriptor)>>>
+    {
+        use strum::IntoEnumIterator;
+
+        let (opt_header, _, mut opt_header_cursor) = self.optional_header_n_cursor()?;
+
+        Ok(DataDirectoryType::iter()
+            .zip(0..opt_header.number_of_data_directories)
+            .filter_map(move |(ty, _)| {
+                match opt_header_cursor.read_reference::<DataDirectoryDescriptor>() {
+                    Ok(dd) if !dd.valid() => None,
+                    Ok(dd) => Some(Ok((ty, dd))),
+                    Err(err) => Some(Err(err)),
+                }
+            }))
+    }
+
+    pub fn data_directory<D: DataDirectory>(&self) -> PeResult<&'pe D> {
+        let (_, _, mut opt_header_cursor) = self.optional_header_n_cursor()?;
+
+        let ordinal = D::ORDINAL as usize;
+        opt_header_cursor.skip(ordinal * core::mem::size_of::<DataDirectoryDescriptor>())?;
+
+        let dd: &DataDirectoryDescriptor = opt_header_cursor.read_reference()?;
+        if !dd.valid() {
+            return Err(PeError::MissingDataDirectory(D::ORDINAL));
+        }
+
+        // TODO resolve DD to section
+        todo!("data directory lookup")
     }
 
     fn coff_cursor(&self) -> PeResult<Cursor<'pe>> {
         Cursor::new(self.buf, self.coff, self.buf.len() - self.coff.into_usize())
+    }
+
+    #[inline]
+    fn coff_n_cursor(&self) -> PeResult<(&'pe CoffHeader, Cursor<'pe>)> {
+        let mut cursor = self.coff_cursor()?;
+        cursor.read_reference().map(|coff| (coff, cursor))
+    }
+
+    /// (_, PE cursor, optional header cursor)
+    #[inline]
+    fn optional_header_n_cursor(
+        &self,
+    ) -> PeResult<(&'pe OptionalHeader, Cursor<'pe>, Cursor<'pe>)> {
+        let (coff, mut cursor) = self.coff_n_cursor()?;
+
+        let size = match coff.optional_header_size() {
+            Some(sz) => sz.get(),
+            None => return Err(PeError::NoOptionalHeader),
+        };
+
+        let mut header_cursor = cursor.sub_buffer(size as usize)?;
+        Ok((header_cursor.read_reference()?, cursor, header_cursor))
     }
 }

@@ -38,7 +38,7 @@ pub struct OptionalHeader {
     size_of_heap_commit: u64,
 
     _loader_flags: u32,
-    number_of_data_directories: u32,
+    pub number_of_data_directories: u32,
 }
 
 impl OptionalHeader {

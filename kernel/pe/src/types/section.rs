@@ -119,7 +119,7 @@ bitflags! {
 
 #[derive(Debug)]
 #[repr(C)]
-pub struct SectionHeader {
+pub struct SectionDescriptor {
     name: [u8; 8],
     virtual_size: u32,
     virtual_address: u32,
@@ -132,7 +132,7 @@ pub struct SectionHeader {
     characteristics: u32,
 }
 
-impl SectionHeader {
+impl SectionDescriptor {
     pub fn name(&self) -> PeResult<&str> {
         // strip null padding if present
         let string_buf = match self.name.iter().position(|&b| b == 0) {
@@ -159,4 +159,4 @@ impl SectionHeader {
 }
 
 // safety: raw PE type
-unsafe impl Reinterpret for SectionHeader {}
+unsafe impl Reinterpret for SectionDescriptor {}
