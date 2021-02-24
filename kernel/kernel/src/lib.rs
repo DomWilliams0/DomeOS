@@ -27,6 +27,7 @@ mod logging;
 mod memory;
 mod multiboot;
 mod panic;
+mod process;
 mod serial;
 mod spinlock;
 mod start;

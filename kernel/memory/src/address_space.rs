@@ -43,11 +43,6 @@ pub enum MapFlags {
 
 // TODO CoW variants, recursively free pages on drop if owned
 
-enum Either<A, B> {
-    Left(A),
-    Right(B),
-}
-
 /// First call to iter(): [given index..512)
 /// Future calls        : [0..512)
 struct OneTimeEntryRange(Range<u16>);
@@ -89,7 +84,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         };
 
         let limit = {
-            let limit = VirtualAddress::new_checked(start.0 + size);
+            let limit = VirtualAddress::with_literal(start.0 + size);
             let aligned = limit.round_up_to(FRAME_SIZE);
             #[cfg(feature = "log-paging")]
             trace!("aligned limit {:?} to {:?}", limit, aligned);
@@ -608,7 +603,6 @@ fn iter_all_pages(
 mod tests {
     use super::*;
     use crate::address::{PhysicalAddress, VirtualAddress};
-    use crate::error::MemoryResult;
     use crate::{PageTable, PhysicalFrame, FRAME_SIZE, P4};
 
     const FRAME_COUNT: usize = 4096;
@@ -655,7 +649,7 @@ mod tests {
         // a single page
         space
             .map_range(
-                VirtualAddress::new_checked(0x5000),
+                VirtualAddress::with_literal(0x5000),
                 0x995, // aligned up to 0x1000
                 MapTarget::Any,
                 MapFlags::Writeable | MapFlags::User,
@@ -665,7 +659,7 @@ mod tests {
         // many pages across many tables
         space
             .map_range(
-                VirtualAddress::new_checked(0xaa3f0000),
+                VirtualAddress::with_literal(0xaa3f0000),
                 0xf0000,
                 MapTarget::Any,
                 MapFlags::Writeable | MapFlags::User,
@@ -675,7 +669,7 @@ mod tests {
         // stupid amount of pages
         space
             .map_range(
-                VirtualAddress::new_checked(0xaa3f0000),
+                VirtualAddress::with_literal(0xaa3f0000),
                 0x9ae20000,
                 MapTarget::Any,
                 MapFlags::Writeable | MapFlags::User,

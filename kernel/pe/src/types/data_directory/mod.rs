@@ -1,5 +1,4 @@
 use crate::cursor::Reinterpret;
-use strum::EnumIter;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -8,7 +7,7 @@ pub struct DataDirectoryDescriptor {
     pub(crate) size: u32,
 }
 
-#[derive(Debug, Copy, Clone, EnumIter)]
+#[derive(Debug, Copy, Clone)]
 pub enum DataDirectoryType {
     ExportTable = 0,
     ImportTable,
@@ -34,6 +33,32 @@ pub trait DataDirectory {
 impl DataDirectoryDescriptor {
     pub fn valid(&self) -> bool {
         self.rva != 0 && self.size != 0
+    }
+}
+
+impl DataDirectoryType {
+    pub fn iter() -> impl Iterator<Item = Self> {
+        use DataDirectoryType::*;
+        // TODO use strum when it supports no_std
+        static VALUES: [DataDirectoryType; 15] = [
+            ExportTable,
+            ImportTable,
+            ResourceTable,
+            ExceptionTable,
+            CertificateTable,
+            BaseRelocationTable,
+            Debug,
+            Architecture,
+            GlobalPointer,
+            TlsTable,
+            LoadConfigTable,
+            BoundImport,
+            Iat,
+            DelayImportDescriptor,
+            ClrRuntimeHeader,
+        ];
+
+        VALUES.iter().copied()
     }
 }
 

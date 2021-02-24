@@ -1,4 +1,6 @@
 use crate::cursor::Reinterpret;
+use crate::error::PeResult;
+use crate::PeError;
 
 /// PE32+ only
 #[derive(Debug)]
@@ -49,7 +51,56 @@ impl OptionalHeader {
             Err(self.magic)
         }
     }
+
+    /// Error if not aligned
+    pub fn image_base(&self) -> PeResult<u64> {
+        const MULTIPLE: u64 = 0x10000;
+
+        if is_multiple_of(self.image_base, MULTIPLE) {
+            Ok(self.image_base)
+        } else {
+            Err(PeError::Unaligned {
+                expected: MULTIPLE,
+                value: self.image_base,
+            })
+        }
+    }
+
+    /// Error if not aligned
+    pub fn size_of_image(&self) -> PeResult<usize> {
+        let multiple = self.section_alignment as u64;
+
+        if is_multiple_of(self.size_of_image as u64, multiple) {
+            Ok(self.size_of_image as usize)
+        } else {
+            Err(PeError::Unaligned {
+                expected: multiple,
+                value: self.size_of_image as u64,
+            })
+        }
+    }
+}
+
+fn is_multiple_of(val: u64, multiple: u64) -> bool {
+    debug_assert!(multiple.is_power_of_two());
+
+    let mask = !(multiple - 1);
+    (val & mask) == val
 }
 
 // safety: raw PE type
 unsafe impl Reinterpret for OptionalHeader {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn multiple_of() {
+        let base = 0x10000;
+        assert!(is_multiple_of(base, base));
+        assert!(is_multiple_of(base * 2, base));
+        assert!(is_multiple_of(base * 50, base));
+        assert!(!is_multiple_of(base + 5, base));
+    }
+}

@@ -67,8 +67,6 @@ impl<'pe> Pe<'pe> {
         &self,
     ) -> PeResult<impl Iterator<Item = PeResult<(DataDirectoryType, &'pe DataDirectoryDescriptor)>>>
     {
-        use strum::IntoEnumIterator;
-
         let (opt_header, _, mut opt_header_cursor) = self.optional_header_n_cursor()?;
 
         Ok(DataDirectoryType::iter()

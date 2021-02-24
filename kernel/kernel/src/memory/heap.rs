@@ -33,13 +33,13 @@ fn grow_heap(bytes: u64) -> Result<(VirtualAddress, u64), MemoryError> {
     let frame_count = length / FRAME_SIZE;
 
     let start_addr = space.find_free_space(
-        VirtualAddress::new_checked(VIRT_KERNEL_HEAP_BASE),
+        VirtualAddress::with_literal(VIRT_KERNEL_HEAP_BASE),
         frame_count as usize,
     )?;
 
     space.map_range(start_addr, length, MapTarget::Any, MapFlags::Writeable)?;
 
-    let end_addr = VirtualAddress::new_checked(start_addr.address() + length);
+    let end_addr = VirtualAddress::with_literal(start_addr.address() + length);
     debug!(
         "growing kernel heap by adding chunk of {:#x} bytes at {:?}",
         length, start_addr

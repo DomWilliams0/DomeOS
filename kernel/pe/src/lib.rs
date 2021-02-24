@@ -1,10 +1,16 @@
+#![no_std]
 #![allow(dead_code)]
+
+extern crate alloc;
 
 mod address;
 mod cursor;
 mod error;
 mod parse;
 mod types;
+
+pub use error::PeError;
+pub use parse::Pe;
 
 #[cfg(test)]
 mod tests {
@@ -20,12 +26,16 @@ mod tests {
         assert_eq!(coff.optional_header_size().map(|n| n.get()), Some(240));
 
         let optional_header = pe.optional_header().unwrap();
+        #[cfg(std)]
         println!("{:#?}", coff);
+        #[cfg(std)]
         println!("{:#?}", optional_header);
 
         for (i, section) in pe.sections().unwrap().enumerate() {
             if let Ok(section) = section {
+                #[cfg(std)]
                 println!("{:?}", section.name());
+                #[cfg(std)]
                 match section.flags() {
                     Ok(k) => println!("flags {:?}", k),
                     Err(e) => println!("flags {}", e),
@@ -34,6 +44,7 @@ mod tests {
         }
 
         for dd in pe.data_directories().unwrap() {
+            #[cfg(std)]
             println!("{:?}", dd);
         }
     }

@@ -17,7 +17,7 @@ const OFFSET_SHIFT: u64 = 9;
 const OFFSET_MASK: u64 = (1 << OFFSET_SHIFT) - 1;
 
 // TODO constructor rather than pub
-#[derive(Copy, Clone, Add, AddAssign)]
+#[derive(Copy, Clone, Add, AddAssign, Eq, PartialEq)]
 #[repr(transparent)]
 pub struct VirtualAddress(pub u64);
 
@@ -34,8 +34,18 @@ impl VirtualAddress {
         Self(addr)
     }
 
+    /// None if value changes from 48-bit sign extension
+    pub fn new_checked(addr: u64) -> Option<Self> {
+        let virt = Self::new(addr);
+        if virt.0 == addr {
+            Some(virt)
+        } else {
+            None
+        }
+    }
+
     /// Panics if value changes from 48-bit sign extension
-    pub fn new_checked(addr: u64) -> Self {
+    pub fn with_literal(addr: u64) -> Self {
         let virt = Self::new(addr);
         assert_eq!(
             virt.0, addr,
@@ -108,7 +118,7 @@ impl VirtualAddress {
     /// Adds physical identity base
     pub fn from_physical(addr: PhysicalAddress) -> VirtualAddress {
         if cfg!(test) {
-            return Self::new_checked(addr.0);
+            return Self::with_literal(addr.0);
         }
 
         let addr = addr.0.checked_add(VIRT_PHYSICAL_BASE).unwrap_or_else(|| {
@@ -117,7 +127,7 @@ impl VirtualAddress {
                 addr
             )
         });
-        Self::new_checked(addr)
+        Self::with_literal(addr)
     }
 
     /// Adds kernel higher half base
@@ -148,11 +158,11 @@ impl VirtualAddress {
     }
 
     pub fn round_up_to(self, multiple: u64) -> Self {
-        Self::new_checked(round_up_to(self.0, multiple))
+        Self::with_literal(round_up_to(self.0, multiple))
     }
 
     pub fn round_down_to(self, multiple: u64) -> Self {
-        Self::new_checked(round_down_to(self.0, multiple))
+        Self::with_literal(round_down_to(self.0, multiple))
     }
 
     pub fn log_all_offsets(self) {
@@ -250,7 +260,7 @@ impl AddAssign<u64> for VirtualAddress {
 
 #[cfg(test)]
 mod tests {
-    use crate::address::{VirtualAddress, ADDRESS_SHIFT, OFFSET_MASK, OFFSET_SHIFT};
+    use crate::address::VirtualAddress;
     use crate::FRAME_SIZE;
 
     #[test]
@@ -295,15 +305,15 @@ mod tests {
     #[test]
     fn round_up() {
         assert_eq!(
-            VirtualAddress::new_checked(0xeff00).round_up_to(0x1000).0,
+            VirtualAddress::with_literal(0xeff00).round_up_to(0x1000).0,
             0xf0000
         );
         assert_eq!(
-            VirtualAddress::new_checked(0x1000).round_up_to(0x1000).0,
+            VirtualAddress::with_literal(0x1000).round_up_to(0x1000).0,
             0x1000
         ); // no change
         assert_eq!(
-            VirtualAddress::new_checked(0x5).round_up_to(0x1000).0,
+            VirtualAddress::with_literal(0x5).round_up_to(0x1000).0,
             0x1000
         );
     }

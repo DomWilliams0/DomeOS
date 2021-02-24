@@ -9,6 +9,7 @@ use byte::{
 
 use crate::address::{Address, FileOffset};
 use crate::error::{PeError, PeResult};
+use alloc::string::String;
 
 #[derive(Clone)]
 pub struct Cursor<'b> {
@@ -215,6 +216,8 @@ impl<'a, 'b, T: TryRead<'b, Endian>> Iterator for BufferIter<'a, 'b, T> {
 mod tests {
 
     use super::*;
+    use alloc::vec;
+    use alloc::vec::Vec;
 
     #[test]
     fn read_until() {

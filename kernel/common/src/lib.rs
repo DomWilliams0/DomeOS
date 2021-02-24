@@ -7,6 +7,8 @@ pub use derive_more::*;
 pub use displaydoc::Display;
 pub use log::{self, *};
 
+pub use either::Either;
 pub use globals::{InitializedGlobal, InitializedGlobalChecked};
 
+mod either;
 mod globals;

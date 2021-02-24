@@ -33,11 +33,14 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     let init_result = (|| -> anyhow::Result<()> {
         // TODO
 
+        // play around with exe loading
+        crate::process::spawn_process()?;
+
         Ok(())
     })();
 
     if let Err(err) = init_result {
-        error!("init failed: {:#}", err);
+        error!("init failed: {:?}", err);
     }
 
     info!("goodbye!");

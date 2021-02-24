@@ -62,6 +62,9 @@ pub enum PeError {
 
     /// Data directory {0:?} not present
     MissingDataDirectory(DataDirectoryType),
+
+    /// Value {value:#x} is not a multiple of {expected:#x}
+    Unaligned { expected: u64, value: u64 },
 }
 
 impl From<byte::Error> for PeError {

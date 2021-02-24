@@ -11,7 +11,7 @@ bitfield = "0.13"
 derive_more = "0.99"
 displaydoc = { version = "0.1", default-features = false }
 log = "0.4"
-anyhow = {version = "1.0", default-features = false}
+anyhow = { version = "1.0", default-features = false }
 
 [features]
 default = []
