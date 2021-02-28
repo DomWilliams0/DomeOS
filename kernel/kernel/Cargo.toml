@@ -20,6 +20,7 @@ volatile = "0.4"
 modular-bitfield = "0.11"
 enumflags2 = "0.6"
 bitfield = "0.13"
+bit_field = "0.10"
 buddy_system_allocator = "0.7"
 smallvec = { version = "1.6", features = ["union"] } # 1.49+
 

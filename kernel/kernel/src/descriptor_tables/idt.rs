@@ -4,6 +4,7 @@ use core::ops::{Shl, Shr};
 use modular_bitfield::prelude::*;
 
 use crate::descriptor_tables::common::DescriptorTablePointer;
+use crate::descriptor_tables::tss::IST_IDX_DOUBLE_FAULT;
 use crate::irq;
 use memory::VIRT_KERNEL_BASE;
 
@@ -92,6 +93,18 @@ impl IdtEntry {
 
         low | mid.shl(16) | high.shl(32)
     }
+
+    fn set_ist_index(&mut self, idx: Option<usize>) {
+        let value = match idx {
+            Some(idx) => {
+                assert!(idx < 7);
+                (idx + 1) as u8
+            }
+            None => 0,
+        };
+
+        self.set_ist(value);
+    }
 }
 
 impl Default for IdtEntry {
@@ -125,7 +138,9 @@ impl Default for InterruptDescriptorTable {
         table.register(5, externs::isr5);
         table.register(6, externs::isr6);
         table.register(7, externs::isr7);
-        table.register(8, externs::isr8);
+        table
+            .register(8, externs::isr8)
+            .set_ist_index(Some(IST_IDX_DOUBLE_FAULT));
         table.register(9, externs::isr9);
         table.register(10, externs::isr10);
         table.register(11, externs::isr11);
@@ -173,11 +188,14 @@ impl Default for InterruptDescriptorTable {
 
 impl InterruptDescriptorTable {
     /// Handler must be in the higher half mapped range, i.e. above VIRT_KERNEL_BASE
-    fn register(&mut self, index: usize, handler: InterruptHandler) {
+    fn register(&mut self, index: usize, handler: InterruptHandler) -> &mut IdtEntry {
         let ptr = handler as *const InterruptHandler;
         debug_assert!(index < IDT_ENTRY_COUNT);
         debug_assert!(ptr as u64 > VIRT_KERNEL_BASE);
-        self.entries[index] = IdtEntry::with_handler(ptr);
+
+        let entry = &mut self.entries[index];
+        *entry = IdtEntry::with_handler(ptr);
+        entry
     }
 
     unsafe fn load(self) {

@@ -55,6 +55,10 @@ impl VirtualAddress {
         virt
     }
 
+    pub const fn zero() -> Self {
+        Self(0)
+    }
+
     pub fn from_indices(p4: u16, p3: u16, p2: u16, p1: u16) -> Self {
         let p4_masked = p4 as u64 & OFFSET_MASK;
         let p3_masked = p3 as u64 & OFFSET_MASK;

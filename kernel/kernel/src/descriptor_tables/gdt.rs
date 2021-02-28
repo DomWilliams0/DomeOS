@@ -1,5 +1,7 @@
 use crate::descriptor_tables::common::DescriptorTablePointer;
+use crate::descriptor_tables::tss::TaskStateSegment;
 use common::*;
+use memory::PhysicalAddress;
 use modular_bitfield::prelude::*;
 
 static mut GDT: InitializedGlobal<GlobalDescriptorTable> = InitializedGlobal::uninit();
@@ -45,10 +47,14 @@ pub fn init() {
     let cs = gdt.add_entry(0, SegmentDescriptor::kernel_code());
     let ds = gdt.add_entry(0, SegmentDescriptor::kernel_data());
 
+    let tss_addr = super::tss::TaskStateSegment::init();
+    let tss = gdt.add_tss_entry(SegmentDescriptor::tss(tss_addr));
+
     unsafe {
         gdt.load();
         cs.load_cs();
         ds.load_segments();
+        tss.load_tss();
     }
 }
 
@@ -62,10 +68,10 @@ impl Default for GlobalDescriptorTable {
 }
 
 impl GlobalDescriptorTable {
-    fn next_free_index(&mut self) -> Option<usize> {
+    fn next_free_index(&mut self, n: usize) -> Option<usize> {
         let idx = self.next_available as usize;
-        if idx < self.entries.len() {
-            self.next_available += 1;
+        if (idx + n - 1) < self.entries.len() {
+            self.next_available += n as u8;
             Some(idx)
         } else {
             None
@@ -73,7 +79,7 @@ impl GlobalDescriptorTable {
     }
 
     fn add_entry(&mut self, rpl: u8, descriptor: SegmentDescriptor) -> SegmentSelector {
-        let idx = self.next_free_index().expect("not enough GDT entries");
+        let idx = self.next_free_index(1).expect("not enough GDT entries");
         self.entries[idx] = descriptor.into_u64();
 
         let selector = SegmentSelector::new().with_rpl(rpl).with_idx(idx as u8);
@@ -82,6 +88,22 @@ impl GlobalDescriptorTable {
             idx,
             selector.into_u8(),
             descriptor.into_u64()
+        );
+        selector
+    }
+
+    fn add_tss_entry(&mut self, (low, high): (u64, u64)) -> SegmentSelector {
+        let idx = self.next_free_index(2).expect("not enough GDT entries");
+        self.entries[idx] = low;
+        self.entries[idx + 1] = high;
+
+        let selector = SegmentSelector::new().with_rpl(0).with_idx(idx as u8);
+        trace!(
+            "gdt[{}:{} ({:#x})] = {:#x}",
+            idx,
+            idx + 1,
+            selector.into_u8(),
+            (low as u128) | ((high as u128) << 64)
         );
         selector
     }
@@ -125,6 +147,25 @@ impl SegmentDescriptor {
         Self::default().with_default_size(true)
     }
 
+    /// (low, high)
+    fn tss(tss: PhysicalAddress) -> (u64, u64) {
+        let ptr = tss.address();
+
+        // TODO why does accessed bit need to be set? is the struct def wrong?
+        let mut low = Self::new().with_present(true).with_accessed(true);
+
+        use bit_field::BitField;
+        low.set_base_0_15(ptr.get_bits(0..16) as u16);
+        low.set_base_16_23(ptr.get_bits(16..24) as u8);
+        low.set_base_24_31(ptr.get_bits(24..32) as u8);
+
+        low.set_limit_0_15((core::mem::size_of::<TaskStateSegment>() - 1) as u16);
+
+        let high = ptr.get_bits(32..64);
+
+        (low.into_u64(), high)
+    }
+
     fn into_u64(self) -> u64 {
         u64::from_le_bytes(self.into_bytes())
     }
@@ -159,6 +200,16 @@ impl SegmentSelector {
             "mov fs, ax",
             "mov gs, ax",
             "mov ss, ax",
+        sel = in(reg) selector as i16,
+        )
+    }
+
+    /// This segment must be a TSS entry
+    unsafe fn load_tss(self) {
+        let selector = self.into_u8();
+        asm!(
+        "mov ax, {sel:x}",
+        "ltr ax",
         sel = in(reg) selector as i16,
         )
     }
