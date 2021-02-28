@@ -1,3 +1,4 @@
+use crate::address::{FileOffset, VirtualAddress};
 use crate::types::DataDirectoryType;
 use byte::Error;
 use common::Display;
@@ -65,6 +66,16 @@ pub enum PeError {
 
     /// Value {value:#x} is not a multiple of {expected:#x}
     Unaligned { expected: u64, value: u64 },
+
+    /// Slice of {length:#x} bytes at {addr:?} is out of bounds for {what:?}
+    VirtualSliceOutOfBounds {
+        what: &'static str,
+        addr: VirtualAddress,
+        length: usize,
+    },
+
+    /// Slice of {length:#x} bytes at {offset:?} is out of bounds
+    SliceOutOfBounds { offset: FileOffset, length: usize },
 }
 
 impl From<byte::Error> for PeError {

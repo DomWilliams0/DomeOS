@@ -9,8 +9,10 @@ mod error;
 mod parse;
 mod types;
 
+pub use address::Address;
 pub use error::PeError;
 pub use parse::Pe;
+pub use types::OptionalHeader;
 
 #[cfg(test)]
 mod tests {

@@ -54,30 +54,39 @@ impl OptionalHeader {
 
     /// Error if not aligned
     pub fn image_base(&self) -> PeResult<u64> {
-        const MULTIPLE: u64 = 0x10000;
+        ensure_multiple(self.image_base, 0x10000_u64)
+    }
 
-        if is_multiple_of(self.image_base, MULTIPLE) {
-            Ok(self.image_base)
+    pub fn entry_point(&self) -> Option<u64> {
+        if self.address_of_entry_point == 0 {
+            None
         } else {
-            Err(PeError::Unaligned {
-                expected: MULTIPLE,
-                value: self.image_base,
-            })
+            Some(self.address_of_entry_point as u64)
         }
     }
 
     /// Error if not aligned
     pub fn size_of_image(&self) -> PeResult<usize> {
-        let multiple = self.section_alignment as u64;
+        ensure_multiple(self.size_of_image, self.section_alignment).map(|sz| sz as usize)
+    }
 
-        if is_multiple_of(self.size_of_image as u64, multiple) {
-            Ok(self.size_of_image as usize)
-        } else {
-            Err(PeError::Unaligned {
-                expected: multiple,
-                value: self.size_of_image as u64,
-            })
-        }
+    /// Error if not aligned
+    pub fn size_of_headers(&self) -> PeResult<usize> {
+        ensure_multiple(self.size_of_headers, self.file_alignment).map(|sz| sz as usize)
+    }
+}
+
+fn ensure_multiple(val: impl Into<u64>, multiple: impl Into<u64>) -> PeResult<u64> {
+    let val = val.into();
+    let multiple = multiple.into();
+
+    if is_multiple_of(val, multiple) {
+        Ok(val)
+    } else {
+        Err(PeError::Unaligned {
+            expected: multiple,
+            value: val,
+        })
     }
 }
 

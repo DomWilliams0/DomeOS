@@ -1,4 +1,4 @@
-use crate::address::{Address, FileOffset};
+use crate::address::{Address, FileOffset, VirtualAddress};
 use crate::cursor::Cursor;
 use crate::error::{PeError, PeResult};
 use crate::types::{
@@ -48,6 +48,7 @@ impl<'pe> Pe<'pe> {
     }
 
     pub fn optional_header(&self) -> PeResult<&'pe OptionalHeader> {
+        // TODO cache offset in a Cell for future calls
         self.optional_header_n_cursor().map(|(header, _, _)| header)
     }
 
@@ -61,6 +62,16 @@ impl<'pe> Pe<'pe> {
         cursor.skip(coff.optional_header_size().map(|sz| sz.get()).unwrap_or(0) as usize)?;
 
         Ok((0..section_count).map(move |_| cursor.read_reference::<SectionDescriptor>()))
+    }
+
+    pub fn slice(&self, offset: FileOffset, size: usize) -> PeResult<&'pe [u8]> {
+        let src_offset = offset.into_usize();
+        self.buf
+            .get(src_offset..src_offset + size)
+            .ok_or(PeError::SliceOutOfBounds {
+                offset,
+                length: size,
+            })
     }
 
     pub fn data_directories(
@@ -93,6 +104,16 @@ impl<'pe> Pe<'pe> {
 
         // TODO resolve DD to section
         todo!("data directory lookup")
+    }
+
+    pub fn headers(&self) -> PeResult<&'pe [u8]> {
+        let opt_header = self.optional_header()?;
+        let sz = opt_header.size_of_headers()?;
+        self.buf.get(..sz).ok_or(PeError::VirtualSliceOutOfBounds {
+            what: "size_of_headers",
+            addr: VirtualAddress::new(0_u64),
+            length: sz,
+        })
     }
 
     fn coff_cursor(&self) -> PeResult<Cursor<'pe>> {

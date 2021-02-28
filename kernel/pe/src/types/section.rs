@@ -1,6 +1,8 @@
+use crate::address::{Address, FileOffset, VirtualAddress};
 use crate::cursor::Reinterpret;
 use crate::error::{PeError, PeResult};
 use bitflags::bitflags;
+use core::fmt::{Display, Formatter};
 
 bitflags! {
     pub struct SectionFlags : u32 {
@@ -132,6 +134,18 @@ pub struct SectionDescriptor {
     characteristics: u32,
 }
 
+#[derive(Debug)]
+pub struct MappableSection<'pe> {
+    pub name: &'pe str,
+    pub virtual_size: usize,
+    pub virtual_address: VirtualAddress,
+
+    /// (size of raw data, pointer to raw data). None if uninitialized
+    pub raw_data: Option<(usize, FileOffset)>,
+
+    pub flags: SectionFlags,
+}
+
 impl SectionDescriptor {
     pub fn name(&self) -> PeResult<&str> {
         // strip null padding if present
@@ -156,7 +170,44 @@ impl SectionDescriptor {
             value: self.characteristics as u64,
         })
     }
+
+    pub fn as_mappable(&self) -> PeResult<Option<MappableSection>> {
+        let virtual_size = match self.virtual_size {
+            0 => return Ok(None),
+            val => val as usize,
+        };
+
+        let virtual_address = match self.virtual_address {
+            0 => return Ok(None),
+            val => VirtualAddress::new(val),
+        };
+
+        let raw_data = match (self.size_of_raw_data, self.pointer_to_raw_data) {
+            (0, _) | (_, 0) => None,
+            (sz, ptr) => Some((sz as usize, FileOffset::new(ptr))),
+        };
+
+        Ok(Some(MappableSection {
+            name: self.name()?,
+            virtual_size,
+            virtual_address,
+            raw_data,
+            flags: self.flags()?,
+        }))
+    }
 }
 
 // safety: raw PE type
 unsafe impl Reinterpret for SectionDescriptor {}
+
+impl Display for SectionDescriptor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "Section({:?}, {:?}:{:?})",
+            self.name(),
+            self.flags(),
+            self
+        )
+    }
+}

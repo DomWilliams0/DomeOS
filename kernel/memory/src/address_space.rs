@@ -56,7 +56,6 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
 
     // TODO constructor to allocate new possibly unmapped frame for p4, then access through id map
 
-    #[inline]
     pub fn map_range(
         &mut self,
         start: VirtualAddress,
@@ -93,7 +92,6 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
 
         let template_entry = {
             let mut entry = CustomPageEntry::default();
-            entry.set_nx(true); // default to not executable
 
             for flag in flags.iter() {
                 use MapFlags::*;

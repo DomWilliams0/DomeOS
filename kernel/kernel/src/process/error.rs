@@ -11,6 +11,12 @@ pub enum ProcessError {
 
     /// Relocation required but not yet supported
     RelocationUnsupported,
+
+    /// Length mismatch, cannot copy {src:#x} bytes into slice of length {dst:#x}
+    LengthMismatch { src: usize, dst: usize },
+
+    /// Image has no entry point
+    NoEntrypoint,
 }
 
 impl From<pe::PeError> for ProcessError {

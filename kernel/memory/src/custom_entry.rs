@@ -45,6 +45,7 @@ pub struct CustomPageEntry {
 }
 
 impl Default for CustomPageEntry {
+    /// All bits unset except for nx=1 and marker bits
     fn default() -> Self {
         Self::new().with_nx(true).with_marker(MARKER)
     }
