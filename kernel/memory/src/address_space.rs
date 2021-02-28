@@ -35,6 +35,8 @@ pub enum MapFlags {
 
     Huge2M = 1 << 3,
     Huge1G = 1 << 4,
+
+    StackGuard = 1 << 5,
     // TODO copy on write
     // TODO global
     // TODO committed
@@ -92,6 +94,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
 
         let template_entry = {
             let mut entry = CustomPageEntry::default();
+            let mut demand = DemandMapping::Anonymous;
 
             for flag in flags.iter() {
                 use MapFlags::*;
@@ -99,12 +102,12 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
                     Writeable => entry.set_writeable(true),
                     Executable => entry.set_nx(false),
                     User => entry.set_user(true),
+                    StackGuard => demand = DemandMapping::StackGuard,
                     Huge2M | Huge1G => todo!("huge pages ({:?})", flag),
                 }
             }
 
-            // TODO depends on flags and target
-            entry.set_on_demand(DemandMapping::Anonymous);
+            entry.set_on_demand(demand);
 
             entry
         };
@@ -466,9 +469,8 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
 
                         #[cfg(feature = "log-paging")]
                         trace!(
-                            " considering {:?}, diff={:#x}, level={:?}, consecutive={:?} (last={:?})",
+                            " considering {:?}, level={:?}, consecutive={:?} (last={:?})",
                             addr,
-                            diff,
                             level,
                             consecutive,last
                         );

@@ -48,6 +48,10 @@ impl PageFaultException {
             .unwrap_or_else(|e| panic!("nonsensical page fault at {:?}: {}", self.addr, e));
 
         match mapping.on_demand() {
+            DemandMapping::None => {
+                // TODO handle failure properly
+                panic!("unhandled page fault: {:?}", self);
+            }
             DemandMapping::Anonymous => {
                 // TODO reuse same physical page and CoW
                 // TODO what do if frame allocation fails?
@@ -62,6 +66,8 @@ impl PageFaultException {
                     .present()
                     .apply();
             }
+
+            DemandMapping::StackGuard => todo!("stack guard"),
         };
     }
 }

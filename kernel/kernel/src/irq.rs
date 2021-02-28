@@ -127,7 +127,7 @@ pub extern "C" fn irq_handler(ctx: *const InterruptContext) {
 
     let ctx: &InterruptContext = unsafe { &*ctx };
     let irq = (ctx.int_no - PIC_MASTER_OFFSET as u64) as usize; // remap to original irq
-    assert!(irq < IRQ_HANDLER_COUNT);
+    debug_assert!(irq < IRQ_HANDLER_COUNT);
 
     // TODO spurious irqs
 

@@ -4,9 +4,12 @@ use modular_bitfield::prelude::*;
 const MARKER: u32 = 0xcc_cc_cc;
 
 #[derive(BitfieldSpecifier, Debug, Copy, Clone)]
-#[bits = 1]
+#[bits = 2]
 pub enum DemandMapping {
+    None,
+
     Anonymous,
+    StackGuard,
     // TODO CoW
     // TODO Mapped file(fd in process)
 }
@@ -38,7 +41,7 @@ pub struct CustomPageEntry {
     marker: B24,
 
     #[skip]
-    _unused: B29,
+    _unused: B28,
 
     // matches up with real nx bit
     pub nx: bool,
@@ -47,7 +50,10 @@ pub struct CustomPageEntry {
 impl Default for CustomPageEntry {
     /// All bits unset except for nx=1 and marker bits
     fn default() -> Self {
-        Self::new().with_nx(true).with_marker(MARKER)
+        Self::new()
+            .with_nx(true)
+            .with_marker(MARKER)
+            .with_on_demand(DemandMapping::None)
     }
 }
 

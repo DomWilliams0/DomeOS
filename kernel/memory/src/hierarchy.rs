@@ -30,7 +30,7 @@ pub trait HasTable<'p>: PageTableHierarchy<'p> {
     fn entry_index(addr: VirtualAddress) -> u16;
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum AnyLevel {
     P4,
     P3,

@@ -13,7 +13,7 @@ use pe::{Address, Pe, PeError};
 const NOP_EXE: &[u8] = include_bytes!("../../../../userspace/nop.exe");
 
 const STACK_START: u64 = 0x6666_0000;
-const INITIAL_STACK_SIZE: u64 = kilobytes(16);
+const INITIAL_STACK_SIZE: u64 = kilobytes(128);
 
 // TODO need to configure via args:
 //  * user vs kernel
