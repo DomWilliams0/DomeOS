@@ -5,7 +5,7 @@ use memory::{PageTable, PhysicalAddress, P1, P2, P3, P4};
 fn cr3() -> u64 {
     let value: u64;
     unsafe {
-        llvm_asm!("mov %cr3, $0" : "=r" (value));
+        asm!("mov {0}, cr3", out(reg) value);
     }
     value
 }
@@ -24,7 +24,7 @@ pub fn set_pml4(p4: &P4<'static>) {
     cr3.set_bit_range(51, 12, ptr.to_4096_aligned());
 
     unsafe {
-        llvm_asm!("mov $0, %cr3" :: "r" (cr3) : "memory");
+        asm!("mov cr3, {0}", in(reg) cr3);
     }
 }
 pub fn log_active_page_hierarchy() {

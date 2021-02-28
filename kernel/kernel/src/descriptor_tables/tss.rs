@@ -44,6 +44,7 @@ impl TaskStateSegment {
         let mut tss = Self::default();
 
         unsafe {
+            // TODO allocate stack dynamically instead of static array
             tss.register_ist(IST_IDX_DOUBLE_FAULT, &mut IST_STACK_DOUBLE_FAULT);
 
             TSS.init(tss);

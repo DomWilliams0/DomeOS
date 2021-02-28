@@ -5,12 +5,12 @@ pub struct Port(pub u16);
 
 impl Port {
     pub unsafe fn write_u8(self, val: u8) {
-        llvm_asm!("outb %al, %dx" :: "{dx}"(self.0), "{al}"(val));
+        asm!("out dx, al", in("dx") self.0, in("al") val, options(nomem, nostack));
     }
 
     pub unsafe fn read_u8(self) -> u8 {
         let ret: u8;
-        llvm_asm!("inb %dx, %al" : "={ax}"(ret) : "{dx}"(self.0) :: "volatile");
+        asm!("in al, dx", out("al") ret, in("dx") self.0, options(nomem, nostack));
         ret
     }
 }

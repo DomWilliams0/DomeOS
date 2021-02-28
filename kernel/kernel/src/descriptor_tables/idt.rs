@@ -8,11 +8,9 @@ use crate::descriptor_tables::tss::IST_IDX_DOUBLE_FAULT;
 use crate::irq;
 use memory::VIRT_KERNEL_BASE;
 
+// for some reason if an InitializedGlobal is used here, its filled with garbage and not zeroed?
+// doesn't happen with a raw maybeuninit so lets just use that
 static mut IDT: MaybeUninit<InterruptDescriptorTable> = MaybeUninit::uninit();
-
-// TODO this only needs to be temporary?
-#[export_name = "idt_descriptor"]
-pub(crate) static mut IDT_POINTER: MaybeUninit<DescriptorTablePointer> = MaybeUninit::uninit();
 
 const IDT_ENTRY_COUNT: usize = 256;
 
@@ -203,13 +201,12 @@ impl InterruptDescriptorTable {
         IDT.as_mut_ptr().write(self);
 
         // point at global IDT
-        IDT_POINTER.as_mut_ptr().write(DescriptorTablePointer {
-            base: IDT.as_ptr() as u64,
+        let ptr = DescriptorTablePointer {
+            base: IDT.as_mut_ptr() as *mut _ as u64,
             limit: core::mem::size_of::<InterruptDescriptorTable>() as u16,
-        });
+        };
 
-        let pointer = IDT_POINTER.as_ptr();
-        llvm_asm!("lidt ($0)" :: "r" (pointer) : "memory");
+        asm!("lidt [{0}])", in(reg) &ptr);
     }
 }
 

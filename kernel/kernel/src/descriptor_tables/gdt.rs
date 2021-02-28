@@ -119,8 +119,7 @@ impl GlobalDescriptorTable {
             limit: (count * core::mem::size_of::<u64>() - 1) as u16,
         };
 
-        let ptr = &table_ptr as *const _;
-        llvm_asm!("lgdt ($0)" :: "r" (ptr) : "memory");
+        asm!("lgdt [{0}])", in(reg) &table_ptr);
     }
 }
 

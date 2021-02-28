@@ -1,6 +1,5 @@
 extern long_mode
 global gdt64_flush
-extern idt_descriptor
 
 section .boot.bss
 

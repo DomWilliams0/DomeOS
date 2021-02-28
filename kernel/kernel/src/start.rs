@@ -48,11 +48,7 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
 }
 
 fn breakpoint() {
-    unsafe { llvm_asm!("int3") }
-}
-
-fn div_by_zero() {
-    unsafe { llvm_asm!("mov dx, 0; div dx" ::: "ax", "dx" : "volatile", "intel") }
+    unsafe { asm!("int3") }
 }
 
 fn hang() -> ! {
@@ -60,6 +56,6 @@ fn hang() -> ! {
 
     info!("hanging forever");
     loop {
-        unsafe { llvm_asm!("hlt") }
+        unsafe { asm!("hlt") }
     }
 }

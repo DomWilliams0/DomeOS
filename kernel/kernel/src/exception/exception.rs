@@ -50,7 +50,7 @@ pub enum Exception {
 fn read_cr2() -> VirtualAddress {
     let value: u64;
     unsafe {
-        llvm_asm!("mov %cr2, $0" : "=r" (value));
+        asm!("mov {0}, cr2", out(reg) value);
     }
     VirtualAddress(value)
 }

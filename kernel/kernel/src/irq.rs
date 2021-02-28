@@ -183,12 +183,12 @@ impl Drop for InterruptGuard {
 
 pub fn enable_interrupts() {
     debug!("enabling interrupts");
-    unsafe { llvm_asm!("sti") };
+    unsafe { asm!("sti") };
 }
 
 pub fn disable_interrupts() {
     debug!("disabling interrupts");
-    unsafe { llvm_asm!("cli") };
+    unsafe { asm!("cli") };
 }
 
 impl Debug for InterruptContext {

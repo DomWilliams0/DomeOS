@@ -75,8 +75,7 @@ pub fn backtrace(mut per_frame: impl FnMut(Frame)) {
     let mut rbp = {
         let rbp: u64;
         unsafe {
-            llvm_asm!("mov %rbp, $0" : "=r" (rbp));
-
+            asm!("mov {0}, rbp", out(reg) rbp);
             rbp as *const u64
         }
     };

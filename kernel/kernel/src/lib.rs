@@ -5,10 +5,10 @@
 // features
 #![feature(maybe_uninit_ref)]
 #![feature(abi_x86_interrupt)]
-#![feature(llvm_asm)]
 #![feature(panic_info_message)]
 #![feature(asm)]
 #![feature(alloc_error_handler)]
+#![feature(core_intrinsics)]
 
 extern crate alloc;
 
@@ -54,7 +54,7 @@ pub fn hang() -> ! {
         warn!("hanging forever");
 
         loop {
-            llvm_asm!("hlt");
+            asm!("hlt");
         }
     }
 }
@@ -68,13 +68,11 @@ extern "C" {
 }
 
 fn zero_bss() {
-    let bss = unsafe {
+    unsafe {
         let start = (&mut BSS_START) as *mut _ as *mut u8;
         let end = (&mut BSS_END) as *mut _ as *mut u8;
         let len = end.offset_from(start);
 
-        core::slice::from_raw_parts_mut(start, len as usize)
-    };
-
-    bss.fill(0);
+        core::intrinsics::volatile_set_memory(start, 0, len as usize);
+    }
 }
