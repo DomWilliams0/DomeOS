@@ -31,23 +31,47 @@ impl<'p, P: PageTableHierarchy<'p>> Debug for PageTable<'p, P> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         let sep = if f.alternate() { "\n    " } else { ", " };
         write!(f, "PageTable(")?;
-        for (i, e) in self.present_entries() {
-            write!(f, "{}{:03} -> {:?}", sep, i, e)?;
+        for (i, (idx, e)) in self.present_entries().enumerate() {
+            if i > 0 {
+                write!(f, "{}", sep)?
+            }
+            write!(f, "{:03} -> {:?}", idx, e)?;
         }
-        write!(f, "{})", sep)
+
+        write!(f, ")")
     }
+}
+macro_rules! ensure_accessible {
+    ($entry:expr, $is_identity_mapped_physical:expr) => {{
+        let entry = $entry;
+        if !($is_identity_mapped_physical) {
+            // is not currently accessible, needs to be offset into identity mapped region
+            let entry_virt =
+                VirtualAddress::from_physical(PhysicalAddress(entry as *const _ as u64));
+            unsafe { &mut *entry_virt.as_ptr() }
+        } else {
+            // already accessible
+            entry
+        }
+    }};
 }
 
 impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
     pub fn present_entries(&self) -> impl Iterator<Item = (usize, CommonEntry<'p, P>)> + '_ {
-        self.entries().enumerate().filter(|(_, e)| e.present())
+        self.entries()
+            .copied()
+            .enumerate()
+            .filter(|(_, e)| e.present())
     }
 
-    pub fn entries(&self) -> impl Iterator<Item = CommonEntry<'p, P>> + '_ {
-        self.entries.iter().copied()
+    pub fn entries(&self) -> impl Iterator<Item = &CommonEntry<'p, P>> + '_ {
+        let identity_mapped_physical = VirtualAddress::is_identity_mapped_physical(self);
+        self.entries
+            .iter()
+            .map(move |e| ensure_accessible!(e, identity_mapped_physical))
     }
 
-    pub fn entries_mut(&mut self) -> impl Iterator<Item = &mut CommonEntry<'p, P>> + '_ {
+    pub fn entries_physical_mut(&mut self) -> impl Iterator<Item = &mut CommonEntry<'p, P>> + '_ {
         self.entries.iter_mut()
     }
 
@@ -55,20 +79,9 @@ impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
         let e = idx.index() as usize;
         debug_assert!(e < self.entries.len(), "entry index {} out of range", e);
 
-        let identity_mapped_physical = VirtualAddress::is_identity_mapped_physical(self);
-
         // safety: not dereferencing physical memory
         let entry = unsafe { self.entries.get_unchecked(e) };
-
-        if !identity_mapped_physical {
-            // is not currently accessible, needs to be offset into identity mapped region
-            let entry_virt =
-                VirtualAddress::from_physical(PhysicalAddress(entry as *const _ as u64));
-            unsafe { &*entry_virt.as_ptr() }
-        } else {
-            // already accessible
-            entry
-        }
+        ensure_accessible!(entry, VirtualAddress::is_identity_mapped_physical(self))
     }
 
     /// If this table is in physical memory, convert the entry address into accessible identity
@@ -78,15 +91,7 @@ impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
 
         // entry may be an inaccessible physical reference but we're not dereferencing it
         let entry = self.entry_physical_mut(idx);
-
-        if !identity_mapped_physical {
-            // is not currently accessible, needs to be offset into identity mapped region
-            let entry_virt = VirtualAddress::from_physical(PhysicalAddress(entry as *mut _ as u64));
-            unsafe { &mut *entry_virt.as_ptr() }
-        } else {
-            // already accessible
-            entry
-        }
+        ensure_accessible!(entry, identity_mapped_physical)
     }
 
     pub fn entry_physical_mut(&mut self, idx: impl EntryIndex<'p, P>) -> &mut CommonEntry<'p, P> {

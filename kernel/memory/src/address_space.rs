@@ -6,6 +6,7 @@ use crate::{
     PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4, PAGE_TABLE_ENTRY_COUNT,
 };
 use common::*;
+use core::marker::PhantomData;
 use core::ops::Range;
 use enumflags2::BitFlags;
 
@@ -17,6 +18,14 @@ pub struct RawAddressSpace<'p, M> {
     pml4: P4<'p>,
     memory: M,
 }
+
+#[derive(Deref, DerefMut)]
+pub struct Pml4Guard<'a, 'p>(
+    #[deref]
+    #[deref_mut]
+    P4<'p>,
+    PhantomData<&'a ()>,
+);
 
 pub enum MapTarget {
     /// Map to any physical address
@@ -73,6 +82,17 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
     /// Table must be mapped in and writeable already
     pub unsafe fn with_existing(pml4: P4<'p>, memory: M) -> Self {
         RawAddressSpace { pml4, memory }
+    }
+
+    pub fn pml4_mut<'a>(&'a mut self) -> Pml4Guard<'a, 'p> {
+        // safety: new p4 reference lives only as long as the guard, which is constrained to the
+        // lifetime of the owning address space
+        let pml4 = unsafe { self.pml4.clone() };
+        Pml4Guard(pml4, PhantomData)
+    }
+
+    pub fn pml4(&self) -> &P4<'p> {
+        &self.pml4
     }
 
     // TODO constructor to allocate new possibly unmapped frame for p4, then access through id map

@@ -7,7 +7,6 @@ use crate::multiboot;
 use crate::multiboot::Multiboot;
 use crate::vga::{self, Color};
 use crate::{clock, descriptor_tables, logging};
-use memory::{kilobytes, megabytes, VirtualAddress, FRAME_SIZE};
 
 // TODO guard page to detect and handle stack overflow
 pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
@@ -32,10 +31,14 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     enable_interrupts();
 
     // finish initialization on a new stack. inner fn to ensure we can't use old local vars
+    // TODO this is just really a demo of new stack allocation, a new stack isnt required
     fn post_init() -> ! {
         let do_it = || -> anyhow::Result<()> {
             // play around with exe loading
             // crate::process::spawn_process()?;
+
+            // run a dummy function in userspace
+            experiment_userspace();
 
             Ok(())
         };
@@ -49,7 +52,8 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     }
 
     // relocate stack and continue initialization there
-    relocate_stack_then_post_init(post_init)
+    // relocate_stack_then_post_init(post_init)
+    post_init()
 }
 
 fn breakpoint() {
@@ -65,38 +69,11 @@ fn hang() -> ! {
     }
 }
 
-fn relocate_stack_then_post_init(run_me: fn() -> !) -> ! {
-    // TODO move to constants
-    const KERNEL_STACKS_START: u64 = 0xffff_8000_0000_0000;
-    const KERNEL_STACK_MAX_SIZE: u64 = megabytes(8);
-    const KERNEL_STACK_SIZE: u64 = kilobytes(64) / FRAME_SIZE;
-    const KERNEL_STACKS_MAX: u64 = 512;
-
-    let core_id = 0; // TODO actually multicore
-    assert!(core_id < KERNEL_STACKS_MAX, "core={}", core_id);
-
-    let stack_start =
-        VirtualAddress::with_literal(KERNEL_STACKS_START + (core_id * KERNEL_STACK_MAX_SIZE));
-
-    let new_stack = crate::process::allocate_kernel_stack(
-        &mut AddressSpace::current(),
-        stack_start,
-        KERNEL_STACK_SIZE as usize,
-    )
-    .expect("couldn't allocate kernel stack");
-
-    debug!("new stack allocated at {:?}", new_stack);
+fn experiment_userspace() {
+    let mut addr = AddressSpace::new().expect("damn");
 
     unsafe {
-        asm!(
-        "mov rax, {func}", // we won't be able to access this on the old stack
-        "mov rsp, {stack_top}", // switcharoo
-        "call rax",
-        stack_top = in(reg) new_stack.address(),
-        func = in(reg) run_me,
-        out("rax") _,
-        )
-    };
-
-    unreachable!()
+        addr.load();
+        hang();
+    }
 }

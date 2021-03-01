@@ -16,11 +16,12 @@ impl PhysicalFrame {
     }
 
     /// # Safety
-    /// Physical address should be of type T
+    /// Physical address should be of type T. Returned value is a **physical** reference
     pub unsafe fn as_mut<'a, T>(self) -> &'a mut T {
         self.0.cast_mut()
     }
 
+    /// Converts physical address to accessible virtual first
     pub fn zero(&self) {
         let ptr = if cfg!(test) {
             (self.0).0 as *mut u8
@@ -29,8 +30,8 @@ impl PhysicalFrame {
             virt.as_ptr()
         };
 
-        let slice = unsafe { core::slice::from_raw_parts_mut(ptr, FRAME_SIZE as usize) };
-
-        slice.fill(0);
+        unsafe {
+            core::intrinsics::volatile_set_memory(ptr, 0, FRAME_SIZE as usize);
+        }
     }
 }

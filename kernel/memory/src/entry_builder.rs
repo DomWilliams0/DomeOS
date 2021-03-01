@@ -129,11 +129,16 @@ impl<'e> EntryBuilder<'e> {
         self
     }
 
+    /// Shorthand for global, writeable, present, supervisor
+    pub fn higher_half(self) -> Self {
+        self.global().writeable().present().supervisor()
+    }
+
     pub fn address(mut self, addr: PhysicalAddress) -> Self {
         if cfg!(debug_assertions) {
             self.bits
                 .set_address_checked(addr.to_4096_aligned())
-                .expect("failed to set address");
+                .unwrap_or_else(|e| panic!("failed to set address to {:?}: {}", addr, e));
         } else {
             self.bits.set_address(addr.to_4096_aligned());
         }

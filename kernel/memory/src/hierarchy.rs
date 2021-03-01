@@ -228,10 +228,26 @@ impl<'p> P4<'p> {
     /// # Safety
     /// Frame must be unused and present and writable, this will blat it with zeros
     pub unsafe fn new(frame: PhysicalFrame) -> Self {
-        let table: &mut PageTable<_> = frame.as_mut();
+        frame.zero();
 
-        *table = core::mem::zeroed();
+        Self(frame.as_mut())
+    }
 
-        Self(table)
+    /// # Safety
+    /// Ensure caller is aware the returned value still points to the same physical address
+    pub unsafe fn clone(&mut self) -> Self {
+        P4(&mut *(self.0 as *mut _))
+    }
+
+    pub fn table_mut(&mut self) -> &mut PageTable<'p, P3<'p>> {
+        self.0
+    }
+
+    pub fn ensure_accessible(&mut self) {
+        if !VirtualAddress::is_identity_mapped_physical(self.0) {
+            // is not currently accessible, needs to be offset into identity mapped region
+            let virt = VirtualAddress::from_physical(PhysicalAddress(self.0 as *mut _ as u64));
+            self.0 = unsafe { &mut *virt.as_ptr() }
+        }
     }
 }

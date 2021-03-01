@@ -1,11 +1,10 @@
-use crate::memory::page_table::pml4;
-use crate::memory::{frame_allocator, heap, phys, FrameAllocator};
+use crate::memory::{frame_allocator, heap, phys, AddressSpace, FrameAllocator};
 use crate::multiboot::{Multiboot, MultibootMemoryMap};
 use crate::vga;
 use common::*;
 use enumflags2::BitFlags;
 use memory::{
-    gigabytes, MemoryError, PageTable, PhysicalAddress, VirtualAddress, P3, VIRT_PHYSICAL_BASE,
+    gigabytes, MemoryError, PageTable, PhysicalAddress, VirtualAddress, P3, P4, VIRT_PHYSICAL_BASE,
     VIRT_PHYSICAL_SIZE,
 };
 
@@ -21,8 +20,10 @@ pub fn init(multiboot: Multiboot) -> Result<(), MemoryError> {
     phys::init_frame_allocator(memory_map);
 
     // setup physical identity mapping
-    init_physical_identity_mapping()?;
-    post_init_physical_identity_mapping(&memory_map)?;
+    let mut addr_space = AddressSpace::current();
+    let mut p4 = addr_space.pml4_mut();
+    init_physical_identity_mapping(&mut *p4)?;
+    post_init_physical_identity_mapping(&memory_map, &mut *p4)?;
 
     // init heap
     heap::init()?;
@@ -31,9 +32,8 @@ pub fn init(multiboot: Multiboot) -> Result<(), MemoryError> {
 }
 
 /// Setup huge physical identity mapping
-fn init_physical_identity_mapping() -> Result<(), MemoryError> {
-    let mut p4 = pml4();
-    let base = VirtualAddress::new(VIRT_PHYSICAL_BASE);
+fn init_physical_identity_mapping(p4: &mut P4) -> Result<(), MemoryError> {
+    let base = VirtualAddress::with_literal(VIRT_PHYSICAL_BASE);
     debug!("identity mapping physical memory from {:?}", base);
     let p3_count = (VIRT_PHYSICAL_SIZE / gigabytes(512)) as u16;
     let start_idx = base.pml4t_offset();
@@ -48,15 +48,13 @@ fn init_physical_identity_mapping() -> Result<(), MemoryError> {
         let p3_table: &mut PageTable<P3> = unsafe { p3_frame.as_mut() };
 
         // initialize p3 entries to each point to 1GB each
-        for (p3_offset, entry) in p3_table.entries_mut().enumerate() {
+        for (p3_offset, entry) in p3_table.entries_physical_mut().enumerate() {
             let addr = (i as u64 * gigabytes(512)) + gigabytes(p3_offset as u64);
             entry
                 .replace()
-                .writeable()
                 .huge()
                 .address(PhysicalAddress(addr))
-                .present()
-                .global()
+                .higher_half()
                 .apply();
         }
 
@@ -65,9 +63,7 @@ fn init_physical_identity_mapping() -> Result<(), MemoryError> {
 
         p4_entry
             .replace()
-            .writeable()
-            .present()
-            .global()
+            .higher_half()
             .address(p3_frame.address())
             .apply();
     }
@@ -75,7 +71,10 @@ fn init_physical_identity_mapping() -> Result<(), MemoryError> {
     Ok(())
 }
 
-fn post_init_physical_identity_mapping(memory_map: &MultibootMemoryMap) -> Result<(), MemoryError> {
+fn post_init_physical_identity_mapping(
+    memory_map: &MultibootMemoryMap,
+    p4: &mut P4,
+) -> Result<(), MemoryError> {
     // ensure frame allocator uses virtual multiboot pointer now
     frame_allocator().relocate_multiboot(unsafe {
         let phys = PhysicalAddress(memory_map.pointer() as u64);
@@ -93,7 +92,6 @@ fn post_init_physical_identity_mapping(memory_map: &MultibootMemoryMap) -> Resul
     }
 
     // now safe to remove low identity maps from early boot
-    let mut p4 = pml4();
     let mut p3 = p4.entry_mut(0).traverse()?;
     p3.entry_mut(0).replace().not_present().apply();
     p4.entry_mut(0).replace().not_present().apply();
