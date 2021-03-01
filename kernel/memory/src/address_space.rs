@@ -2,8 +2,8 @@ use crate::address::{PhysicalAddress, VirtualAddress};
 use crate::custom_entry::{CustomPageEntry, DemandMapping};
 use crate::error::MemoryResult;
 use crate::{
-    AnyLevel, Frame, HasTable, MemoryError, PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4,
-    PAGE_TABLE_ENTRY_COUNT,
+    AnyLevel, CommonEntry, EntryBuilder, Frame, HasTable, MemoryError, PageTableBits,
+    PageTableHierarchy, PhysicalFrame, FRAME_SIZE, P4, PAGE_TABLE_ENTRY_COUNT,
 };
 use common::*;
 use core::ops::Range;
@@ -37,6 +37,7 @@ pub enum MapFlags {
     Huge1G = 1 << 4,
 
     StackGuard = 1 << 5,
+    Commit = 1 << 6,
     // TODO copy on write
     // TODO global
     // TODO committed
@@ -48,6 +49,24 @@ pub enum MapFlags {
 /// First call to iter(): [given index..512)
 /// Future calls        : [0..512)
 struct OneTimeEntryRange(Range<u16>);
+
+impl From<BitFlags<MapFlags>> for PageTableBits {
+    fn from(flags: BitFlags<MapFlags>) -> Self {
+        let mut bits = PageTableBits::default().with_nx(true);
+
+        for flag in flags.iter() {
+            use MapFlags::*;
+            match flag {
+                Writeable => bits.set_writeable(true),
+                Executable => bits.set_nx(false),
+                User => bits.set_user(true),
+                StackGuard | Commit | Huge2M | Huge1G => {}
+            }
+        }
+
+        bits
+    }
+}
 
 impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
     /// # Safety
@@ -92,24 +111,34 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             aligned
         };
 
-        let template_entry = {
-            let mut entry = CustomPageEntry::default();
+        enum NewEntry {
+            Absent(CustomPageEntry),
+            Committed(PageTableBits),
+        }
+
+        let new_entry = {
+            let mut bits = PageTableBits::default().with_nx(true);
+
+            let mut commit = false;
             let mut demand = DemandMapping::Anonymous;
 
             for flag in flags.iter() {
                 use MapFlags::*;
                 match flag {
-                    Writeable => entry.set_writeable(true),
-                    Executable => entry.set_nx(false),
-                    User => entry.set_user(true),
+                    Writeable => bits.set_writeable(true),
+                    Executable => bits.set_nx(false),
+                    User => bits.set_user(true),
                     StackGuard => demand = DemandMapping::StackGuard,
+                    Commit => commit = true,
                     Huge2M | Huge1G => todo!("huge pages ({:?})", flag),
                 }
             }
 
-            entry.set_on_demand(demand);
-
-            entry
+            if commit {
+                NewEntry::Committed(bits)
+            } else {
+                NewEntry::Absent(CustomPageEntry::from_bits(bits).with_on_demand(demand))
+            }
         };
 
         #[cfg(feature = "log-paging")]
@@ -179,14 +208,22 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
                     );
 
                     for p1_idx in tables[3]..tables[3] + pages_to_do {
-                        let new_entry = template_entry;
+                        let entry = p1_table.entry_mut(p1_idx);
 
-                        // safety: blatting it entirely with new custom entry, and not running any
-                        // drop on probably uninitialized entry by writing through a pointer
-                        unsafe {
-                            let entry = p1_table.entry_mut(p1_idx).as_custom_unchecked_mut()
-                                as *mut CustomPageEntry;
-                            entry.write(new_entry);
+                        match new_entry {
+                            NewEntry::Absent(custom) => {
+                                // safety: blatting it entirely with new custom entry, and not running any
+                                // drop on probably uninitialized entry by writing through a pointer
+                                unsafe {
+                                    (entry.as_custom_unchecked_mut() as *mut CustomPageEntry)
+                                        .write(custom);
+                                }
+                            }
+                            NewEntry::Committed(bits) => {
+                                // allocate new physical
+                                // TODO check for previous mapping?
+                                Self::create_entry(entry, bits, &mut self.memory)?;
+                            }
                         }
                     }
 
@@ -220,28 +257,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             entry.address()
         } else {
             // need a new frame
-            let frame = memory.new_frame()?;
-
-            #[cfg(feature = "log-paging")]
-            trace!(
-                "allocated new {} at {:?}",
-                P::NextLevel::NAME,
-                frame.address()
-            );
-
-            // ensure its cleared
-            frame.zero();
-
-            // link up to entry
-            entry
-                .replace()
-                .address(frame.address())
-                .writeable() // TODO depends on flags
-                .present()
-                .supervisor() // TODO depends on flags
-                .apply();
-
-            frame.address()
+            Self::create_entry(entry, flags.into(), memory)?
         };
 
         // get accessible virtual address
@@ -250,6 +266,32 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         // safety: type safety from page table types
         let next_table = P::NextLevel::with_table(unsafe { &mut *virt.as_ptr() })?;
         Ok((phys, next_table))
+    }
+
+    fn create_entry<'pt, P: PageTableHierarchy<'pt> + 'pt>(
+        entry: &mut CommonEntry<'pt, P>,
+        bits: PageTableBits,
+        memory: &mut M,
+    ) -> MemoryResult<PhysicalAddress> {
+        let frame = memory.new_frame()?;
+
+        #[cfg(feature = "log-paging")]
+        trace!(
+            "allocated new {} at {:?}",
+            P::NextLevel::NAME,
+            frame.address()
+        );
+
+        // ensure its cleared
+        frame.zero();
+
+        // link up to entry
+        EntryBuilder::with_entry_and_bits(entry, bits)
+            .address(frame.address())
+            .present()
+            .apply();
+
+        Ok(frame.address())
     }
 
     /// Returns mutable reference to entry but makes no changes.
@@ -472,7 +514,8 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
                             " considering {:?}, level={:?}, consecutive={:?} (last={:?})",
                             addr,
                             level,
-                            consecutive,last
+                            consecutive,
+                            last
                         );
 
                         consecutive

@@ -10,7 +10,7 @@ section .boot.bss
 align 4096
 bss_start:
 
-; allocate petit stack of 16KiB
+; allocate petit stack
 stack_bottom:
 	resb 6*4096
 stack_top:

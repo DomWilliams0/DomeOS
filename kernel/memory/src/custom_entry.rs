@@ -81,4 +81,18 @@ impl CustomPageEntry {
         let entry = unsafe { &mut *(self as *mut _ as *mut CommonEntry<P4>) };
         EntryBuilder::with_entry_and_bits(entry, bits)
     }
+
+    pub fn from_bits(bits: PageTableBits) -> Self {
+        // TODO might be able to transmute as the bits line up
+        Self::default()
+            .with_writeable(bits.writeable())
+            .with_user(bits.user())
+            .with_write_through(bits.write_through())
+            .with_cache_disable(bits.cache_disable())
+            .with_accessed(bits.accessed())
+            .with_dirty(bits.dirty())
+            .with_huge(bits.huge())
+            .with_global(bits.global())
+            .with_nx(bits.nx())
+    }
 }

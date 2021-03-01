@@ -24,18 +24,8 @@ pub fn allocate_kernel_stack(
         stack_bottom,
         (frames as u64 - 1) * FRAME_SIZE,
         MapTarget::Any,
-        MapFlags::Writeable,
+        MapFlags::Writeable | MapFlags::Commit,
     )?;
-
-    // force committing of stack
-    // TODO add this as a MapFlags
-    unsafe {
-        let mut ptr = stack_bottom.as_ptr::<u8>();
-        for _ in 0..(frames - 1) {
-            let _ = ptr.read_volatile();
-            ptr = ptr.offset(FRAME_SIZE as isize);
-        }
-    }
 
     // return stack top
     Ok(base + (frames as u64 * FRAME_SIZE))

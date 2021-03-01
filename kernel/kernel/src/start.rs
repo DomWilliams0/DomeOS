@@ -31,22 +31,25 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     // actually mapped
     enable_interrupts();
 
-    // relocate stack to include guard page
-    let init_result = relocate_stack_then_post_init();
+    // finish initialization on a new stack. inner fn to ensure we can't use old local vars
+    fn post_init() -> ! {
+        let do_it = || -> anyhow::Result<()> {
+            // play around with exe loading
+            // crate::process::spawn_process()?;
 
-    if let Err(err) = init_result {
-        error!("init failed: {:?}", err);
+            Ok(())
+        };
+
+        if let Err(err) = do_it() {
+            error!("init failed: {:?}", err);
+        }
+
+        info!("goodbye!");
+        hang();
     }
 
-    info!("goodbye!");
-    hang();
-}
-
-fn post_init() -> anyhow::Result<()> {
-    // play around with exe loading
-    crate::process::spawn_process()?;
-
-    Ok(())
+    // relocate stack and continue initialization there
+    relocate_stack_then_post_init(post_init)
 }
 
 fn breakpoint() {
@@ -62,7 +65,7 @@ fn hang() -> ! {
     }
 }
 
-fn relocate_stack_then_post_init() -> anyhow::Result<()> {
+fn relocate_stack_then_post_init(run_me: fn() -> !) -> ! {
     // TODO move to constants
     const KERNEL_STACKS_START: u64 = 0xffff_8000_0000_0000;
     const KERNEL_STACK_MAX_SIZE: u64 = megabytes(8);
@@ -80,17 +83,20 @@ fn relocate_stack_then_post_init() -> anyhow::Result<()> {
         stack_start,
         KERNEL_STACK_SIZE as usize,
     )
-    .map_err(Error::msg)?;
+    .expect("couldn't allocate kernel stack");
 
     debug!("new stack allocated at {:?}", new_stack);
 
     unsafe {
         asm!(
-        "mov rsp, {stack_top}",
+        "mov rax, {func}", // we won't be able to access this on the old stack
+        "mov rsp, {stack_top}", // switcharoo
+        "call rax",
         stack_top = in(reg) new_stack.address(),
+        func = in(reg) run_me,
+        out("rax") _,
         )
     };
 
-    // on new stack
-    post_init()
+    unreachable!()
 }
