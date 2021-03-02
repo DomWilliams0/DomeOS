@@ -6,8 +6,13 @@ use modular_bitfield::prelude::*;
 
 static mut GDT: InitializedGlobal<GlobalDescriptorTable> = InitializedGlobal::uninit();
 
+const SEL_KERNEL_CODE: u8 = 0x08;
+const SEL_KERNEL_DATA: u8 = 0x10;
+pub const SEL_USER_CODE: u8 = 0x1b;
+pub const SEL_USER_DATA: u8 = 0x23;
+
 pub struct GlobalDescriptorTable {
-    entries: [u64; 6],
+    entries: [u64; 8],
     next_available: u8,
 }
 
@@ -47,8 +52,18 @@ pub fn init() {
     let cs = gdt.add_entry(0, SegmentDescriptor::kernel_code());
     let ds = gdt.add_entry(0, SegmentDescriptor::kernel_data());
 
+    let cs_user = gdt.add_entry(3, SegmentDescriptor::user_code());
+    let ds_user = gdt.add_entry(3, SegmentDescriptor::user_data());
+
     let tss_addr = super::tss::TaskStateSegment::init();
     let tss = gdt.add_tss_entry(SegmentDescriptor::tss(tss_addr));
+
+    assert!(
+        cs.into_u8() == SEL_KERNEL_CODE
+            && ds.into_u8() == SEL_KERNEL_DATA
+            && cs_user.into_u8() == SEL_USER_CODE
+            && ds_user.into_u8() == SEL_USER_DATA
+    );
 
     unsafe {
         gdt.load();
@@ -61,7 +76,7 @@ pub fn init() {
 impl Default for GlobalDescriptorTable {
     fn default() -> Self {
         Self {
-            entries: [0; 6],
+            entries: [0; 8],
             next_available: 1, // skip null
         }
     }
@@ -144,6 +159,14 @@ impl SegmentDescriptor {
 
     fn kernel_data() -> Self {
         Self::default().with_default_size(true)
+    }
+
+    fn user_code() -> Self {
+        Self::kernel_code().with_dpl(3)
+    }
+
+    fn user_data() -> Self {
+        Self::kernel_data().with_dpl(3)
     }
 
     /// (low, high)

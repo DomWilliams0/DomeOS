@@ -48,7 +48,7 @@ pub fn spawn_process() -> anyhow::Result<Rc<Process>> {
         .map_err(Error::msg)?;
 
     let length = pages_needed * FRAME_SIZE as usize;
-    let mapped_slice = {
+    let mut mapped = {
         // map as RWX and on-demand
         address_space
             .map_range(
@@ -57,12 +57,9 @@ pub fn spawn_process() -> anyhow::Result<Rc<Process>> {
                 MapTarget::Any,
                 MapFlags::Writeable | MapFlags::Executable,
             )
-            .map_err(Error::msg)?;
-
-        // create slice for bounds checking
-        // safety: region has been mapped as writeable above
-        unsafe { core::slice::from_raw_parts_mut(image_base.as_ptr::<u8>(), length as usize) }
+            .map_err(Error::msg)?
     };
+    let mapped_slice = mapped.write().unwrap(); // mapped as writeable
 
     trace!("mapped {:#x} bytes for image", length);
 
@@ -131,7 +128,7 @@ pub fn spawn_process() -> anyhow::Result<Rc<Process>> {
     // TODO guard page to grow stack dynamically
     let stack_bottom = VirtualAddress::with_literal(STACK_START);
     let stack_size = INITIAL_STACK_SIZE;
-    address_space
+    let mapped = address_space
         .map_range(
             stack_bottom,
             stack_size,
@@ -140,7 +137,7 @@ pub fn spawn_process() -> anyhow::Result<Rc<Process>> {
         )
         .map_err(Error::msg)?;
 
-    let stack_top = stack_bottom + stack_size;
+    let stack_top = mapped.end_address();
     let entry_point = image_base + entry_point_rva;
 
     // TODO actually allocate a process/thread struct

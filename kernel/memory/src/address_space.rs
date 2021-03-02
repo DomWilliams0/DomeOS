@@ -59,6 +59,9 @@ pub enum MapFlags {
 /// Future calls        : [0..512)
 struct OneTimeEntryRange(Range<u16>);
 
+#[derive(Deref)]
+pub struct MappedSlice(#[deref] &'static mut [u8], BitFlags<MapFlags>);
+
 impl From<BitFlags<MapFlags>> for PageTableBits {
     fn from(flags: BitFlags<MapFlags>) -> Self {
         let mut bits = PageTableBits::default().with_nx(true);
@@ -103,7 +106,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         size: u64,
         target: MapTarget,
         flags: impl Into<BitFlags<MapFlags>>,
-    ) -> MemoryResult<()> {
+    ) -> MemoryResult<MappedSlice> {
         self.map_range_impl(start, size, target, flags.into())
     }
 
@@ -115,7 +118,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         size: u64,
         target: MapTarget,
         flags: BitFlags<MapFlags>,
-    ) -> MemoryResult<()> {
+    ) -> MemoryResult<MappedSlice> {
         let start = {
             let aligned = start.round_up_to(FRAME_SIZE);
             #[cfg(feature = "log-paging")]
@@ -259,7 +262,12 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
 
         // TODO consider huge pages
 
-        Ok(())
+        Ok({
+            let length = limit.address() - start.address();
+            // safety: just mapped
+            let slice = unsafe { core::slice::from_raw_parts_mut(start.as_ptr(), length as usize) };
+            MappedSlice(slice, flags)
+        })
     }
 
     /// Allocates a new physical frame if not already present
@@ -567,6 +575,29 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
 
         contiguous_start
             .ok_or_else(|| MemoryError::NoContiguousVirtualRegion(start.address(), n_to_find))
+    }
+}
+
+#[allow(clippy::len_without_is_empty)]
+impl MappedSlice {
+    pub fn address(&self) -> VirtualAddress {
+        VirtualAddress(self.0.as_ptr() as u64)
+    }
+
+    pub fn end_address(&self) -> VirtualAddress {
+        self.address() + (self.len() as u64)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn write(&mut self) -> Option<&mut [u8]> {
+        if self.1.contains(MapFlags::Writeable) {
+            Some(self.0)
+        } else {
+            None
+        }
     }
 }
 

@@ -4,8 +4,8 @@ use core::alloc::{GlobalAlloc, Layout};
 use core::cell::RefCell;
 use core::ptr::{null_mut, NonNull};
 use memory::{
-    gigabytes, kilobytes, round_up_to, MapFlags, MapTarget, MemoryError, VirtualAddress,
-    FRAME_SIZE, VIRT_KERNEL_HEAP_BASE,
+    gigabytes, kilobytes, round_up_to, MapFlags, MapTarget, MappedSlice, MemoryError,
+    VirtualAddress, FRAME_SIZE, VIRT_KERNEL_HEAP_BASE,
 };
 
 #[global_allocator]
@@ -25,8 +25,7 @@ pub fn init() -> Result<(), MemoryError> {
 }
 
 /// Parameter is rounded up to nearest number of frames
-/// (start addr, length in bytes)
-fn grow_heap(bytes: u64) -> Result<(VirtualAddress, u64), MemoryError> {
+fn grow_heap(bytes: u64) -> Result<MappedSlice, MemoryError> {
     let mut space = AddressSpace::current();
 
     let length = round_up_to(bytes, FRAME_SIZE);
@@ -37,9 +36,9 @@ fn grow_heap(bytes: u64) -> Result<(VirtualAddress, u64), MemoryError> {
         frame_count as usize,
     )?;
 
-    space.map_range(start_addr, length, MapTarget::Any, MapFlags::Writeable)?;
-
-    let end_addr = VirtualAddress::with_literal(start_addr.address() + length);
+    let mapped = space.map_range(start_addr, length, MapTarget::Any, MapFlags::Writeable)?;
+    let start_addr = mapped.address();
+    let end_addr = mapped.end_address();
     debug!(
         "growing kernel heap by adding chunk of {:#x} bytes at {:?}",
         length, start_addr
@@ -50,7 +49,7 @@ fn grow_heap(bytes: u64) -> Result<(VirtualAddress, u64), MemoryError> {
         heap.add_to_heap(start_addr.address() as usize, end_addr.address() as usize);
     }
 
-    Ok((start_addr, length))
+    Ok(mapped)
 }
 
 unsafe impl GlobalAlloc for Heap {

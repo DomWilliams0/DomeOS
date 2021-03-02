@@ -59,4 +59,13 @@ impl TaskStateSegment {
 
         self.interrupt_stacks[idx] = VirtualAddress::new(stack_top);
     }
+
+    pub fn set_privilege_stack(&mut self, pl: u8, stack: VirtualAddress) {
+        common::trace!("tss priv stack[{}] = {:?}", pl, stack);
+        self.privilege_stacks[pl as usize] = stack;
+    }
+}
+
+pub fn tss() -> &'static mut TaskStateSegment {
+    unsafe { TSS.get() }
 }
