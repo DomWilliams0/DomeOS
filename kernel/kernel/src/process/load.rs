@@ -153,11 +153,7 @@ pub fn experiment_new_process() -> anyhow::Result<ProcessRef> {
     // TODO respect PE requested heap+stack commit/reserve
     // TODO flush instruction cache?
 
-    let proc = new_process(
-        Some(address_space),
-        new_pid(),
-        ProcessPrivilegeLevel::Kernel,
-    );
+    let proc = new_process(Some(address_space), new_pid(), ProcessPrivilegeLevel::User);
     let _thread = new_thread(new_pid(), stack_top, Some(proc.clone()), entry_point);
     Ok(proc)
 }
