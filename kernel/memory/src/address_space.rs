@@ -119,6 +119,9 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         target: MapTarget,
         flags: BitFlags<MapFlags>,
     ) -> MemoryResult<MappedSlice> {
+        #[cfg(feature = "log-paging")]
+        trace!("map({:?}, {:#x} bytes, flags {:?})", start, size, flags);
+
         let start = {
             let aligned = start.round_up_to(FRAME_SIZE);
             #[cfg(feature = "log-paging")]
@@ -584,6 +587,7 @@ impl MappedSlice {
         VirtualAddress(self.0.as_ptr() as u64)
     }
 
+    /// Inclusive!! This points outside of the mapping
     pub fn end_address(&self) -> VirtualAddress {
         self.address() + (self.len() as u64)
     }
@@ -691,6 +695,24 @@ fn iter_all_pages(
 
         Some((pages as u16, unwind, tables))
     })
+}
+
+impl<M: Clone> RawAddressSpace<'_, M> {
+    /// # Safety
+    /// Ensure caller is aware the returned value still points to the same physical address
+    pub unsafe fn clone(&self) -> Self {
+        let pml4 = self.pml4.clone();
+        RawAddressSpace {
+            pml4,
+            memory: self.memory.clone(),
+        }
+    }
+}
+
+impl<'p, M> PartialEq<P4<'p>> for RawAddressSpace<'p, M> {
+    fn eq(&self, other: &P4<'p>) -> bool {
+        self.pml4.eq(other)
+    }
 }
 
 #[cfg(test)]

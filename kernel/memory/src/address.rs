@@ -1,5 +1,5 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
-use core::ops::{Add, AddAssign, Shl, Shr};
+use core::ops::{Add, AddAssign, Shl, Shr, Sub, SubAssign};
 
 use crate::{VIRT_KERNEL_BASE, VIRT_PHYSICAL_BASE, VIRT_PHYSICAL_MAX};
 use common::*;
@@ -259,6 +259,20 @@ impl Add<u64> for VirtualAddress {
 impl AddAssign<u64> for VirtualAddress {
     fn add_assign(&mut self, rhs: u64) {
         self.0 += rhs;
+    }
+}
+
+impl Sub<u64> for VirtualAddress {
+    type Output = Self;
+
+    fn sub(self, rhs: u64) -> Self::Output {
+        Self(self.0 - rhs)
+    }
+}
+
+impl SubAssign<u64> for VirtualAddress {
+    fn sub_assign(&mut self, rhs: u64) {
+        self.0 -= rhs;
     }
 }
 

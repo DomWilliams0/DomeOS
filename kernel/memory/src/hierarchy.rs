@@ -235,8 +235,9 @@ impl<'p> P4<'p> {
 
     /// # Safety
     /// Ensure caller is aware the returned value still points to the same physical address
-    pub unsafe fn clone(&mut self) -> Self {
-        P4(&mut *(self.0 as *mut _))
+    pub unsafe fn clone(&self) -> Self {
+        #[allow(clippy::cast_ref_to_mut)]
+        P4(&mut *(self.0 as *const _ as *mut _))
     }
 
     pub fn table_mut(&mut self) -> &mut PageTable<'p, P3<'p>> {
@@ -251,3 +252,13 @@ impl<'p> P4<'p> {
         }
     }
 }
+
+impl PartialEq for P4<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        let this = self.0 as *const PageTable<P3>;
+        let other = other.0 as *const PageTable<P3>;
+        core::ptr::eq(this, other)
+    }
+}
+
+impl Eq for P4<'_> {}

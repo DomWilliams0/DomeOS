@@ -42,6 +42,12 @@ impl<'e> EntryBuilder<'e> {
         self.bits.set_writeable(false);
         self
     }
+
+    pub fn set_writeable(mut self, writeable: bool) -> Self {
+        self.bits.set_writeable(writeable);
+        self
+    }
+
     pub fn user(mut self) -> Self {
         self.bits.set_user(true);
         self
@@ -51,6 +57,12 @@ impl<'e> EntryBuilder<'e> {
         self.bits.set_user(false);
         self
     }
+
+    pub fn set_user(mut self, user: bool) -> Self {
+        self.bits.set_user(user);
+        self
+    }
+
     pub fn write_through(mut self) -> Self {
         self.bits.set_write_through(true);
         self
@@ -60,6 +72,7 @@ impl<'e> EntryBuilder<'e> {
         self.bits.set_write_through(false);
         self
     }
+
     pub fn cache_disable(mut self) -> Self {
         self.bits.set_cache_disable(true);
         self
@@ -79,6 +92,7 @@ impl<'e> EntryBuilder<'e> {
         self.bits.set_accessed(false);
         self
     }
+
     pub fn dirty(mut self) -> Self {
         self.bits.set_dirty(true);
         self
@@ -116,6 +130,11 @@ impl<'e> EntryBuilder<'e> {
 
     pub fn not_executable(mut self) -> Self {
         self.bits.set_nx(true);
+        self
+    }
+
+    pub fn set_executable(mut self, executable: bool) -> Self {
+        self.bits.set_nx(!executable);
         self
     }
 

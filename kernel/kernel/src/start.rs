@@ -6,6 +6,7 @@ use crate::logging::LogMode;
 use crate::memory::AddressSpace;
 use crate::multiboot;
 use crate::multiboot::Multiboot;
+use crate::process::ThreadRef;
 use crate::vga::{self, Color};
 use crate::{clock, descriptor_tables, logging};
 use memory::{kilobytes, megabytes, MapFlags, MapTarget, VirtualAddress, FRAME_SIZE};
@@ -32,30 +33,16 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     // actually mapped
     enable_interrupts();
 
-    // finish initialization on a new stack. inner fn to ensure we can't use old local vars
-    // TODO this is just really a demo of new stack allocation, a new stack isnt required
-    fn post_init() -> ! {
-        let do_it = || -> anyhow::Result<()> {
-            // play around with exe loading
-            // crate::process::spawn_process()?;
+    let process = crate::process::experiment_new_process().expect("failed");
+    debug!("process created");
 
-            // run a dummy function in userspace
-            experiment_userspace();
+    let thread: ThreadRef = {
+        let inner = process.inner_locked();
+        let thread = inner.threads().next().expect("no main thread");
+        thread.clone()
+    };
 
-            Ok(())
-        };
-
-        if let Err(err) = do_it() {
-            error!("init failed: {:?}", err);
-        }
-
-        info!("goodbye!");
-        hang();
-    }
-
-    // relocate stack and continue initialization there
-    // relocate_stack_then_post_init(post_init)
-    post_init()
+    unsafe { thread.run_now() }
 }
 
 fn breakpoint() {
@@ -71,6 +58,7 @@ fn hang() -> ! {
     }
 }
 
+#[deprecated]
 fn experiment_userspace() {
     let mut addr = AddressSpace::new().expect("damn");
 
@@ -86,7 +74,7 @@ fn experiment_userspace() {
 
     // switch to user address space
     unsafe {
-        addr.load();
+        addr.load_unconditionally();
     }
 
     // write simple shellcode

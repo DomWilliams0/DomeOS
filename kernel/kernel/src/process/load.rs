@@ -1,7 +1,7 @@
 use crate::memory::AddressSpace;
-use crate::process::block::Process;
+use crate::process::block::{new_pid, new_process, new_thread, ProcessPrivilegeLevel, ProcessRef};
 use crate::process::error::ProcessError;
-use alloc::rc::Rc;
+
 use common::{
     anyhow::{self, anyhow, Error},
     *,
@@ -20,14 +20,24 @@ const INITIAL_STACK_SIZE: u64 = kilobytes(128);
 //  * exe mapped address/pointer/reference
 
 // TODO ensure address space and/or mappings are freed/unmapped on error with e.g. a Bomb guard
-pub fn spawn_process() -> anyhow::Result<Rc<Process>> {
+/// For testing only
+/// Switches to new address space
+pub fn experiment_new_process() -> anyhow::Result<ProcessRef> {
     let image = NOP_EXE;
 
-    // parse PE
-    let pe = pe::Pe::from_buffer(image).map_err(Error::msg)?;
+    // allocate and load new addr space for PE
+    // TODO not for kernel threads
+    let mut address_space = AddressSpace::new().map_err(Error::msg)?;
+    unsafe {
+        address_space.load_unconditionally();
+    }
 
-    // TODO allocate address space
-    let mut address_space = AddressSpace::current();
+    // parse PE
+    // TODO parse in new userspace process in its own address space
+    //  * PE loader needs to be available as a userspace dll
+    //      * not necessarily on filesystem
+    //  * PE loader needs to replace itself with the new process
+    let pe = pe::Pe::from_buffer(image).map_err(Error::msg)?;
 
     // check image can be mapped at preferred base without relocating
     let (image_base, pages_needed, entry_point_rva) =
@@ -49,13 +59,13 @@ pub fn spawn_process() -> anyhow::Result<Rc<Process>> {
 
     let length = pages_needed * FRAME_SIZE as usize;
     let mut mapped = {
-        // map as RWX and on-demand
+        // map as RWX and userspace (TODO depends on options)
         address_space
             .map_range(
                 image_base,
                 length as u64,
                 MapTarget::Any,
-                MapFlags::Writeable | MapFlags::Executable,
+                MapFlags::Writeable | MapFlags::Executable | MapFlags::User,
             )
             .map_err(Error::msg)?
     };
@@ -77,7 +87,7 @@ pub fn spawn_process() -> anyhow::Result<Rc<Process>> {
 
         dst.copy_from_slice(headers);
 
-        // TODO mark headers as ro
+        // TODO update header permissions as ro
     }
 
     // copy sections
@@ -121,7 +131,6 @@ pub fn spawn_process() -> anyhow::Result<Rc<Process>> {
         }
 
         // TODO protect sections properly
-        // TODO mmap sections instead of copy
     }
 
     // allocate a stack
@@ -133,44 +142,24 @@ pub fn spawn_process() -> anyhow::Result<Rc<Process>> {
             stack_bottom,
             stack_size,
             MapTarget::Any,
-            MapFlags::Writeable,
+            MapFlags::Writeable | MapFlags::User | MapFlags::Commit,
         )
         .map_err(Error::msg)?;
 
-    let stack_top = mapped.end_address();
+    let stack_top = mapped.end_address() - 64;
     let entry_point = image_base + entry_point_rva;
 
-    // TODO actually allocate a process/thread struct
+    // TODO allocate heap
+    // TODO respect PE requested heap+stack commit/reserve
     // TODO flush instruction cache?
-    // TODO load address space
 
-    trace!(
-        "new stack is at {:?}, calling entrypoint at {:?}",
-        stack_top,
-        entry_point
+    let proc = new_process(
+        Some(address_space),
+        new_pid(),
+        ProcessPrivilegeLevel::Kernel,
     );
-
-    unsafe {
-        asm!(
-        // switch stack
-        "mov rsp, {new_rsp}",
-
-        // stdcall entry point args
-        "push 0",
-        "push 0",
-        "push 0",
-
-        // jmp to entrypoint
-        "call {entry}",
-
-        new_rsp = in(reg) stack_top.address(),
-        entry = in(reg) entry_point.address(),
-        );
-    }
-
-    // TODO handle exit
-
-    unimplemented!("process main returned??!!")
+    let _thread = new_thread(new_pid(), stack_top, Some(proc.clone()), entry_point);
+    Ok(proc)
 }
 
 /// (image base, size of image in 4k pages, entrypoint RVA)

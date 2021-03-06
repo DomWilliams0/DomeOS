@@ -1,13 +1,21 @@
 use crate::memory::phys::{frame_allocator, FrameAllocator};
+
+use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use enumflags2::BitFlags;
 pub use memory::{
     MemoryError, MemoryProvider, PageTableHierarchy, PhysicalFrame, RawAddressSpace, P1, P2, P4,
 };
 
+#[derive(Clone)]
 pub struct FrameProvider;
 
 pub struct AddressSpace<'p>(RawAddressSpace<'p, FrameProvider>);
+
+/// * 'p: physical PML4 page
+/// * 'r: this reference
+#[repr(transparent)]
+pub struct AddressSpaceRef<'p: 'r, 'r>(AddressSpace<'p>, PhantomData<&'r ()>);
 
 impl MemoryProvider for FrameProvider {
     fn new_frame(&mut self) -> Result<PhysicalFrame, MemoryError> {
@@ -22,17 +30,25 @@ impl<'p> AddressSpace<'p> {
         Self(address_space)
     }
 
-    fn kernel() -> AddressSpace<'static> {
+    pub fn kernel<'r>() -> AddressSpaceRef<'static, 'r> {
         extern "C" {
             #[link_name = "init_pml4"]
             static KERNEL_P4: usize;
         }
 
-        let address_space = unsafe {
-            let p4 = (&KERNEL_P4) as *const _ as u64 as *mut () as *mut _;
-            RawAddressSpace::with_existing(P4::with_initialized(&mut *p4), FrameProvider)
-        };
-        AddressSpace(address_space)
+        unsafe {
+            let address_space = AddressSpace({
+                let p4 = (&KERNEL_P4) as *const _ as u64 as *mut () as *mut _;
+                RawAddressSpace::with_existing(P4::with_initialized(&mut *p4), FrameProvider)
+            });
+
+            AddressSpaceRef(address_space, PhantomData)
+        }
+    }
+
+    pub fn is_current(&self) -> bool {
+        let current = cr3::get();
+        self.0 == current
     }
 
     /// New totally empty address space
@@ -71,9 +87,21 @@ impl<'p> AddressSpace<'p> {
         Ok(addr_space)
     }
 
-    pub unsafe fn load(&mut self) {
+    pub fn borrow<'space>(&self) -> AddressSpaceRef<'p, 'space> {
+        // safety: lifetime is still restricted
+        let addr_space = unsafe { self.0.clone() };
+        AddressSpaceRef(AddressSpace(addr_space), PhantomData)
+    }
+
+    pub unsafe fn load_unconditionally(&mut self) {
         let pml4 = self.pml4_mut();
         cr3::set(&*pml4)
+    }
+
+    pub unsafe fn load_if_not_current(&mut self) {
+        if !self.is_current() {
+            self.load_unconditionally();
+        }
     }
 
     pub fn log_hierarchy(&self) {
@@ -110,6 +138,19 @@ impl<'p> Deref for AddressSpace<'p> {
 }
 
 impl<'p> DerefMut for AddressSpace<'p> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+impl<'p, 'r> Deref for AddressSpaceRef<'p, 'r> {
+    type Target = AddressSpace<'p>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'p, 'r> DerefMut for AddressSpaceRef<'p, 'r> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }

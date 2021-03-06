@@ -14,7 +14,7 @@ int _start() {
 		g_things[i] = 0x66666666;
 	}
 
-	do_illegal();
+	//do_illegal();
 
 	while (1);
 }
