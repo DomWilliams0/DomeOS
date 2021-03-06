@@ -42,6 +42,15 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
         thread.clone()
     };
 
+    // use this stack for interrupts after jumping to userspace
+    {
+        let rsp: u64;
+        unsafe {
+            asm!("mov {0}, rsp", out(reg) rsp);
+        }
+        crate::descriptor_tables::tss().set_privilege_stack(0, VirtualAddress(rsp));
+    }
+
     unsafe { thread.run_now() }
 }
 
