@@ -1,4 +1,4 @@
-use crate::address::VirtualAddress;
+use crate::{kilobytes, megabytes};
 
 pub const VIRT_USERSPACE_MAX: u64 = 0x2000_0000_0000;
 
@@ -16,35 +16,10 @@ pub const PHYS_KERNEL_BASE: u64 = 0x10_0000;
 
 pub const FRAME_SIZE: u64 = 4096;
 
-#[derive(Copy, Clone)]
-pub enum VirtualMapping {
-    PhysicalIdentity,
-    KernelIdentity,
-}
-
-#[deprecated]
-pub fn mapping_for_address(addr: VirtualAddress) -> Option<VirtualMapping> {
-    let ranges = [
-        (
-            VirtualMapping::KernelIdentity,
-            VIRT_KERNEL_BASE,
-            VIRT_KERNEL_MAX,
-        ),
-        (
-            VirtualMapping::PhysicalIdentity,
-            VIRT_PHYSICAL_BASE,
-            VIRT_PHYSICAL_MAX,
-        ),
-    ];
-
-    ranges.iter().find_map(|(ty, start, end)| {
-        if ((*start)..(*end)).contains(&addr.0) {
-            Some(*ty)
-        } else {
-            None
-        }
-    })
-}
+pub const KERNEL_STACKS_START: u64 = 0xffff_8000_0000_0000;
+pub const KERNEL_STACK_MAX_SIZE: u64 = megabytes(8);
+pub const KERNEL_STACK_SIZE: u64 = kilobytes(64) / FRAME_SIZE;
+pub const KERNEL_STACKS_MAX: u64 = 512;
 
 #[cfg(test)]
 mod tests {

@@ -32,6 +32,7 @@ mod process;
 mod serial;
 mod spinlock;
 mod start;
+mod syscall;
 mod vga;
 
 #[no_mangle]

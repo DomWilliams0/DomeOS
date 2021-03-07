@@ -6,9 +6,9 @@ use modular_bitfield::prelude::*;
 use crate::io::Port;
 use crate::irq;
 
-const PIT_CHANNEL0_DATA: Port = Port(0x40);
-// const PIT_CHANNEL2_DATA: Port = Port(0x42);
-const PIT_COMMAND: Port = Port(0x43);
+const PIT_CHANNEL0_DATA: Port = Port::new(0x40);
+// const PIT_CHANNEL2_DATA: Port = Port::new(0x42);
+const PIT_COMMAND: Port = Port::new(0x43);
 
 const TICKS_PER_SECOND: u64 = 120;
 

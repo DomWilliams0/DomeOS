@@ -32,6 +32,7 @@ A toy x86_64 OS in Rust.
   * [ ] Userspace process
   * [ ] Syscalls
   * [ ] Basic Rust `std` userspace implementation
+* [ ] Add support for hardware without 1G pages (inc. VirtualBox and Bochs)
 * ...everything else...
 
 ## Building

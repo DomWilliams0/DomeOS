@@ -6,8 +6,8 @@ use modular_bitfield::prelude::*;
 
 static mut GDT: InitializedGlobal<GlobalDescriptorTable> = InitializedGlobal::uninit();
 
-const SEL_KERNEL_CODE: u8 = 0x08;
-const SEL_KERNEL_DATA: u8 = 0x10;
+pub const SEL_KERNEL_CODE: u8 = 0x08;
+pub const SEL_KERNEL_DATA: u8 = 0x10;
 pub const SEL_USER_CODE: u8 = 0x1b;
 pub const SEL_USER_DATA: u8 = 0x23;
 

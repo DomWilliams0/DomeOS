@@ -6,11 +6,11 @@ use crate::exception::Exception;
 use crate::io::Port;
 use core::convert::TryFrom;
 
-const PIC_MASTER_COMMAND: Port = Port(0x20);
-const PIC_MASTER_DATA: Port = Port(0x21);
+const PIC_MASTER_COMMAND: Port = Port::new(0x20);
+const PIC_MASTER_DATA: Port = Port::new(0x21);
 
-const PIC_SLAVE_COMMAND: Port = Port(0xA0);
-const PIC_SLAVE_DATA: Port = Port(0xA1);
+const PIC_SLAVE_COMMAND: Port = Port::new(0xA0);
+const PIC_SLAVE_DATA: Port = Port::new(0xA1);
 
 const PIC_END_OF_INTERRUPT: u8 = 0x20;
 

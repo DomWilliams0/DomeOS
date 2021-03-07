@@ -10,7 +10,7 @@ use memory::{kilobytes, round_up_to, MapFlags, MapTarget, VirtualAddress, FRAME_
 use pe::{Address, Pe, PeError};
 
 // temporary
-const NOP_EXE: &[u8] = include_bytes!("../../../../userspace/nop.exe");
+const NOP_EXE: &[u8] = include_bytes!("../../../../userspace/syscall.exe");
 
 const STACK_START: u64 = 0x6666_0000;
 const INITIAL_STACK_SIZE: u64 = kilobytes(128);

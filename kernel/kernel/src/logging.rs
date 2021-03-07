@@ -10,7 +10,7 @@ use crate::spinlock::SpinLock;
 use crate::vga::Color;
 use crate::{clock, vga};
 
-static mut COM1: SerialPort = SerialPort::new(Port(0x3F8), false);
+static mut COM1: SerialPort = SerialPort::new(Port::new(0x3F8), false);
 
 static mut SERIAL_LOGGER: MaybeUninit<LockedSerialLogger> = MaybeUninit::uninit();
 
