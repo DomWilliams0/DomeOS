@@ -104,10 +104,10 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         &mut self,
         start: VirtualAddress,
         size: u64,
-        target: MapTarget,
+        _target: MapTarget,
         flags: impl Into<BitFlags<MapFlags>>,
     ) -> MemoryResult<MappedSlice> {
-        self.map_range_impl(start, size, target, flags.into())
+        self.map_range_impl(start, size, flags.into())
     }
 
     /// Actual implementation with no generic params to avoid huge code duplication
@@ -116,7 +116,6 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         &mut self,
         start: VirtualAddress,
         size: u64,
-        target: MapTarget,
         flags: BitFlags<MapFlags>,
     ) -> MemoryResult<MappedSlice> {
         #[cfg(feature = "log-paging")]
