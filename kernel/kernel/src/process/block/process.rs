@@ -1,11 +1,15 @@
-use crate::memory::{AddressSpace, AddressSpaceRef};
+use crate::memory::{
+    AddressSpace, AddressSpaceRef, ProcessKernelStacks, ProcessUserStacks, Stacks,
+};
 use crate::process::block::id::{OwnedPid, Pid};
+use crate::process::block::new_pid;
 use crate::process::block::thread::ThreadRef;
 use crate::spinlock::SpinLock;
 use alloc::sync::Arc;
 use common::*;
 use core::cell::RefCell;
 use core::ops::{Deref, DerefMut};
+use memory::{MemoryError, VirtualAddress};
 use smallvec::SmallVec;
 
 #[derive(Clone)]
@@ -21,9 +25,10 @@ pub struct ProcessHandle {
 
 /// Not protected by mutex/refcell, readonly after creation
 pub struct ProcessConstantInner {
-    /// * None: use default kernel address space
-    /// * Some: use own address space, destroyed along with this process
-    addr_space: Option<AddressSpace<'static>>,
+    addr_space: AddressSpace<'static>,
+
+    /// If true, destroy the address space on process exit
+    owns_addr_space: bool,
 
     pid: OwnedPid,
 
@@ -33,6 +38,9 @@ pub struct ProcessConstantInner {
 /// Protected by mutex
 pub struct ProcessLockedInner {
     threads: SmallVec<[ThreadRef; 2]>,
+
+    user_stacks: Stacks<ProcessUserStacks>,
+    kernel_stacks: Stacks<ProcessKernelStacks>,
 }
 
 /// Protected by a refcell
@@ -44,27 +52,55 @@ pub enum ProcessPrivilegeLevel {
     Kernel,
 }
 
-pub fn new_process(
-    addr_space: Option<AddressSpace<'static>>,
-    pid: OwnedPid,
-    pl: ProcessPrivilegeLevel,
-) -> ProcessRef {
-    let pid_copy = *pid;
-    let process = ProcessRef(Arc::new(ProcessHandle {
-        inner_const: ProcessConstantInner {
-            addr_space,
-            pid,
-            pl,
-        },
-        inner_locked: SpinLock::new(ProcessLockedInner {
-            threads: SmallVec::new(),
-        }),
-        inner_refcell: RefCell::new(ProcessInner {}),
-    }));
+pub enum ProcessAddressSpace {
+    Owned(AddressSpace<'static>),
 
-    trace!("new process {:?}", pid_copy);
+    /// Use default shared kernel address space
+    Kernel,
+}
 
-    process
+/// Shared kernel "process" that owns kernel threads and allocates their stacks
+static mut KERNEL_PROCESS: InitializedGlobal<ProcessRef> = InitializedGlobal::uninit();
+
+/// Must be called once only before other process/thread creation
+pub fn init_kernel_process() {
+    let process = ProcessRef::new(
+        ProcessAddressSpace::Kernel,
+        new_pid(),
+        ProcessPrivilegeLevel::Kernel,
+    );
+    unsafe {
+        KERNEL_PROCESS.init(process);
+    }
+}
+
+impl ProcessRef {
+    pub fn new(addr_space: ProcessAddressSpace, pid: OwnedPid, pl: ProcessPrivilegeLevel) -> Self {
+        let pid_copy = *pid;
+        let (addr_space, owns_addr_space) = match addr_space {
+            ProcessAddressSpace::Owned(space) => (space, true),
+            ProcessAddressSpace::Kernel => (AddressSpace::kernel(), false),
+        };
+
+        let process = ProcessRef(Arc::new(ProcessHandle {
+            inner_const: ProcessConstantInner {
+                addr_space,
+                owns_addr_space,
+                pid,
+                pl,
+            },
+            inner_locked: SpinLock::new(ProcessLockedInner {
+                threads: SmallVec::new(),
+                user_stacks: Stacks::default(),
+                kernel_stacks: Stacks::default(),
+            }),
+            inner_refcell: RefCell::new(ProcessInner {}),
+        }));
+
+        trace!("new process {:?}", pid_copy);
+
+        process
+    }
 }
 
 impl Deref for ProcessHandle {
@@ -94,10 +130,32 @@ impl ProcessHandle {
         self.inner_locked.lock()
     }
 
-    // TODO lifetime probably shouldn't be static on the clone
-    pub fn address_space(&self) -> Option<AddressSpaceRef<'static, '_>> {
-        self.inner_const.addr_space.as_ref().map(|a| a.borrow())
+    pub fn address_space(&self) -> AddressSpaceRef<'static, '_> {
+        self.inner_const.addr_space.borrow()
     }
+
+    /// (user thread stack, kernel thread stack)
+    pub fn allocate_new_thread_stacks(
+        &self,
+    ) -> Result<(VirtualAddress, VirtualAddress), MemoryError> {
+        let (user, kernel) = {
+            let mut inner = self.inner_locked.lock();
+            (
+                inner.user_stacks.new_stack(),
+                inner.kernel_stacks.new_stack(),
+            )
+        };
+
+        // mutex dropped asap
+
+        let (user, _) = user?;
+        let (kernel, _) = kernel?;
+        Ok((user, kernel))
+    }
+}
+
+pub fn kernel_process() -> ProcessRef {
+    unsafe { KERNEL_PROCESS.get().clone() }
 }
 
 impl ProcessLockedInner {
@@ -131,5 +189,14 @@ impl ProcessConstantInner {
 impl ProcessPrivilegeLevel {
     pub fn user(self) -> bool {
         matches!(self, Self::User)
+    }
+}
+
+impl Drop for ProcessHandle {
+    fn drop(&mut self) {
+        trace!("dropping process {:?}", self.pid);
+
+        // TODO kill all threads
+        // TODO destroy address space if owned
     }
 }

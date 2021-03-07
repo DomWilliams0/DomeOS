@@ -30,19 +30,17 @@ impl<'p> AddressSpace<'p> {
         Self(address_space)
     }
 
-    pub fn kernel<'r>() -> AddressSpaceRef<'static, 'r> {
+    pub fn kernel() -> AddressSpace<'static> {
         extern "C" {
             #[link_name = "init_pml4"]
             static KERNEL_P4: usize;
         }
 
         unsafe {
-            let address_space = AddressSpace({
+            AddressSpace({
                 let p4 = (&KERNEL_P4) as *const _ as u64 as *mut () as *mut _;
                 RawAddressSpace::with_existing(P4::with_initialized(&mut *p4), FrameProvider)
-            });
-
-            AddressSpaceRef(address_space, PhantomData)
+            })
         }
     }
 

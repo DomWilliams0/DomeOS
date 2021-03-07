@@ -1,19 +1,19 @@
 use crate::memory::AddressSpace;
-use crate::process::block::{new_pid, new_process, new_thread, ProcessPrivilegeLevel, ProcessRef};
+use crate::process::block::{
+    new_pid, ProcessAddressSpace, ProcessPrivilegeLevel, ProcessRef, ThreadProcess,
+};
 use crate::process::error::ProcessError;
 
+use crate::process::ThreadRef;
 use common::{
     anyhow::{self, anyhow, Error},
     *,
 };
-use memory::{kilobytes, round_up_to, MapFlags, MapTarget, VirtualAddress, FRAME_SIZE};
+use memory::{round_up_to, MapFlags, MapTarget, VirtualAddress, FRAME_SIZE};
 use pe::{Address, Pe, PeError};
 
 // temporary
 const NOP_EXE: &[u8] = include_bytes!("../../../../userspace/syscall.exe");
-
-const STACK_START: u64 = 0x6666_0000;
-const INITIAL_STACK_SIZE: u64 = kilobytes(128);
 
 // TODO need to configure via args:
 //  * user vs kernel
@@ -133,28 +133,19 @@ pub fn experiment_new_process() -> anyhow::Result<ProcessRef> {
         // TODO protect sections properly
     }
 
-    // allocate a stack
-    // TODO guard page to grow stack dynamically
-    let stack_bottom = VirtualAddress::with_literal(STACK_START);
-    let stack_size = INITIAL_STACK_SIZE;
-    let mapped = address_space
-        .map_range(
-            stack_bottom,
-            stack_size,
-            MapTarget::Any,
-            MapFlags::Writeable | MapFlags::User | MapFlags::Commit,
-        )
-        .map_err(Error::msg)?;
-
-    let stack_top = mapped.end_address() - 64;
     let entry_point = image_base + entry_point_rva;
 
     // TODO allocate heap
     // TODO respect PE requested heap+stack commit/reserve
     // TODO flush instruction cache?
 
-    let proc = new_process(Some(address_space), new_pid(), ProcessPrivilegeLevel::User);
-    let _thread = new_thread(new_pid(), stack_top, Some(proc.clone()), entry_point);
+    let proc = ProcessRef::new(
+        ProcessAddressSpace::Owned(address_space),
+        new_pid(),
+        ProcessPrivilegeLevel::User,
+    );
+    let _thread = ThreadRef::new(ThreadProcess::Process(proc.clone()), new_pid(), entry_point)
+        .map_err(Error::msg)?;
     Ok(proc)
 }
 

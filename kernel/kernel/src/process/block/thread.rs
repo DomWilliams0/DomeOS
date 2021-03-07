@@ -1,13 +1,13 @@
 use crate::descriptor_tables::{SEL_USER_CODE, SEL_USER_DATA};
-use crate::memory::{AddressSpace, AddressSpaceRef};
+use crate::memory::AddressSpaceRef;
 use crate::process::block::id::{OwnedPid, Pid};
-use crate::process::block::process::ProcessRef;
+use crate::process::block::process::{kernel_process, ProcessRef};
 use crate::spinlock::SpinLock;
 use alloc::sync::Arc;
 use common::*;
 use core::cell::RefCell;
 use core::ops::Deref;
-use memory::VirtualAddress;
+use memory::{MemoryError, VirtualAddress};
 
 #[derive(Clone)]
 pub struct ThreadRef(Arc<ThreadHandle>);
@@ -22,20 +22,18 @@ pub struct ThreadHandle {
 
 /// Not protected by mutex/refcell, readonly after creation
 pub struct ThreadConstantInner {
-    /// Parent process, None for kernel threads
-    process: Option<ProcessRef>,
+    process: ProcessRef,
 
     tid: OwnedPid,
 }
 
 /// Protected by mutex
-struct ThreadLockedInner {}
+struct ThreadLockedInner {
+    kernel_stack: VirtualAddress,
+}
 
 /// Protected by a refcell
 struct ThreadInner {
-    /// Start of usable stack (growing downwards)
-    stack_top: VirtualAddress,
-
     state: ThreadState,
 }
 
@@ -66,30 +64,48 @@ struct ThreadState {
     // TODO SSE/MMX if necessary
 }
 
-pub fn new_thread(
-    tid: OwnedPid,
-    stack_top: VirtualAddress,
-    process: Option<ProcessRef>,
-    entry_point: VirtualAddress,
-) -> ThreadRef {
-    let tid_copy = *tid;
-    let thread = ThreadRef(Arc::new(ThreadHandle {
-        inner_const: ThreadConstantInner { process, tid },
-        inner_locked: SpinLock::new(ThreadLockedInner {}),
-        inner_refcell: RefCell::new(ThreadInner {
-            stack_top,
-            state: ThreadState {
-                rsp: stack_top.address(),
-                rip: entry_point.address(),
-                ..ThreadState::default()
-            },
-        }),
-    }));
+pub enum ThreadProcess {
+    Process(ProcessRef),
+    KernelThread,
+}
 
-    if let Some(process) = thread.inner_const.process.as_ref() {
-        let mut inner = process.inner_locked();
-        let idx = inner.add_thread(thread.clone()).unwrap(); // thread just created so can't already be a member
-        drop(inner);
+impl ThreadRef {
+    pub fn new(
+        process: ThreadProcess,
+        tid: OwnedPid,
+        entry_point: VirtualAddress,
+    ) -> Result<ThreadRef, MemoryError> {
+        let (process, user_stack, kernel_stack) = {
+            let proc = match process {
+                ThreadProcess::Process(proc) => proc,
+                ThreadProcess::KernelThread => kernel_process(),
+            };
+
+            let (user, kernel) = proc.allocate_new_thread_stacks()?;
+            (proc, user, kernel)
+        };
+
+        let tid_copy = *tid;
+        let thread = ThreadRef(Arc::new(ThreadHandle {
+            inner_const: ThreadConstantInner {
+                process: process.clone(),
+                tid,
+            },
+            inner_locked: SpinLock::new(ThreadLockedInner { kernel_stack }),
+            inner_refcell: RefCell::new(ThreadInner {
+                state: ThreadState {
+                    rsp: user_stack.address(),
+                    rip: entry_point.address(),
+                    ..ThreadState::default()
+                },
+            }),
+        }));
+
+        // register with process
+        let idx = {
+            let mut inner = process.inner_locked();
+            inner.add_thread(thread.clone()).unwrap() // thread just created so can't already be a member
+        };
 
         trace!(
             "new thread {:?} added to process {:?} as thread #{}",
@@ -97,11 +113,9 @@ pub fn new_thread(
             process.pid(),
             idx
         );
-    } else {
-        trace!("new kernel thread {:?}", tid_copy);
-    }
 
-    thread
+        Ok(thread)
+    }
 }
 
 impl Deref for ThreadHandle {
@@ -123,6 +137,13 @@ impl Deref for ThreadRef {
 impl ThreadConstantInner {
     pub fn tid(&self) -> Pid {
         *self.tid
+    }
+}
+
+impl Drop for ThreadHandle {
+    fn drop(&mut self) {
+        trace!("dropping thread {:?}", self.tid);
+        // TODO unmap kernel stack
     }
 }
 
@@ -280,17 +301,10 @@ impl ThreadHandle {
     }
 
     pub fn address_space(&self) -> AddressSpaceRef<'static, '_> {
-        self.inner_const
-            .process
-            .as_ref()
-            .and_then(|proc| proc.address_space())
-            .unwrap_or_else(AddressSpace::kernel)
+        self.inner_const.process.address_space()
     }
 
     pub fn is_user(&self) -> bool {
-        match self.inner_const.process.as_ref() {
-            None => false,
-            Some(proc) => proc.privilege_level().user(),
-        }
+        self.inner_const.process.privilege_level().user()
     }
 }

@@ -29,4 +29,7 @@ pub enum MemoryError {
 
     /// Physical page {0:#x} is already mapped
     AlreadyMapped(u64),
+
+    /// Invalid stack index {0}:{1} for {2}
+    InvalidStack(u64, u64, &'static str),
 }

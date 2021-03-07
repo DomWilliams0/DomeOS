@@ -1,68 +1,157 @@
 //! Kernel stack management
 
 use memory::{
-    MapFlags, MapTarget, MemoryError, VirtualAddress, FRAME_SIZE, KERNEL_STACKS_MAX,
-    KERNEL_STACKS_START, KERNEL_STACK_MAX_SIZE, KERNEL_STACK_SIZE,
+    gigabytes, kilobytes, megabytes, MapFlags, MapTarget, MemoryError, VirtualAddress, FRAME_SIZE,
 };
 
 use crate::memory::AddressSpace;
+use core::marker::PhantomData;
+use enumflags2::BitFlags;
 
-/// [stack bottom, stack top)
-fn kernel_stack_for_cpu(cpu: u64) -> (VirtualAddress, VirtualAddress) {
-    assert!(cpu < KERNEL_STACKS_MAX, "cpu {} out of range", cpu);
+pub trait StackAllocation {
+    /// Bottom of allocation
+    const BASE: u64;
 
-    let stack_bottom =
-        VirtualAddress::with_literal(KERNEL_STACKS_START + (cpu * KERNEL_STACK_MAX_SIZE));
-    let stack_top = stack_bottom + KERNEL_STACK_MAX_SIZE - 8;
+    /// Size of total allocation in bytes
+    const SIZE: u64;
 
-    (stack_bottom, stack_top)
+    /// Max size of a single stack in bytes
+    const MAX_STACK_SIZE: u64;
+
+    /// Amount to grow a stack at a time in bytes
+    const STACK_GROWTH_INCREMENT: u64;
+
+    const WHAT: &'static str;
+
+    const USER_ACCESSIBLE: bool = false;
+
+    const MAX_SLABS: u64 = Self::MAX_STACK_SIZE / Self::STACK_GROWTH_INCREMENT;
+    const MAX_STACKS: u64 = Self::SIZE / Self::MAX_STACK_SIZE;
 }
 
-pub fn init_kernel_stack(cpu: u64) -> Result<(), MemoryError> {
-    let (_bottom, top) = kernel_stack_for_cpu(cpu);
+/// Kernel stacks for each thread in a process
+pub struct ProcessKernelStacks;
 
-    // TODO grow stack dynamically if needed?
-    let alloc_start = top - KERNEL_STACK_SIZE;
+/// User stacks for each thread in a process
+pub struct ProcessUserStacks;
 
-    let mut addr_space = AddressSpace::kernel();
-    let addr = allocate_kernel_stack(&mut addr_space, alloc_start, KERNEL_STACK_SIZE as usize)?;
+/// Kernel stacks for interrupts for each CPU
+pub struct KernelInterruptStacks;
 
-    common::debug!("kernel stack for cpu #{} allocated at {:?}", cpu, addr);
-    Ok(())
+#[derive(Copy, Clone)]
+pub struct StackIndex(u64);
+
+pub struct Stacks<A: StackAllocation> {
+    next_stack: u64,
+    _phantom: PhantomData<A>,
 }
 
-/// Top of stack for given CPU
-pub fn kernel_stack(cpu: u64) -> VirtualAddress {
-    let (_bottom, top) = kernel_stack_for_cpu(cpu);
-    top
+impl<A: StackAllocation> Default for Stacks<A> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-/// Returns stack top.
-///
-/// Leaves an unmapped guard page to ensure double fault on stack overflow
-fn allocate_kernel_stack(
-    addr_space: &mut AddressSpace,
-    stack_bottom: VirtualAddress,
-    frames: usize,
-) -> Result<VirtualAddress, MemoryError> {
-    let stack_bottom = stack_bottom.round_down_to(FRAME_SIZE);
+impl<A: StackAllocation> Stacks<A> {
+    pub fn new() -> Self {
+        Self {
+            next_stack: 0,
+            _phantom: PhantomData,
+        }
+    }
 
-    // +1 for guard page
-    let frames = frames + 1;
-    let base = addr_space.find_free_space(stack_bottom, frames)?;
+    pub fn new_stack(&mut self) -> Result<(VirtualAddress, StackIndex), MemoryError> {
+        let idx = StackIndex(self.next_stack);
+        let stack = Self::allocate_stack(idx, 0)?;
 
-    // leave guard page unmapped
-    // addr_space.map_range(base, FRAME_SIZE, MapTarget::Any, MapFlags::StackGuard)?;
+        // increment on success
+        self.next_stack += 1;
 
-    // map stack just afterwards
-    let stack_bottom = base + FRAME_SIZE;
-    addr_space.map_range(
-        stack_bottom,
-        (frames as u64 - 1) * FRAME_SIZE,
-        MapTarget::Any,
-        MapFlags::Writeable | MapFlags::Commit,
-    )?;
+        Ok((stack, idx))
+    }
 
-    // return stack top
-    Ok(base + (frames as u64 * FRAME_SIZE))
+    /// * stack: unique stack index
+    /// * slab: slab index in this stack to grow. Starts at 0 and increments for each growth
+    fn allocate_stack(
+        StackIndex(stack): StackIndex,
+        slab: u64,
+    ) -> Result<VirtualAddress, MemoryError> {
+        let calc_slab_bottom = || -> Option<VirtualAddress> {
+            if !Self::validate(stack, slab) {
+                return None;
+            };
+
+            let stack_top = A::BASE + ((stack + 1) * A::MAX_STACK_SIZE);
+            let slab_bottom = stack_top.checked_sub((slab + 1) * A::STACK_GROWTH_INCREMENT)?;
+            VirtualAddress::new_checked(slab_bottom)
+        };
+
+        let slab_bottom =
+            calc_slab_bottom().ok_or(MemoryError::InvalidStack(stack, slab, A::WHAT))?;
+
+        debug_assert_eq!(
+            slab_bottom.address(),
+            slab_bottom.round_down_to(FRAME_SIZE).address()
+        );
+
+        // includes guard page
+        let mut addr_space = AddressSpace::current();
+
+        // ensure unmapped
+        if addr_space.get_absent_mapping(slab_bottom).is_ok() {
+            return Err(MemoryError::AlreadyMapped(slab_bottom.address()));
+        }
+
+        // leave guard page unmapped
+        // addr_space.map_range(base, FRAME_SIZE, MapTarget::Any, MapFlags::StackGuard)?;
+        // TODO unmapped guard page entry should store the index of the next slab to grow
+
+        // map stack just afterwards
+        let extra_flags = if A::USER_ACCESSIBLE {
+            MapFlags::User.into()
+        } else {
+            BitFlags::empty()
+        };
+
+        addr_space.map_range(
+            slab_bottom + FRAME_SIZE,
+            A::STACK_GROWTH_INCREMENT - FRAME_SIZE,
+            MapTarget::Any,
+            extra_flags | MapFlags::Writeable,
+        )?;
+
+        // return stack top
+        Ok(slab_bottom + FRAME_SIZE + A::STACK_GROWTH_INCREMENT - 8)
+    }
+
+    fn validate(stack: u64, slab: u64) -> bool {
+        debug_assert!(A::MAX_SLABS > 0 && A::MAX_STACKS > 0);
+
+        stack < A::MAX_STACKS && slab < A::MAX_SLABS
+    }
+}
+
+impl StackAllocation for ProcessKernelStacks {
+    const BASE: u64 = 0xffff_8001_0000_0000;
+    const SIZE: u64 = gigabytes(4);
+    const MAX_STACK_SIZE: u64 = kilobytes(128);
+    const STACK_GROWTH_INCREMENT: u64 = Self::MAX_STACK_SIZE;
+    const WHAT: &'static str = "process kernel stack";
+}
+
+impl StackAllocation for ProcessUserStacks {
+    const BASE: u64 = 0x0000_1ff8_0000_0000;
+    const SIZE: u64 = gigabytes(32);
+    const MAX_STACK_SIZE: u64 = megabytes(1);
+    const STACK_GROWTH_INCREMENT: u64 = kilobytes(64);
+    const WHAT: &'static str = "user thread stack";
+    const USER_ACCESSIBLE: bool = true;
+}
+
+impl StackAllocation for KernelInterruptStacks {
+    const BASE: u64 = 0xffff_8000_0000_0000;
+    const SIZE: u64 = megabytes(8);
+    const MAX_STACK_SIZE: u64 = kilobytes(64);
+    const STACK_GROWTH_INCREMENT: u64 = Self::MAX_STACK_SIZE;
+    const WHAT: &'static str = "interrupt stack";
 }

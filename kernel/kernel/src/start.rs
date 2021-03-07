@@ -4,6 +4,7 @@ use crate::descriptor_tables::{SEL_KERNEL_CODE, SEL_USER_CODE};
 use crate::io::{Efer, LStar, Msr, Star};
 use crate::irq::{disable_interrupts, enable_interrupts};
 use crate::logging::LogMode;
+use crate::memory::{KernelInterruptStacks, Stacks};
 use crate::multiboot;
 use crate::multiboot::Multiboot;
 use crate::process::ThreadRef;
@@ -33,14 +34,22 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     // actually mapped
     enable_interrupts();
 
-    // prepare for syscalls
+    // prepare for syscalls, processes and userspace
     enable_syscalls();
-    crate::memory::init_kernel_stack(0).expect("failed to map kernel stack");
+    crate::process::init_kernel_process();
 
+    // TODO 1 stack per core only
+    let mut interrupt_stacks = Stacks::<KernelInterruptStacks>::new();
+    let (_interrupt_stack, _) = interrupt_stacks
+        .new_stack()
+        .expect("failed to map kernel interrupt stack");
+    // TODO register stack for use by interrupts
+
+    // begin testing
     let process = crate::process::experiment_new_process().expect("failed");
     debug!("process created");
 
-    let thread: ThreadRef = {
+    let _thread: ThreadRef = {
         let inner = process.inner_locked();
         let thread = inner.threads().next().expect("no main thread");
         thread.clone()
@@ -55,7 +64,8 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
         crate::descriptor_tables::tss().set_privilege_stack(0, VirtualAddress(rsp));
     }
 
-    unsafe { thread.run_now() }
+    // unsafe { thread.run_now() }
+    hang()
 }
 
 fn breakpoint() {
