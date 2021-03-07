@@ -5,6 +5,7 @@ members = [
     "common",
     "memory",
     "pe",
+    "userspace/syscall",
     # build helpers
     "helpers/ld-link-map",
     "helpers/patcher",

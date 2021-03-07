@@ -12,7 +12,7 @@ const PACKED_SYMBOLS_COUNT: usize = kilobytes(512) as usize / core::mem::size_of
 const PACKED_SYMBOLS_MARKER: u32 = 0xbeef_face;
 static PACKED_SYMBOLS: [u32; PACKED_SYMBOLS_COUNT] = [PACKED_SYMBOLS_MARKER; PACKED_SYMBOLS_COUNT];
 
-#[panic_handler]
+#[cfg_attr(not(test), panic_handler)]
 fn panic_handler(panic_info: &PanicInfo) -> ! {
     if is_panicking() {
         error!("nested panic: {:#?}", panic_info);

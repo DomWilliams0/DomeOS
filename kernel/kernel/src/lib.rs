@@ -10,6 +10,7 @@
 #![feature(alloc_error_handler)]
 #![feature(core_intrinsics)]
 #![feature(const_ptr_offset_from, const_maybe_uninit_as_ptr, const_raw_ptr_deref)]
+#![feature(naked_functions)]
 
 extern crate alloc;
 

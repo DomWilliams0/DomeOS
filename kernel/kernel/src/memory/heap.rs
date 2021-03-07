@@ -8,7 +8,7 @@ use memory::{
     VirtualAddress, FRAME_SIZE, VIRT_KERNEL_HEAP_BASE,
 };
 
-#[global_allocator]
+#[cfg_attr(not(test), global_allocator)]
 static mut HEAP: Heap = Heap(RefCell::new(buddy_system_allocator::Heap::empty()));
 
 const MIN_HEAP_ALLOC: u64 = kilobytes(512);
@@ -112,7 +112,7 @@ unsafe impl GlobalAlloc for Heap {
     }
 }
 
-#[alloc_error_handler]
+#[cfg_attr(not(test), alloc_error_handler)]
 fn alloc_error_handler(layout: Layout) -> ! {
     panic!("failed to allocate: {:?}", layout)
 }
