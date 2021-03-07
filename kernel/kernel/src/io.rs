@@ -20,7 +20,7 @@ pub trait Msr: Sized {
 
     unsafe fn store(&self) {
         let value = self.value();
-        common::trace!("setting MSR {} to {:#x}", Self::NAME, value);
+        common::trace!("{} = {:#x}", Self::NAME, value);
 
         let lo = value as u32;
         let hi = (value >> 32) as u32;
@@ -52,16 +52,6 @@ impl Add<u16> for Port {
     }
 }
 
-//
-// pub const LSTAR: Self = Self(0xC0000082);
-//
-// /// The kernel's RIP for SYSCALL in compatibility mode.
-// pub const CSTAR: Self = Self(0xC0000083);
-//
-// /// The low 32 bits are the SYSCALL flag mask. If a bit in this is set, the corresponding bit
-// /// in rFLAGS is cleared
-// pub const SFMASK: Self = Self(0xC0000083);
-
 mod msrs {
     use crate::io::Msr;
     use modular_bitfield::prelude::*;
@@ -70,6 +60,7 @@ mod msrs {
     #[derive(Copy, Clone)]
     pub struct LStar(u64);
 
+    /// Ring 0 and Ring 3 Segment bases, as well as SYSCALL EIP.
     #[bitfield]
     #[derive(Copy, Clone)]
     pub struct Star {
@@ -90,8 +81,16 @@ mod msrs {
         _padding: B63,
     }
 
+    /// This register is used by the SWAPGS instruction. This instruction
+    /// exchanges the value located in KernelGSbase with the value located in GS.base.
+    #[derive(Copy, Clone)]
+    pub struct KernelGsBase(u64);
+
+    #[derive(Copy, Clone)]
+    pub struct GsBase(u64);
+
     impl Msr for Efer {
-        const MSR: u32 = 0xC0000080;
+        const MSR: u32 = 0xC000_0080;
         const NAME: &'static str = "EFER";
 
         fn with_value(val: u64) -> Self {
@@ -104,7 +103,7 @@ mod msrs {
     }
 
     impl Msr for LStar {
-        const MSR: u32 = 0xC0000082;
+        const MSR: u32 = 0xC000_0082;
         const NAME: &'static str = "LSTAR";
 
         fn with_value(val: u64) -> Self {
@@ -117,7 +116,7 @@ mod msrs {
     }
 
     impl Msr for Star {
-        const MSR: u32 = 0xC0000081;
+        const MSR: u32 = 0xC000_0081;
         const NAME: &'static str = "STAR";
 
         fn with_value(val: u64) -> Self {
@@ -127,5 +126,42 @@ mod msrs {
         fn value(&self) -> u64 {
             u64::from_ne_bytes(self.into_bytes())
         }
+    }
+
+    impl Msr for KernelGsBase {
+        const MSR: u32 = 0xC000_0102;
+        const NAME: &'static str = "KernelGSbase";
+
+        fn with_value(val: u64) -> Self {
+            Self(val)
+        }
+
+        fn value(&self) -> u64 {
+            self.0
+        }
+    }
+
+    impl Msr for GsBase {
+        const MSR: u32 = 0xC000_0101;
+        const NAME: &'static str = "GS.Base";
+
+        fn with_value(val: u64) -> Self {
+            Self(val)
+        }
+
+        fn value(&self) -> u64 {
+            self.0
+        }
+
+        // unsafe fn load() -> Self {
+        //     let val: u64;
+        //     asm!("rdgsbase rax", out("rax") val,  options(nostack));
+        //     Self(val)
+        // }
+        //
+        // unsafe fn store(&self) {
+        //     common::trace!("{} = {:#x}", Self::NAME, self.0);
+        //     asm!("wrgsbase rax", in("rax") self.0,  options(nostack));
+        // }
     }
 }

@@ -1,3 +1,4 @@
+use crate::cpu::CpuState;
 use crate::descriptor_tables::{SEL_USER_CODE, SEL_USER_DATA};
 use crate::memory::AddressSpaceRef;
 use crate::process::block::id::{OwnedPid, Pid};
@@ -23,14 +24,13 @@ pub struct ThreadHandle {
 /// Not protected by mutex/refcell, readonly after creation
 pub struct ThreadConstantInner {
     process: ProcessRef,
+    kernel_stack: VirtualAddress,
 
     tid: OwnedPid,
 }
 
 /// Protected by mutex
-struct ThreadLockedInner {
-    kernel_stack: VirtualAddress,
-}
+struct ThreadLockedInner {}
 
 /// Protected by a refcell
 struct ThreadInner {
@@ -82,6 +82,12 @@ impl ThreadRef {
             };
 
             let (user, kernel) = proc.allocate_new_thread_stacks()?;
+            trace!(
+                "thread {:?} has stack at {:?} and kernel stack at {:?}",
+                tid,
+                user,
+                kernel
+            );
             (proc, user, kernel)
         };
 
@@ -89,9 +95,10 @@ impl ThreadRef {
         let thread = ThreadRef(Arc::new(ThreadHandle {
             inner_const: ThreadConstantInner {
                 process: process.clone(),
+                kernel_stack,
                 tid,
             },
-            inner_locked: SpinLock::new(ThreadLockedInner { kernel_stack }),
+            inner_locked: SpinLock::new(ThreadLockedInner {}),
             inner_refcell: RefCell::new(ThreadInner {
                 state: ThreadState {
                     rsp: user_stack.address(),
@@ -116,6 +123,12 @@ impl ThreadRef {
 
         Ok(thread)
     }
+
+    pub unsafe fn switch_to(&self) -> ! {
+        CpuState::update_current_thread(self.clone());
+
+        self.0.run_now()
+    }
 }
 
 impl Deref for ThreadHandle {
@@ -137,6 +150,10 @@ impl Deref for ThreadRef {
 impl ThreadConstantInner {
     pub fn tid(&self) -> Pid {
         *self.tid
+    }
+
+    pub fn kernel_stack(&self) -> VirtualAddress {
+        self.kernel_stack
     }
 }
 
@@ -167,7 +184,7 @@ const OFFSET_RSP: usize = memoffset::offset_of!(ThreadState, rsp);
 const OFFSET_RFLAGS: usize = memoffset::offset_of!(ThreadState, rflags);
 
 impl ThreadHandle {
-    pub unsafe fn run_now(&self) -> ! {
+    unsafe fn run_now(&self) -> ! {
         self.address_space().load_if_not_current();
 
         let state = self.thread_state();
@@ -178,6 +195,7 @@ impl ThreadHandle {
             Self::restore_kernel_space(state)
         }
     }
+
     unsafe fn restore_kernel_space(state: *const ThreadState) -> ! {
         asm!(
             // move to new stack

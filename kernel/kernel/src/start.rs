@@ -1,13 +1,13 @@
 use common::*;
 
+use crate::cpu::CpuState;
 use crate::descriptor_tables::{SEL_KERNEL_CODE, SEL_USER_CODE};
-use crate::io::{Efer, LStar, Msr, Star};
+use crate::io::{Efer, GsBase, KernelGsBase, LStar, Msr, Star};
 use crate::irq::{disable_interrupts, enable_interrupts};
 use crate::logging::LogMode;
 use crate::memory::{KernelInterruptStacks, Stacks};
 use crate::multiboot;
 use crate::multiboot::Multiboot;
-use crate::process::ThreadRef;
 use crate::vga::{self, Color};
 use crate::{clock, descriptor_tables, logging};
 use memory::VirtualAddress;
@@ -34,42 +34,34 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     // actually mapped
     enable_interrupts();
 
+    // TODO 1 stack per core only, this needs to be shared
+    let mut interrupt_stacks = Stacks::<KernelInterruptStacks>::new();
+    let (interrupt_stack, _) = interrupt_stacks
+        .new_stack()
+        .expect("failed to map kernel interrupt stack");
+
     // prepare for syscalls, processes and userspace
     enable_syscalls();
     crate::process::init_kernel_process();
 
-    // TODO 1 stack per core only
-    let mut interrupt_stacks = Stacks::<KernelInterruptStacks>::new();
-    let (_interrupt_stack, _) = interrupt_stacks
-        .new_stack()
-        .expect("failed to map kernel interrupt stack");
-    // TODO register stack for use by interrupts
+    // init per-cpu state
+    let _cpu = init_cpu_state(interrupt_stack);
+
+    // use this stack for interrupts on this cpu
+    // TODO is tss shared or unique to cpu?
+    crate::descriptor_tables::tss().set_privilege_stack(0, interrupt_stack);
 
     // begin testing
     let process = crate::process::experiment_new_process().expect("failed");
     debug!("process created");
 
-    let _thread: ThreadRef = {
+    let thread = {
         let inner = process.inner_locked();
         let thread = inner.threads().next().expect("no main thread");
         thread.clone()
     };
 
-    // use this stack for interrupts after jumping to userspace
-    {
-        let rsp: u64;
-        unsafe {
-            asm!("mov {0}, rsp", out(reg) rsp);
-        }
-        crate::descriptor_tables::tss().set_privilege_stack(0, VirtualAddress(rsp));
-    }
-
-    // unsafe { thread.run_now() }
-    hang()
-}
-
-fn breakpoint() {
-    unsafe { asm!("int3") }
+    unsafe { thread.switch_to() }
 }
 
 fn hang() -> ! {
@@ -97,5 +89,17 @@ fn enable_syscalls() {
         star.set_sysret(SEL_USER_CODE as u16); // cs = this+16, SS.Sel = this+8
         star.set_syscall(SEL_KERNEL_CODE as u16);
         star.store();
+    }
+}
+
+/// Allocates a new CpuState and writes its ptr to KernelGSbase
+fn init_cpu_state(interrupt_stack_top: VirtualAddress) -> &'static mut CpuState {
+    let state = crate::cpu::CpuState::new(interrupt_stack_top);
+
+    unsafe {
+        KernelGsBase::with_value(state as u64).store();
+        GsBase::with_value(state as u64).store();
+
+        &mut *state
     }
 }

@@ -21,6 +21,7 @@ use common::*;
 use crate::irq::disable_interrupts;
 
 mod clock;
+mod cpu;
 mod descriptor_tables;
 mod exception;
 mod io;

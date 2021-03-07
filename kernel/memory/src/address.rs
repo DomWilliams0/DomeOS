@@ -47,7 +47,7 @@ impl VirtualAddress {
     /// Panics if value changes from 48-bit sign extension
     pub fn with_literal(addr: u64) -> Self {
         let virt = Self::new(addr);
-        assert_eq!(
+        debug_assert_eq!(
             virt.0, addr,
             "virtual address {:#x} is not representable (becomes {:?})",
             addr, virt

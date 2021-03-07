@@ -1,4 +1,4 @@
-use crate::{gigabytes, kilobytes, megabytes};
+use crate::{gigabytes, megabytes};
 
 pub const VIRT_USERSPACE_MAX: u64 = 0x2000_0000_0000;
 
