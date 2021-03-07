@@ -21,6 +21,12 @@ pub const KERNEL_STACK_MAX_SIZE: u64 = megabytes(8);
 pub const KERNEL_STACK_SIZE: u64 = kilobytes(64) / FRAME_SIZE;
 pub const KERNEL_STACKS_MAX: u64 = 512;
 
+pub const ACCESSIBLE_RANGES: [core::ops::Range<u64>; 3] = [
+    (KERNEL_STACKS_START..KERNEL_STACKS_START + (KERNEL_STACKS_MAX * KERNEL_STACK_MAX_SIZE)),
+    (VIRT_PHYSICAL_BASE..VIRT_PHYSICAL_MAX),
+    (VIRT_KERNEL_BASE..VIRT_KERNEL_MAX),
+];
+
 #[cfg(test)]
 mod tests {
     use super::*;

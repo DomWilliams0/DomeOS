@@ -42,9 +42,9 @@ impl<'p, P: PageTableHierarchy<'p>> Debug for PageTable<'p, P> {
     }
 }
 macro_rules! ensure_accessible {
-    ($entry:expr, $is_identity_mapped_physical:expr) => {{
+    ($entry:expr, $is_accessible:expr) => {{
         let entry = $entry;
-        if !($is_identity_mapped_physical) {
+        if !($is_accessible) {
             // is not currently accessible, needs to be offset into identity mapped region
             let entry_virt =
                 VirtualAddress::from_physical(PhysicalAddress(entry as *const _ as u64));
@@ -65,10 +65,10 @@ impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
     }
 
     pub fn entries(&self) -> impl Iterator<Item = &CommonEntry<'p, P>> + '_ {
-        let identity_mapped_physical = VirtualAddress::is_identity_mapped_physical(self);
+        let accessible = VirtualAddress::is_accessible(self);
         self.entries
             .iter()
-            .map(move |e| ensure_accessible!(e, identity_mapped_physical))
+            .map(move |e| ensure_accessible!(e, accessible))
     }
 
     pub fn entries_physical_mut(&mut self) -> impl Iterator<Item = &mut CommonEntry<'p, P>> + '_ {
@@ -81,17 +81,17 @@ impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
 
         // safety: not dereferencing physical memory
         let entry = unsafe { self.entries.get_unchecked(e) };
-        ensure_accessible!(entry, VirtualAddress::is_identity_mapped_physical(self))
+        ensure_accessible!(entry, VirtualAddress::is_accessible(self))
     }
 
     /// If this table is in physical memory, convert the entry address into accessible identity
     /// mapped virtual memory. Otherwise returns it as-is
     pub fn entry_mut(&mut self, idx: impl EntryIndex<'p, P>) -> &mut CommonEntry<'p, P> {
-        let identity_mapped_physical = VirtualAddress::is_identity_mapped_physical(self);
+        let accessible = VirtualAddress::is_accessible(self);
 
         // entry may be an inaccessible physical reference but we're not dereferencing it
         let entry = self.entry_physical_mut(idx);
-        ensure_accessible!(entry, identity_mapped_physical)
+        ensure_accessible!(entry, accessible)
     }
 
     pub fn entry_physical_mut(&mut self, idx: impl EntryIndex<'p, P>) -> &mut CommonEntry<'p, P> {

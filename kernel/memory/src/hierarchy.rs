@@ -245,7 +245,7 @@ impl<'p> P4<'p> {
     }
 
     pub fn ensure_accessible(&mut self) {
-        if !VirtualAddress::is_identity_mapped_physical(self.0) {
+        if !VirtualAddress::is_accessible(self.0) {
             // is not currently accessible, needs to be offset into identity mapped region
             let virt = VirtualAddress::from_physical(PhysicalAddress(self.0 as *mut _ as u64));
             self.0 = unsafe { &mut *virt.as_ptr() }

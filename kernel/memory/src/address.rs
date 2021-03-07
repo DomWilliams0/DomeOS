@@ -1,7 +1,7 @@
 use core::fmt::{Debug, Error as FmtError, Formatter};
 use core::ops::{Add, AddAssign, Shl, Shr, Sub, SubAssign};
 
-use crate::{VIRT_KERNEL_BASE, VIRT_PHYSICAL_BASE, VIRT_PHYSICAL_MAX};
+use crate::{ACCESSIBLE_RANGES, VIRT_KERNEL_BASE, VIRT_PHYSICAL_BASE};
 use common::*;
 
 /// Bottom 12 bits should be 0 from 4096 alignment
@@ -155,10 +155,10 @@ impl VirtualAddress {
         PhysicalAddress(addr)
     }
 
-    /// True if in the physical identity mapped range
-    pub fn is_identity_mapped_physical<T>(thing: &T) -> bool {
+    /// True if at an accessible virtual address
+    pub fn is_accessible<T>(thing: &T) -> bool {
         let addr = thing as *const T as u64;
-        (VIRT_PHYSICAL_BASE..VIRT_PHYSICAL_MAX).contains(&addr)
+        ACCESSIBLE_RANGES.iter().any(|range| range.contains(&addr))
     }
 
     pub fn round_up_to(self, multiple: u64) -> Self {

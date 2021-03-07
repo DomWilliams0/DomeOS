@@ -35,8 +35,7 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
 
     // prepare for syscalls
     enable_syscalls();
-    // TODO broken temporarily
-    // crate::memory::init_kernel_stack(0).expect("failed to map kernel stack");
+    crate::memory::init_kernel_stack(0).expect("failed to map kernel stack");
 
     let process = crate::process::experiment_new_process().expect("failed");
     debug!("process created");
