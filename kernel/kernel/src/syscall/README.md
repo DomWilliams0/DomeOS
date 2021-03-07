@@ -5,5 +5,5 @@
 	* TODO use high bits to specify platform compatibility (Windows, POSIX, DomeOS)
 * Return value is passed in `rax`
 * Arguments are passed right-to-left in `rdi`, `rsi`, `rbx`, `rdx`, `r8`, `r9`
-	* Only integers or pointers allowed
+	* Only integers (including pointers) allowed
 	* Limited to 6

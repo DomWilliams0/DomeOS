@@ -1,14 +1,8 @@
-use core::convert::TryFrom;
-use num_enum::TryFromPrimitive;
 use ux::u63;
 
-/// Returned as negative i64
-#[repr(u64)]
-#[derive(TryFromPrimitive, Debug)]
-pub enum SyscallError {
-    NotImplemented = 1,
-    UnknownError,
-}
+use crate::error::SyscallError;
+use core::convert::TryFrom;
+
 /// Must be representable only as a positive u64
 pub trait SyscallReturnable: From<SyscallOkResult> + Into<SyscallOkResult> {}
 
@@ -52,13 +46,21 @@ impl SyscallResult {
             Err(val)
         }
     }
+
+    pub const fn error(error: SyscallError) -> Self {
+        let negative = -(error as i64);
+        Self(unsafe { core::mem::transmute::<i64, u64>(negative) })
+    }
+
+    pub const fn to_u64(&self) -> u64 {
+        self.0
+    }
 }
 
 impl From<SyscallError> for SyscallResult {
     #[inline]
     fn from(err: SyscallError) -> Self {
-        let negative = -(err as i64);
-        Self(unsafe { core::mem::transmute::<i64, u64>(negative) })
+        Self::error(err)
     }
 }
 
@@ -82,8 +84,9 @@ impl From<SyscallOkResult> for u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use core::fmt::Debug;
+
+    use super::*;
 
     #[derive(Debug, Copy, Clone, Eq, PartialEq)]
     struct Nice(u32, u32);

@@ -10,8 +10,9 @@ _start:
 
 ; int syscall_log(utf8 str, str len bytes)
 loop:
-mov r9, g_message
-mov r10, 8
+mov rax, 0 ; syscall 0
+mov rdi, g_message
+mov rsi, 8
 o64 syscall
 
 jmp loop
