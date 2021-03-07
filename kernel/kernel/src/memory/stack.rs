@@ -70,6 +70,8 @@ impl<A: StackAllocation> Stacks<A> {
         Ok((stack, idx))
     }
 
+    /// Maps in current address space
+    ///
     /// * stack: unique stack index
     /// * slab: slab index in this stack to grow. Starts at 0 and increments for each growth
     fn allocate_stack(
@@ -94,34 +96,50 @@ impl<A: StackAllocation> Stacks<A> {
             slab_bottom.round_down_to(FRAME_SIZE).address()
         );
 
-        // includes guard page
         let mut addr_space = AddressSpace::current();
 
-        // ensure unmapped
+        // ensure currently unmapped
         if addr_space.get_absent_mapping(slab_bottom).is_ok() {
             return Err(MemoryError::AlreadyMapped(slab_bottom.address()));
         }
 
-        // leave guard page unmapped
-        // addr_space.map_range(base, FRAME_SIZE, MapTarget::Any, MapFlags::StackGuard)?;
-        // TODO unmapped guard page entry should store the index of the next slab to grow
+        let slab_top = slab_bottom + A::STACK_GROWTH_INCREMENT - 8;
 
-        // map stack just afterwards
+        let growable_stack = A::STACK_GROWTH_INCREMENT != A::MAX_STACK_SIZE;
+        assert_eq!(A::USER_ACCESSIBLE, growable_stack);
+
         let extra_flags = if A::USER_ACCESSIBLE {
             MapFlags::User.into()
         } else {
             BitFlags::empty()
         };
 
-        addr_space.map_range(
-            slab_bottom + FRAME_SIZE,
-            A::STACK_GROWTH_INCREMENT - FRAME_SIZE,
-            MapTarget::Any,
-            extra_flags | MapFlags::Writeable,
-        )?;
+        if growable_stack {
+            // stack is growable, use guard pages
 
-        // return stack top
-        Ok(slab_bottom + FRAME_SIZE + A::STACK_GROWTH_INCREMENT - 8)
+            // requested slab is the new guard page
+            addr_space.map_range(
+                slab_top - FRAME_SIZE,
+                FRAME_SIZE,
+                MapTarget::Any,
+                MapFlags::StackGuard,
+            )?;
+
+        // TODO actual stack mapping done in handler?
+        } else {
+            // stack is not growable, commit now
+
+            addr_space.map_range(
+                slab_bottom,
+                A::MAX_STACK_SIZE,
+                MapTarget::Any,
+                extra_flags | MapFlags::Writeable | MapFlags::Commit,
+            )?;
+
+            // TODO add a guard page anyway to avoid trampling a neighbouring stack?
+        }
+
+        Ok(slab_top)
     }
 
     fn validate(stack: u64, slab: u64) -> bool {
