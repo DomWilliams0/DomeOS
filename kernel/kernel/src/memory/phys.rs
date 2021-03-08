@@ -30,8 +30,8 @@ pub fn init_frame_allocator(mmap: MultibootMemoryMap) {
     let size = kernel_size();
     debug!("kernel is {} ({:#x}) bytes", size, size);
     assert!(
-        size < 4 * 1024 * 1024,
-        "kernel is bigger than 4MB, initial identity mapping is too small!"
+        size < 12 * 1024 * 1024,
+        "kernel is bigger than 12MB, initial identity mapping is too small!"
     );
 
     let allocator = DumbFrameAllocator::new(mmap);

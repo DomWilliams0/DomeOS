@@ -8,9 +8,10 @@ global init_pml4
 section .data
 align 0x1000
 
-; ident map of first 4MB GB, and mirror it at the -2GB mark
+; ident map of first 12MB, and mirror it at the -2GB mark
 ; tyvm https://github.com/eteran/os64/blob/master/arch/x86_64/boot.S
 init_pml4:
+	; +3 ===> present and R/W
 	dq init_pdp - KERNEL_VIRT + 3 ; [0x0000000000000000 - 0x00000007ffffffff)
 	times 510 dq 0
 	dq init_pdp - KERNEL_VIRT + 3 ; [0xfffffff800000000 - 0xffffffffffffffff)
@@ -22,8 +23,12 @@ init_pdp:
 	dq 0
 
 init_pd:
-	dq 0x0000000000000083 ; 0MB - 2MB
-	dq 0x0000000000200083 ; 2MB - 4MB
+	dq 0x0000000000000083 ; 0MB  - 2MB
+	dq 0x0000000000200083 ; 2MB  - 4MB
+	dq 0x0000000000400083 ; 4MB  - 6MB
+	dq 0x0000000000800083 ; 6MB  - 8MB
+	dq 0x0000000000a00083 ; 8MB  - 10MB
+	dq 0x0000000000c00083 ; 10MB - 12MB
 	times 510 dq 0
 
 
