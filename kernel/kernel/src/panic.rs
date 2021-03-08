@@ -49,6 +49,7 @@ pub struct Frame {
 }
 
 pub fn backtrace(mut per_frame: impl FnMut(Frame)) {
+    // TODO backtrace into userspace possible?
     let symbols = {
         let first_word = unsafe {
             let ptr = &PACKED_SYMBOLS as *const u32;

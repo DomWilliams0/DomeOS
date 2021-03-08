@@ -1,6 +1,6 @@
 use crate::cpu::CpuState;
 use crate::descriptor_tables::{SEL_USER_CODE, SEL_USER_DATA};
-use crate::memory::AddressSpaceRef;
+use crate::memory::{AddressSpaceRef, StackGrowth};
 use crate::process::block::id::{OwnedPid, Pid};
 use crate::process::block::process::{kernel_process, ProcessRef};
 use crate::spinlock::SpinLock;
@@ -11,6 +11,7 @@ use core::ops::Deref;
 use memory::{MemoryError, VirtualAddress};
 
 #[derive(Clone)]
+#[repr(transparent)]
 pub struct ThreadRef(Arc<ThreadHandle>);
 
 /// Only immutable references are handed out, fields are protected by refcells/mutexes as needed
@@ -128,6 +129,10 @@ impl ThreadRef {
         CpuState::update_current_thread(self.clone());
 
         self.0.run_now()
+    }
+
+    pub fn grow_user_stack(&self, growth: StackGrowth) -> Result<(), MemoryError> {
+        self.process.grow_user_thread_stack(growth)
     }
 }
 
@@ -323,6 +328,6 @@ impl ThreadHandle {
     }
 
     pub fn is_user(&self) -> bool {
-        self.inner_const.process.privilege_level().user()
+        self.inner_const.process.privilege_level().is_user()
     }
 }

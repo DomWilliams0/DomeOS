@@ -18,7 +18,7 @@ pub trait StackAllocation {
     /// Max size of a single stack in bytes
     const MAX_STACK_SIZE: u64;
 
-    /// Amount to grow a stack at a time in bytes
+    /// Amount to grow a stack at a time in bytes (slab size)
     const STACK_GROWTH_INCREMENT: u64;
 
     const WHAT: &'static str;
@@ -105,16 +105,8 @@ impl<A: StackAllocation> Stacks<A> {
 
         let slab_top = slab_bottom + A::STACK_GROWTH_INCREMENT - 8;
 
-        let growable_stack = A::STACK_GROWTH_INCREMENT != A::MAX_STACK_SIZE;
-        assert_eq!(A::USER_ACCESSIBLE, growable_stack);
-
-        let extra_flags = if A::USER_ACCESSIBLE {
-            MapFlags::User.into()
-        } else {
-            BitFlags::empty()
-        };
-
-        if growable_stack {
+        let map_flags = Self::map_flags();
+        if map_flags.contains(MapFlags::User) {
             // stack is growable, use guard pages
 
             // requested slab is the new guard page
@@ -129,12 +121,7 @@ impl<A: StackAllocation> Stacks<A> {
         } else {
             // stack is not growable, commit now
 
-            addr_space.map_range(
-                slab_bottom,
-                A::MAX_STACK_SIZE,
-                MapTarget::Any,
-                extra_flags | MapFlags::Writeable | MapFlags::Commit,
-            )?;
+            addr_space.map_range(slab_bottom, A::MAX_STACK_SIZE, MapTarget::Any, map_flags)?;
 
             // TODO add a guard page anyway to avoid trampling a neighbouring stack?
         }
@@ -147,6 +134,91 @@ impl<A: StackAllocation> Stacks<A> {
 
         stack < A::MAX_STACKS && slab < A::MAX_SLABS
     }
+
+    fn map_flags() -> BitFlags<MapFlags> {
+        let mut flags = BitFlags::from(MapFlags::Writeable);
+
+        let growable_stack = A::STACK_GROWTH_INCREMENT != A::MAX_STACK_SIZE;
+        assert_eq!(A::USER_ACCESSIBLE, growable_stack);
+
+        if growable_stack {
+            flags.insert(MapFlags::User);
+        } else {
+            flags.insert(MapFlags::Commit);
+        }
+
+        flags
+    }
+
+    pub fn resolve_required_stack_growth(addr: VirtualAddress) -> Option<StackGrowth> {
+        let base = addr.address().checked_sub(A::BASE)?;
+        let stack_index = base / A::MAX_STACK_SIZE;
+
+        if stack_index >= A::MAX_STACKS {
+            return None;
+        };
+
+        let slab_index = {
+            let stack_base = stack_index * A::MAX_STACK_SIZE;
+            let slab_base = base.checked_sub(stack_base)?;
+            A::MAX_SLABS - (slab_base / A::STACK_GROWTH_INCREMENT) - 1
+        };
+
+        if slab_index >= A::MAX_SLABS {
+            // cant grow anymore
+            return None;
+        };
+
+        Some(StackGrowth {
+            stack: stack_index,
+            slab: slab_index,
+        })
+    }
+
+    pub fn grow_stack(&self, growth: StackGrowth) -> Result<(), MemoryError> {
+        // trust input because it can only be constructed by resolve_required_stack_growth
+
+        let stack_bottom = A::BASE + (growth.stack * A::MAX_STACK_SIZE);
+        let slab_top = VirtualAddress(
+            stack_bottom + ((A::MAX_SLABS - growth.slab) * A::STACK_GROWTH_INCREMENT),
+        );
+        let slab_bottom = slab_top - A::STACK_GROWTH_INCREMENT;
+
+        let mut addr_space = AddressSpace::current();
+
+        // ensure currently unmapped
+        if addr_space.get_absent_mapping(slab_bottom).is_ok() {
+            return Err(MemoryError::AlreadyMapped(slab_bottom.address()));
+        }
+
+        let flags = Self::map_flags();
+
+        // commit this slab as usable stack space (blatting previous guard page)
+        addr_space.map_range(
+            slab_bottom,
+            A::STACK_GROWTH_INCREMENT,
+            MapTarget::Any,
+            flags | MapFlags::Commit,
+        )?;
+
+        // map next slab as guard page, already checked as valid during construction of StackGrowth
+        addr_space.map_range(
+            slab_bottom - FRAME_SIZE,
+            FRAME_SIZE,
+            MapTarget::Any,
+            flags | MapFlags::StackGuard,
+        )?;
+
+        Ok(())
+    }
+}
+
+pub struct StackGrowth {
+    /// Stack index
+    stack: u64,
+
+    /// Slab to allocate and map, is currently a guard page
+    slab: u64,
 }
 
 impl StackAllocation for ProcessKernelStacks {

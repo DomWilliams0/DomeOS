@@ -62,21 +62,30 @@ struct OneTimeEntryRange(Range<u16>);
 #[derive(Deref)]
 pub struct MappedSlice(#[deref] &'static mut [u8], BitFlags<MapFlags>);
 
-impl From<BitFlags<MapFlags>> for PageTableBits {
-    fn from(flags: BitFlags<MapFlags>) -> Self {
+impl MapFlags {
+    fn page_bits(flags: BitFlags<MapFlags>) -> PageTableBits {
         let mut bits = PageTableBits::default().with_nx(true);
 
         for flag in flags.iter() {
             use MapFlags::*;
             match flag {
-                Writeable => bits.set_writeable(true),
+                Writeable | StackGuard => bits.set_writeable(true),
                 Executable => bits.set_nx(false),
                 User => bits.set_user(true),
-                StackGuard | Commit | Huge2M | Huge1G => {}
+                Commit | Huge2M | Huge1G => {}
             }
         }
 
         bits
+    }
+
+    /// Defaults to `Anonymous`
+    fn demand(flags: BitFlags<MapFlags>) -> DemandMapping {
+        if flags.contains(MapFlags::StackGuard) {
+            DemandMapping::StackGuard
+        } else {
+            DemandMapping::Anonymous
+        }
     }
 }
 
@@ -100,6 +109,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
 
     // TODO constructor to allocate new possibly unmapped frame for p4, then access through id map
 
+    /// * size: bytes
     pub fn map_range(
         &mut self,
         start: VirtualAddress,
@@ -142,26 +152,13 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         }
 
         let new_entry = {
-            let mut bits = PageTableBits::default().with_nx(true);
-
-            let mut commit = false;
-            let mut demand = DemandMapping::Anonymous;
-
-            for flag in flags.iter() {
-                use MapFlags::*;
-                match flag {
-                    Writeable => bits.set_writeable(true),
-                    Executable => bits.set_nx(false),
-                    User => bits.set_user(true),
-                    StackGuard => demand = DemandMapping::StackGuard,
-                    Commit => commit = true,
-                    Huge2M | Huge1G => todo!("huge pages ({:?})", flag),
-                }
-            }
+            let bits = MapFlags::page_bits(flags);
+            let commit = flags.contains(MapFlags::Commit);
 
             if commit {
                 NewEntry::Committed(bits)
             } else {
+                let demand = MapFlags::demand(flags);
                 NewEntry::Absent(CustomPageEntry::from_bits(bits).with_on_demand(demand))
             }
         };
@@ -280,14 +277,21 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
         memory: &mut M,
     ) -> MemoryResult<(PhysicalAddress, P::NextLevel)> {
         let entry = current.table_mut()?.entry_mut(idx);
+        let bits = MapFlags::page_bits(flags);
+
         let phys = if entry.present() {
             // already present
             #[cfg(feature = "log-paging")]
-            trace!("already present: {:?}", entry.address());
-            entry.address()
+            trace!("already present: {:?}", entry);
+
+            // set requested bits, preserving address and present bit
+            let addr = entry.address();
+            entry.replace_with(bits).address(addr).present().apply();
+
+            addr
         } else {
             // need a new frame
-            Self::create_entry(entry, flags.into(), memory)?
+            Self::create_entry(entry, bits, memory)?
         };
 
         // get accessible virtual address

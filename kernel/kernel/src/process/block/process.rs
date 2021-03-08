@@ -1,5 +1,5 @@
 use crate::memory::{
-    AddressSpace, AddressSpaceRef, ProcessKernelStacks, ProcessUserStacks, Stacks,
+    AddressSpace, AddressSpaceRef, ProcessKernelStacks, ProcessUserStacks, StackGrowth, Stacks,
 };
 use crate::process::block::id::{OwnedPid, Pid};
 use crate::process::block::new_pid;
@@ -38,13 +38,17 @@ pub struct ProcessConstantInner {
 /// Protected by mutex
 pub struct ProcessLockedInner {
     threads: SmallVec<[ThreadRef; 2]>,
-
-    user_stacks: Stacks<ProcessUserStacks>,
     kernel_stacks: Stacks<ProcessKernelStacks>,
 }
 
 /// Protected by a refcell
-struct ProcessInner {}
+struct ProcessInner {
+    /// Not protected by mutex because:
+    /// * Page fault handler needs to grow a stack (immutable ref needed)
+    /// * New threads (after the main thread) are done by other user threads only, so will be
+    ///   running on a single core only
+    user_stacks: Stacks<ProcessUserStacks>,
+}
 
 #[derive(Copy, Clone)]
 pub enum ProcessPrivilegeLevel {
@@ -91,10 +95,11 @@ impl ProcessRef {
             },
             inner_locked: SpinLock::new(ProcessLockedInner {
                 threads: SmallVec::new(),
-                user_stacks: Stacks::default(),
                 kernel_stacks: Stacks::default(),
             }),
-            inner_refcell: RefCell::new(ProcessInner {}),
+            inner_refcell: RefCell::new(ProcessInner {
+                user_stacks: Stacks::default(),
+            }),
         }));
 
         trace!("new process {:?}", pid_copy);
@@ -138,19 +143,26 @@ impl ProcessHandle {
     pub fn allocate_new_thread_stacks(
         &self,
     ) -> Result<(VirtualAddress, VirtualAddress), MemoryError> {
-        let (user, kernel) = {
-            let mut inner = self.inner_locked.lock();
-            (
-                inner.user_stacks.new_stack(),
-                inner.kernel_stacks.new_stack(),
-            )
+        let user = {
+            let mut inner = self.inner_refcell.borrow_mut();
+            inner.user_stacks.new_stack()
         };
 
-        // mutex dropped asap
+        let kernel = {
+            let mut inner = self.inner_locked.lock();
+            inner.kernel_stacks.new_stack()
+        };
+
+        // mutex and refcell dropped asap
 
         let (user, _) = user?;
         let (kernel, _) = kernel?;
         Ok((user, kernel))
+    }
+
+    pub fn grow_user_thread_stack(&self, growth: StackGrowth) -> Result<(), MemoryError> {
+        let inner = self.inner_refcell.borrow();
+        inner.user_stacks.grow_stack(growth)
     }
 }
 
@@ -187,7 +199,7 @@ impl ProcessConstantInner {
 }
 
 impl ProcessPrivilegeLevel {
-    pub fn user(self) -> bool {
+    pub fn is_user(self) -> bool {
         matches!(self, Self::User)
     }
 }

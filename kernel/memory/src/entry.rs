@@ -28,7 +28,7 @@ pub struct PageTableBits {
     pub nx: bool,
 }
 
-#[derive(BitFlags, Copy, Clone, Eq, PartialEq)]
+#[derive(BitFlags, Copy, Clone, Eq, PartialEq, Debug)]
 #[repr(u64)]
 pub enum PageTableFlag {
     Present = 1 << 0,
@@ -134,6 +134,11 @@ impl<'p, P: PageTableHierarchy<'p>> CommonEntry<'p, P> {
     /// Clears all bits
     pub fn replace(&mut self) -> EntryBuilder {
         EntryBuilder::with_zeroed_entry(self)
+    }
+
+    /// Replaces all bits with given
+    pub fn replace_with(&mut self, bits: PageTableBits) -> EntryBuilder {
+        EntryBuilder::with_entry_and_bits(self, bits)
     }
 
     pub fn address(&self) -> PhysicalAddress {

@@ -1,7 +1,8 @@
 use common::*;
 use core::fmt::{Debug, Error, Formatter};
 
-use crate::memory::{frame_allocator, AddressSpace, FrameAllocator};
+use crate::cpu::CpuState;
+use crate::memory::{frame_allocator, AddressSpace, FrameAllocator, ProcessUserStacks, Stacks};
 use enumflags2::BitFlags;
 use memory::{DemandMapping, VirtualAddress};
 
@@ -36,6 +37,15 @@ impl PageFaultException {
         // TODO get from current process block instead
         // TODO on error, either kill process or kernel panic
 
+        macro_rules! unhandled {
+            ($msg:expr $(,)?) => ({
+                unhandled!("{}", $msg)
+            });
+            ($fmt:expr, $($arg:tt)*) => ({
+                panic!("unhandled page fault {:?}: {}", self, format_args!($fmt, $($arg)*));
+            });
+        }
+
         let mut addr_space = AddressSpace::current();
 
         if self.flags.contains(PageFaultFlag::Present) {
@@ -50,7 +60,7 @@ impl PageFaultException {
         match mapping.on_demand() {
             DemandMapping::None => {
                 // TODO handle failure properly
-                panic!("unhandled page fault: {:?}", self);
+                unhandled!("no demand mapping");
             }
             DemandMapping::Anonymous => {
                 // TODO reuse same physical page and CoW
@@ -67,7 +77,21 @@ impl PageFaultException {
                     .apply();
             }
 
-            DemandMapping::StackGuard => todo!("stack guard"),
+            DemandMapping::StackGuard => {
+                // only process user stacks can grow
+                let growth = Stacks::<ProcessUserStacks>::resolve_required_stack_growth(self.addr);
+                match growth {
+                    Some(growth) => {
+                        // safety: already validated this is a user stack overflowing, so there must
+                        // be an active user thread we're servicing
+                        let thread = unsafe { CpuState::current_thread() };
+                        if let Err(err) = thread.grow_user_stack(growth) {
+                            unhandled!("failed to grow stack: {}", err);
+                        }
+                    }
+                    None => panic!("stack overflow: {:?}", self),
+                }
+            }
         };
     }
 }
