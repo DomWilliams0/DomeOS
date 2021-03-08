@@ -13,8 +13,6 @@ members = [
 
 default-members = ["kernel"]
 
-[profile.dev]
-
 # ux overflows the stack constantly
 [profile.dev.package.ux]
 opt-level = 1

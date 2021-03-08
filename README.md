@@ -3,6 +3,9 @@ A toy x86_64 OS in Rust.
 
 ## Progress log
 
+* 08 Mar 2021: <em>A functional syscall that prints a string to VGA. [syscall.s](userspace/syscall.s) is [compiled](userspace/README.md) to a freestanding Windows PE, which is embedded in the kernel binary (no filesystem!). It is loaded and executed in usermode in its own address space.</em>
+<p style="margin: auto"><img src=".progress/2021-03-08-userspace-exe.png"/></p>
+
 * 20 Feb 2021: <em>A basic kernel heap</em>
 <p style="margin: auto"><img src=".progress/2021-02-20-heap.jpg"/></p>
 
@@ -23,16 +26,30 @@ A toy x86_64 OS in Rust.
   * [X] Mapping regions of virtual memory into current address space
   * [X] Kernel heap
   * [X] Demand paging - physical pages only allocated when accessed
-  * [ ] Guard pages to detect stack overflow
+  * [X] Guard pages
   * [ ] CoW pages
-  * [ ] Mmaped files
+  * [ ] `mmap`ped files
 * Processes
-  * [ ] Manual creation and allocation of kernel process (heap, stack etc)
-  * [ ] PE binary loader
-  * [ ] Userspace process
-  * [ ] Syscalls
+  * [X] Simple PE binary loader
+  * [X] Process creation and execution from hardcoded .exe blob
+  * [X] Userspace process
+  * [X] Growable userspace stacks with guard pages
+  * [ ] Userspace heap
+  * [X] Basic syscall with SYSCALL/SYSRET
+	* [ ] Actually useful syscalls
+	* [ ] Linux/Windows syscall compatibility
+  * Process lifecycle
+    * [X] Creation of address space and threads
+    * [X] Jump to executing thread in kernel/userspace
+    * [ ] Scheduling/preemption
+    * [ ] Exiting
   * [ ] Basic Rust `std` userspace implementation
 * [ ] Add support for hardware without 1G pages (inc. VirtualBox and Bochs)
+* Devices
+  * [ ] Keyboard/mouse
+  * [ ] Filesystem
+  * [ ] Networking
+
 * ...everything else...
 
 ## Building
