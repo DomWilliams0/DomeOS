@@ -1,7 +1,8 @@
 use ux::u63;
 
 use crate::error::SyscallError;
-use core::convert::TryFrom;
+
+// TODO feature gate "kernel"
 
 /// Must be representable only as a positive u64
 pub trait SyscallReturnable: From<SyscallOkResult> + Into<SyscallOkResult> {}
@@ -15,9 +16,12 @@ pub struct SyscallResult(u64);
 #[repr(transparent)]
 pub struct SyscallOkResult(pub u63);
 
+#[cfg(any(feature = "userspace", test))]
 pub fn parse_syscall_result<T: From<SyscallOkResult>>(
     returned: SyscallResult,
 ) -> Result<T, SyscallError> {
+    use core::convert::TryFrom;
+
     let signed: i64 = unsafe { core::mem::transmute(returned) };
     if signed.is_negative() {
         let err = SyscallError::try_from(signed.abs() as u64).unwrap_or(SyscallError::UnknownError);
@@ -37,7 +41,8 @@ fn is_ok(val: u64) -> bool {
 }
 
 impl SyscallResult {
-    pub fn try_from<T: Into<u64> + Clone>(val: T) -> Result<Self, T> {
+    /// Err if value cannot be represented as a successful syscall result
+    pub fn try_ok<T: Into<u64> + Clone>(val: T) -> Result<Self, T> {
         let int = val.clone().into();
         if is_ok(int) {
             let ok = SyscallOkResult(u63::new(int));
@@ -54,6 +59,15 @@ impl SyscallResult {
 
     pub const fn to_u64(&self) -> u64 {
         self.0
+    }
+}
+
+impl<T: Into<SyscallOkResult>> From<Result<T, SyscallError>> for SyscallResult {
+    fn from(result: Result<T, SyscallError>) -> Self {
+        match result {
+            Ok(ok) => Self(ok.into().into()),
+            Err(err) => Self::error(err),
+        }
     }
 }
 
@@ -79,6 +93,36 @@ impl From<SyscallOkResult> for u64 {
         let positive = u64::from(val.0);
         debug_assert_eq!(positive.to_le_bytes()[7], 0);
         positive
+    }
+}
+
+// --------- trivial conversions --------- //
+
+impl From<u32> for SyscallOkResult {
+    #[inline]
+    fn from(val: u32) -> Self {
+        Self(u63::from(val))
+    }
+}
+
+impl From<u16> for SyscallOkResult {
+    #[inline]
+    fn from(val: u16) -> Self {
+        Self(u63::from(val))
+    }
+}
+
+impl From<u8> for SyscallOkResult {
+    #[inline]
+    fn from(val: u8) -> Self {
+        Self(u63::from(val))
+    }
+}
+
+impl From<()> for SyscallOkResult {
+    #[inline]
+    fn from(_: ()) -> Self {
+        Self::from(0u8)
     }
 }
 
@@ -108,11 +152,6 @@ mod tests {
         }
     }
 
-    impl From<u32> for SyscallOkResult {
-        fn from(val: u32) -> Self {
-            Self(u63::new(u64::from(val)))
-        }
-    }
     impl From<SyscallOkResult> for u32 {
         fn from(result: SyscallOkResult) -> Self {
             u64::from(result.0) as u32
@@ -140,9 +179,9 @@ mod tests {
         check_ok(u32::MAX);
         check_ok(Nice(10, 20));
 
-        assert!(SyscallResult::try_from(u64::MAX).is_err());
+        assert!(SyscallResult::try_ok(u64::MAX).is_err());
 
-        let res = SyscallResult::try_from(500_u64).unwrap();
+        let res = SyscallResult::try_ok(500_u64).unwrap();
         assert_eq!(parse_syscall_result::<u64>(res).unwrap(), 500);
 
         assert!(matches!(
@@ -154,7 +193,26 @@ mod tests {
     #[test]
     #[should_panic]
     fn unrepresentable_ok() {
-        // bit 63 is 1, meaning
+        // bit 63 is 1, meaning the underlying int is negative and treated as an error
         check_ok(Nice(u32::MAX, 20));
+    }
+
+    #[test]
+    fn from_result() {
+        let ok = Ok(());
+        let err = Result::<(), SyscallError>::Err(SyscallError::InvalidArguments);
+
+        impl From<SyscallOkResult> for () {
+            fn from(_: SyscallOkResult) -> Self {}
+        }
+
+        assert!(matches!(
+            parse_syscall_result::<()>(SyscallResult::from(ok)),
+            Ok(())
+        ));
+        assert!(matches!(
+            parse_syscall_result::<()>(SyscallResult::from(err)),
+            Err(SyscallError::InvalidArguments)
+        ));
     }
 }

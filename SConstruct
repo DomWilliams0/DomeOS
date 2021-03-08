@@ -29,7 +29,8 @@ domeos = env.Command("build/symbols.bin", ["build/symbols.map", build], [
     "cargo run --manifest-path kernel/helpers/ld-link-map/Cargo.toml --release --bin create-packed build/symbols.map build/symbols.bin",
 
     # patch in packed link map
-    "cargo run --manifest-path kernel/helpers/patcher/Cargo.toml --release build/iso/boot/DomeOS build/symbols.bin",
+    # TODO compress!
+    #"cargo run --manifest-path kernel/helpers/patcher/Cargo.toml --release build/iso/boot/DomeOS build/symbols.bin",
 ])
 
 

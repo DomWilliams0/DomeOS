@@ -14,4 +14,8 @@ members = [
 default-members = ["kernel"]
 
 [profile.dev]
-debug = 0 # symbols are manually patched in
+
+# ux overflows the stack constantly
+[profile.dev.package.ux]
+opt-level = 1
+debug = 0

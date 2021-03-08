@@ -56,9 +56,19 @@ unsafe extern "C" fn tramp_validate_log() -> ! {
         "sub r10, rsi",
         "js 1f", // error if negative, sf=1
 
-        // args validated, switch to kernel stack and run handler
+        // args validated! switch to kernel stack
+        "mov r10, rsp",
         "mov rsp, gs:{gs_stack_offset}",
-        "jmp {handler}",
+
+        // preserve values
+        // TODO r11 for user flags too
+        "push rcx", // user rip
+        "push r10", // user rsp
+
+        // call C ABI syscall handler
+        // TODO preserve registers for C ABI
+        "call {handler}",
+        "jmp {success_return}",
 
         // bad args. we can sysret immediately without any other reg restoring required because
         // no other registers have been clobbered or functions called
@@ -69,24 +79,52 @@ unsafe extern "C" fn tramp_validate_log() -> ! {
         userspace_max = const VIRT_USERSPACE_MAX,
         gs_stack_offset = const CpuState::THREAD_KERNEL_STACK_OFFSET,
         handler = sym tramp_to_rust_log,
+        success_return = sym common_return,
         err_args = const ERR_ARGS,
         options(noreturn)
     )
 }
 
+/// Returns to userspace after a syscall handler has run
+///
+/// Assumptions:
+/// * swapgs has been run once
+/// * we're on kernel stack of current thread
+/// * stack is (top-->bottom) [ user rsp, user rip ]
 #[naked]
 unsafe extern "C" fn common_return() -> ! {
-    asm!("", options(noreturn))
+    asm!(
+        "pop r10", // user rsp
+        "pop rcx", // user rip
+        // restore user stack
+        "mov rsp, r10",
+        // back we go
+        "swapgs",
+        "sysretq",
+        options(noreturn)
+    )
 }
 
-unsafe extern "C" fn tramp_to_rust_log(string: *mut c_void, len: u64) -> ! {
+/// Trampoline through C ABI to Rust ABI of syscall handler
+unsafe extern "C" fn tramp_to_rust_log(string: *mut c_void, len: u64) -> SyscallResult {
     // call rust abi handler
-    syscall_log(string, len);
+    let res = syscall_log(string, len);
 
-    common_return()
+    // return value in rax
+    SyscallResult::from(res)
 }
 
-fn syscall_log(_string: *mut c_void, _len: u64) {
-    common::info!("wow!");
-    unsafe { asm!("", in("rcx") 0x41414141) }
+fn syscall_log(string: *mut c_void, len: u64) -> Result<(), SyscallError> {
+    // safety: verified by syscall handler
+    let slice = unsafe { core::slice::from_raw_parts(string as *mut u8, len as usize) };
+    match core::str::from_utf8(slice) {
+        Ok(s) => {
+            common::info!("message from userspace: '{}'", s);
+            Ok(())
+        }
+        Err(_) => {
+            common::warn!("bad utf8!");
+            Err(SyscallError::InvalidArguments)
+        }
+    }
 }
