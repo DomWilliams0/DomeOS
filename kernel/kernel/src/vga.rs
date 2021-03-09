@@ -62,8 +62,21 @@ pub struct VgaGuard<'a> {
 }
 
 pub fn init(fg: Color, bg: Color) {
+    let mut screen = Screen {
+        buffer: unsafe { &mut *(VGA_ADDR as *mut VgaBuffer) },
+        foreground: fg,
+        background: bg,
+        x: 0,
+        y: 0,
+    };
+    debug!(
+        "initialized vga with foreground {:?} and background {:?}",
+        fg, bg
+    );
+    screen.clear();
+
     unsafe {
-        SCREEN.init(SpinLock::new(Screen::with_colors(fg, bg)));
+        SCREEN.init(SpinLock::new(screen));
     }
 }
 
@@ -108,22 +121,6 @@ fn color_as_byte(fg: Color, bg: Color) -> u8 {
 }
 
 impl Screen {
-    fn with_colors(fg: Color, bg: Color) -> Self {
-        let mut s = Self {
-            buffer: unsafe { &mut *(VGA_ADDR as *mut VgaBuffer) },
-            foreground: fg,
-            background: bg,
-            x: 0,
-            y: 0,
-        };
-        debug!(
-            "initialized vga with foreground {:?} and background {:?}",
-            fg, bg
-        );
-        s.clear();
-        s
-    }
-
     pub fn set_colors(&mut self, fg: impl Into<Option<Color>>, bg: impl Into<Option<Color>>) {
         if let Some(fg) = fg.into() {
             self.foreground = fg
