@@ -1,4 +1,4 @@
-pub use gdt::{SEL_KERNEL_CODE, SEL_KERNEL_DATA, SEL_USER_CODE, SEL_USER_DATA};
+pub use gdt::{SEL_KERNEL_CODE, SEL_KERNEL_DATA, SEL_USER_BASE, SEL_USER_CODE, SEL_USER_DATA};
 pub use tss::tss;
 
 mod gdt;

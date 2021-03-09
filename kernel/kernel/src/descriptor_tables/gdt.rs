@@ -8,8 +8,9 @@ static mut GDT: InitializedGlobal<GlobalDescriptorTable> = InitializedGlobal::un
 
 pub const SEL_KERNEL_CODE: u8 = 0x08;
 pub const SEL_KERNEL_DATA: u8 = 0x10;
-pub const SEL_USER_CODE: u8 = 0x1b;
+pub const SEL_USER_BASE: u8 = 0x1b;
 pub const SEL_USER_DATA: u8 = 0x23;
+pub const SEL_USER_CODE: u8 = 0x2b;
 
 #[repr(C)]
 pub struct GlobalDescriptorTable {
@@ -49,21 +50,27 @@ struct SegmentSelector {
 
 pub fn init() {
     let mut gdt = GlobalDescriptorTable::default();
+
+    // 0 is already null
     let cs = gdt.add_entry(0, SegmentDescriptor::kernel_code());
     let ds = gdt.add_entry(0, SegmentDescriptor::kernel_data());
 
-    let cs_user = gdt.add_entry(3, SegmentDescriptor::user_code());
+    let base_user = gdt.add_null_entry(3);
     let ds_user = gdt.add_entry(3, SegmentDescriptor::user_data());
+    let cs_user = gdt.add_entry(3, SegmentDescriptor::user_code());
 
     let tss_addr = super::tss::TaskStateSegment::init();
     let tss = gdt.add_tss_entry(SegmentDescriptor::tss(tss_addr));
 
-    assert!(
-        cs.into_u8() == SEL_KERNEL_CODE
-            && ds.into_u8() == SEL_KERNEL_DATA
-            && cs_user.into_u8() == SEL_USER_CODE
-            && ds_user.into_u8() == SEL_USER_DATA
-    );
+    debug_assert_eq!(cs.into_u8(), SEL_KERNEL_CODE, "kernel code");
+    debug_assert_eq!(ds.into_u8(), SEL_KERNEL_DATA, "kernel data");
+
+    debug_assert_eq!(base_user.into_u8(), SEL_USER_BASE, "user base");
+    debug_assert_eq!(cs_user.into_u8(), SEL_USER_CODE, "user code");
+    debug_assert_eq!(ds_user.into_u8(), SEL_USER_DATA, "user data");
+
+    debug_assert_eq!(SEL_USER_BASE + 0x08, SEL_USER_DATA);
+    debug_assert_eq!(SEL_USER_BASE + 0x10, SEL_USER_CODE);
 
     unsafe {
         gdt.load();
@@ -104,6 +111,15 @@ impl GlobalDescriptorTable {
             selector.into_u8(),
             descriptor.into_u64()
         );
+        selector
+    }
+
+    fn add_null_entry(&mut self, rpl: u8) -> SegmentSelector {
+        let idx = self.next_free_index(1).expect("not enough GDT entries");
+        self.entries[idx] = 0;
+
+        let selector = SegmentSelector::new().with_rpl(rpl).with_idx(idx as u8);
+        trace!("gdt[{} ({:#x})] = NULL", idx, selector.into_u8(),);
         selector
     }
 

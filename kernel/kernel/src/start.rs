@@ -1,7 +1,7 @@
 use common::*;
 
 use crate::cpu::CpuState;
-use crate::descriptor_tables::{SEL_KERNEL_CODE, SEL_USER_CODE};
+use crate::descriptor_tables::{SEL_KERNEL_CODE, SEL_USER_BASE};
 use crate::io::{Efer, GsBase, KernelGsBase, LStar, Msr, Star};
 use crate::irq::{disable_interrupts, enable_interrupts};
 use crate::logging::LogMode;
@@ -86,7 +86,7 @@ fn enable_syscalls() {
 
         // register syscall segments
         let mut star = Star::load();
-        star.set_sysret(SEL_USER_CODE as u16); // cs = this+16, SS.Sel = this+8
+        star.set_sysret(SEL_USER_BASE as u16);
         star.set_syscall(SEL_KERNEL_CODE as u16);
         star.store();
     }
