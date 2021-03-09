@@ -12,7 +12,7 @@ bss_start:
 
 ; allocate petit stack
 stack_bottom:
-	resb 6*4096
+	resb INITIAL_STACK_SIZE
 stack_top:
 
 bss_end:

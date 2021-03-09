@@ -44,7 +44,6 @@ A toy x86_64 OS in Rust.
     * [ ] Scheduling/preemption
     * [ ] Exiting
   * [ ] Basic Rust `std` userspace implementation
-* [ ] Add support for hardware without 1G pages (inc. VirtualBox and Bochs)
 * Devices
   * [ ] Keyboard/mouse
   * [ ] Filesystem

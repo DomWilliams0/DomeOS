@@ -91,6 +91,8 @@ impl<'p, P: PageTableHierarchy<'p>> PageTable<'p, P> {
 
         // entry may be an inaccessible physical reference but we're not dereferencing it
         let entry = self.entry_physical_mut(idx);
+        // TODO use a generic wrapper type around references that declare them Physical or Accessible
+        //  to avoid confusion
         ensure_accessible!(entry, accessible)
     }
 

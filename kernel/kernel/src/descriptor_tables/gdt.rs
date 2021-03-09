@@ -1,5 +1,5 @@
-use crate::descriptor_tables::common::DescriptorTablePointer;
 use crate::descriptor_tables::tss::TaskStateSegment;
+use crate::descriptor_tables::DescriptorTablePointer;
 use common::*;
 use memory::PhysicalAddress;
 use modular_bitfield::prelude::*;
@@ -11,6 +11,7 @@ pub const SEL_KERNEL_DATA: u8 = 0x10;
 pub const SEL_USER_CODE: u8 = 0x1b;
 pub const SEL_USER_DATA: u8 = 0x23;
 
+#[repr(C)]
 pub struct GlobalDescriptorTable {
     entries: [u64; 8],
     next_available: u8,
@@ -23,10 +24,9 @@ struct SegmentDescriptor {
     base_0_15: B16,
     base_16_23: B8,
 
-    accessed: bool,
-    writable: bool,
-    conforming: bool,
-    executable: bool,
+    /// Type
+    ty: B4,
+
     user_segment: bool,
     dpl: B2,
     present: bool,
@@ -130,22 +130,23 @@ impl GlobalDescriptorTable {
         GDT.init(self);
 
         let table_ptr = DescriptorTablePointer {
-            base: GDT.get() as *const _ as u64,
+            base: GDT.get() as *mut _ as u64,
             limit: (count * core::mem::size_of::<u64>() - 1) as u16,
         };
 
-        asm!("lgdt [{0}])", in(reg) &table_ptr);
+        asm!("lgdt [{0}])", in(reg) &table_ptr, options(nostack));
     }
 }
 
 impl Default for SegmentDescriptor {
     /// Default bits set for flat segment
     fn default() -> Self {
+        // accessed, writeable
+        let ty = 0b0011;
         Self::new()
             .with_user_segment(true)
             .with_present(true)
-            .with_writable(true)
-            .with_accessed(true)
+            .with_ty(ty)
             .with_granularity(true)
             .with_limit_0_15(0xffff)
             .with_limit_16_19(0xf)
@@ -154,7 +155,8 @@ impl Default for SegmentDescriptor {
 
 impl SegmentDescriptor {
     fn kernel_code() -> Self {
-        Self::default().with_executable(true).with_long_mode(true)
+        let ty = 0b1011; // accessed, writeable, executable
+        Self::default().with_ty(ty).with_long_mode(true)
     }
 
     fn kernel_data() -> Self {
@@ -173,8 +175,8 @@ impl SegmentDescriptor {
     fn tss(tss: PhysicalAddress) -> (u64, u64) {
         let ptr = tss.address();
 
-        // TODO why does accessed bit need to be set? is the struct def wrong?
-        let mut low = Self::new().with_present(true).with_accessed(true);
+        let ty = 0b1001;
+        let mut low = Self::new().with_present(true).with_ty(ty);
 
         use bit_field::BitField;
         low.set_base_0_15(ptr.get_bits(0..16) as u16);
@@ -232,7 +234,7 @@ impl SegmentSelector {
         asm!(
         "mov ax, {sel:x}",
         "ltr ax",
-        sel = in(reg) selector as i16,
+        sel = in(reg) selector as u16,
         )
     }
 }

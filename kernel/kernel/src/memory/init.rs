@@ -1,10 +1,11 @@
-use crate::memory::{frame_allocator, heap, phys, AddressSpace, FrameAllocator};
-use crate::multiboot::{Multiboot, MultibootMemoryMap};
+use crate::memory::{frame_allocator, heap, phys, AddressSpace, FrameAllocator, FrameFlags};
+use crate::multiboot::{MemoryRegionType, Multiboot, MultibootMemoryMap};
 use crate::vga;
 use common::*;
 use enumflags2::BitFlags;
 use memory::{
-    gigabytes, MemoryError, PageTable, PhysicalAddress, VirtualAddress, P3, P4, VIRT_PHYSICAL_BASE,
+    gigabytes, iter_all_pages, megabytes, round_up_to, MemoryError, PageTableHierarchy,
+    PhysicalAddress, VirtualAddress, P4, PAGE_TABLE_ENTRY_COUNT, VIRT_PHYSICAL_BASE,
     VIRT_PHYSICAL_SIZE,
 };
 
@@ -21,9 +22,8 @@ pub fn init(multiboot: Multiboot) -> Result<(), MemoryError> {
 
     // setup physical identity mapping
     let mut addr_space = AddressSpace::current();
-    let mut p4 = addr_space.pml4_mut();
-    init_physical_identity_mapping(&mut *p4)?;
-    post_init_physical_identity_mapping(&memory_map, &mut *p4)?;
+    init_physical_identity_mapping(&mut *addr_space.pml4_mut(), &memory_map)?;
+    post_init_physical_identity_mapping(&memory_map, &mut *addr_space.pml4_mut());
 
     // init heap
     heap::init()?;
@@ -32,49 +32,130 @@ pub fn init(multiboot: Multiboot) -> Result<(), MemoryError> {
 }
 
 /// Setup huge physical identity mapping
-fn init_physical_identity_mapping(p4: &mut P4) -> Result<(), MemoryError> {
+fn init_physical_identity_mapping(
+    p4: &mut P4,
+    memory_map: &MultibootMemoryMap,
+) -> Result<(), MemoryError> {
+    // find highest physical address
+    let phys_max = memory_map
+        .iter_regions()
+        .filter(|region| matches!(region.region_type, MemoryRegionType::Available))
+        .map(|region| region.base_addr + region.length)
+        .max_by_key(|addr| addr.address())
+        .unwrap(); // at least 1 region expected
+
+    // round up to nearest 2MB
+    let phys_max = round_up_to(phys_max.address(), megabytes(2));
     let base = VirtualAddress::with_literal(VIRT_PHYSICAL_BASE);
-    debug!("identity mapping physical memory from {:?}", base);
-    let p3_count = (VIRT_PHYSICAL_SIZE / gigabytes(512)) as u16;
-    let start_idx = base.pml4t_offset();
+    debug!(
+        "identity mapping {:.2}GB/{:.2}MB of physical memory from {:?}",
+        phys_max as f32 / gigabytes(1) as f32,
+        phys_max as f32 / megabytes(1) as f32,
+        base
+    );
 
-    for i in 0..p3_count {
-        let p4_offset = start_idx + i;
+    // never gonna happen i tell you
+    assert!(phys_max < VIRT_PHYSICAL_SIZE, "too much physical memory?");
 
-        // allocate new frame for p3 - will be early after the kernel image and therefore identity
-        // mapped and writable already
-        let p3_frame = frame_allocator().allocate(BitFlags::empty())?;
+    // entry index into each table
+    let mut tables = [
+        base.pml4t_offset(),
+        base.pdp_offset(),
+        base.pd_offset(),
+        base.pt_offset(),
+    ];
 
-        let p3_table: &mut PageTable<P3> = unsafe { p3_frame.as_mut() };
+    let mut pages = iter_all_pages(base, base + phys_max);
 
-        // initialize p3 entries to each point to 1GB each
-        for (p3_offset, entry) in p3_table.entries_physical_mut().enumerate() {
-            let addr = (i as u64 * gigabytes(512)) + gigabytes(p3_offset as u64);
-            entry
-                .replace()
-                .huge()
-                .address(PhysicalAddress(addr))
-                .higher_half()
-                .apply();
+    trace!(
+        "mapping {}.{}.{}.{} => {}.{}.{}.{}",
+        base.pml4t_offset(),
+        base.pdp_offset(),
+        base.pd_offset(),
+        base.pt_offset(),
+        (base + phys_max).pml4t_offset(),
+        (base + phys_max).pdp_offset(),
+        (base + phys_max).pd_offset(),
+        (base + phys_max).pt_offset(),
+    );
+
+    const KEEP_LOOPING: u16 = 4;
+    let mut unroll = KEEP_LOOPING;
+
+    // ensure all allocated frames are already writeable
+    let frame_flags = BitFlags::from(FrameFlags::PreMapped);
+
+    let p4 = p4.table_mut();
+    'outer: while unroll > 0 {
+        let p4_entry = p4.entry_physical_mut(tables[0]);
+
+        let p3_frame = frame_allocator().allocate(frame_flags)?;
+        unsafe {
+            // safety: frame allocated with PreMapped
+            p3_frame.zero_in_place();
         }
-
-        // point p4 entry at new p3
-        let p4_entry = p4.entry_physical_mut(p4_offset);
 
         p4_entry
             .replace()
-            .higher_half()
             .address(p3_frame.address())
+            .higher_half()
             .apply();
+
+        unroll = KEEP_LOOPING;
+        while unroll > 1 {
+            let mut p3 = p4_entry.traverse().expect("p3 was just mapped");
+            let p3_table = p3.table_mut().expect("p3 is not huge");
+            let p3_entry = p3_table.entry_physical_mut(tables[1]);
+
+            let p2_frame = frame_allocator().allocate(frame_flags)?;
+            unsafe {
+                // safety: frame allocated with PreMapped
+                p2_frame.zero_in_place();
+            }
+            p3_entry
+                .replace()
+                .address(p2_frame.address())
+                .higher_half()
+                .apply();
+
+            let mut p2 = p3_entry.traverse().expect("p2 was just mapped");
+            let p2_table = p2.table_mut().expect("p2 is not huge");
+
+            unroll = KEEP_LOOPING;
+            while unroll > 2 {
+                let new_tables = match pages.next() {
+                    Some((n, to_unroll, new_indices)) => {
+                        // multiples of 2M only
+                        assert_eq!(n, PAGE_TABLE_ENTRY_COUNT as u16);
+
+                        unroll = to_unroll;
+                        new_indices
+                    }
+                    None => {
+                        // finished
+                        break 'outer;
+                    }
+                };
+
+                // initialize p2 entries to each point to 2MB each
+                let addr = gigabytes(tables[1] as u64) + megabytes(2 * tables[2] as u64);
+                p2_table
+                    .entry_physical_mut(tables[2])
+                    .replace()
+                    .address(PhysicalAddress(addr))
+                    .huge() // 2MB
+                    .higher_half()
+                    .apply();
+
+                tables = new_tables;
+            }
+        }
     }
 
     Ok(())
 }
 
-fn post_init_physical_identity_mapping(
-    memory_map: &MultibootMemoryMap,
-    p4: &mut P4,
-) -> Result<(), MemoryError> {
+fn post_init_physical_identity_mapping(memory_map: &MultibootMemoryMap, p4: &mut P4) {
     // ensure frame allocator uses virtual multiboot pointer now
     frame_allocator().relocate_multiboot(unsafe {
         let phys = PhysicalAddress(memory_map.pointer() as u64);
@@ -92,9 +173,11 @@ fn post_init_physical_identity_mapping(
     }
 
     // now safe to remove low identity maps from early boot
-    let mut p3 = p4.entry_mut(0).traverse()?;
-    p3.entry_mut(0).replace().not_present().apply();
-    p4.entry_mut(0).replace().not_present().apply();
+    p4.table_mut()
+        .entry_physical_mut(0)
+        .replace()
+        .not_present()
+        .apply();
 
-    Ok(())
+    // don't bother zeroing other hardcoded p3 and p2s as we won't reference them again
 }

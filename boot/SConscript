@@ -5,8 +5,12 @@ build = env["build"]
 
 env = Environment(tools=["default", "nasm"], ASFLAGS=["-I", src.path, "-felf64"])
 
+stack_size_kb = 16 if build == "release" else 64
+
 if build == "release":
     env["ASFLAGS"] += ["-O2"]
+
+env["ASFLAGS"] += ["-DINITIAL_STACK_SIZE={}".format(stack_size_kb * 1024)]
 
 boot_objs = [env.StaticObject(src) for src in Glob("*.asm")]
 

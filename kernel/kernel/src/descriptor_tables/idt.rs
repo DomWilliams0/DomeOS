@@ -1,16 +1,14 @@
-use core::mem::MaybeUninit;
 use core::ops::{Shl, Shr};
 
 use modular_bitfield::prelude::*;
 
-use crate::descriptor_tables::common::DescriptorTablePointer;
 use crate::descriptor_tables::tss::IST_IDX_DOUBLE_FAULT;
+use crate::descriptor_tables::DescriptorTablePointer;
 use crate::irq;
+use common::InitializedGlobal;
 use memory::VIRT_KERNEL_BASE;
 
-// for some reason if an InitializedGlobal is used here, its filled with garbage and not zeroed?
-// doesn't happen with a raw maybeuninit so lets just use that
-static mut IDT: MaybeUninit<InterruptDescriptorTable> = MaybeUninit::uninit();
+static mut IDT: InitializedGlobal<InterruptDescriptorTable> = InitializedGlobal::uninit();
 
 const IDT_ENTRY_COUNT: usize = 256;
 
@@ -198,12 +196,12 @@ impl InterruptDescriptorTable {
 
     unsafe fn load(self) {
         // replace global IDT with self
-        IDT.as_mut_ptr().write(self);
+        IDT.init(self);
 
         // point at global IDT
         let ptr = DescriptorTablePointer {
-            base: IDT.as_mut_ptr() as *mut _ as u64,
-            limit: core::mem::size_of::<InterruptDescriptorTable>() as u16,
+            base: IDT.get() as *mut _ as u64,
+            limit: core::mem::size_of::<InterruptDescriptorTable>() as u16 - 1,
         };
 
         asm!("lidt [{0}])", in(reg) &ptr);

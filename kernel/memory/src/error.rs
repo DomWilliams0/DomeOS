@@ -9,6 +9,9 @@ pub enum MemoryError {
     /// No physical frames available
     NoFrame,
 
+    /// No premapped physical frames available
+    NoPremappedFrame,
+
     /// No contiguous region of virtual memory of {0:#x} pages available from addr {1:#?}
     NoContiguousVirtualRegion(u64, u64 /* pages */),
 
