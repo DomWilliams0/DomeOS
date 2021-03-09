@@ -87,10 +87,6 @@ impl Multiboot {
     pub fn new(mbi: &'static multiboot_info) -> Self {
         trace!("multiboot flags: {:#b}", mbi.flags);
 
-        if mbi.flags.bit(0) {
-            trace!("memory range: {}KiB -> {}KiB", mbi.mem_lower, mbi.mem_upper);
-        }
-
         match CommandLine::init(mbi) {
             None => debug!("no command line args given"),
             Some(args) => debug!("command line: '{}'", args),

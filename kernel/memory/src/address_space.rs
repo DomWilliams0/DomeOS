@@ -176,8 +176,8 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             limit.pt_offset(),
         );
 
+        // TODO make this public/wrap in a newtype
         const KEEP_LOOPING: u16 = 4;
-
         let mut unroll = KEEP_LOOPING;
 
         // entry index into each table
@@ -562,7 +562,7 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
             if !is_consecutive || contiguous_start.is_none() {
                 // restart search from here
                 #[cfg(feature = "log-paging")]
-                trace!(" restarting search from {:?}", addr);
+                trace!("resetting contiguous start to {:?}", addr);
                 contiguous_start = Some(addr);
             }
 
@@ -573,7 +573,31 @@ impl<'p, M: MemoryProvider> RawAddressSpace<'p, M> {
 
             // calculate number of consecutive pages we have
             let contiguous_start = contiguous_start.unwrap(); // unconditionally initialized above
-            let contiguous_count = (addr.address() - contiguous_start.address()) / FRAME_SIZE;
+            let contiguous_end = {
+                use AnyLevel::*;
+                const ENTRY_COUNT: u64 = PAGE_TABLE_ENTRY_COUNT as u64;
+
+                let frames = match level {
+                    P4 => ENTRY_COUNT.pow(3),
+                    P3 => ENTRY_COUNT.pow(2),
+                    P2 => ENTRY_COUNT.pow(1),
+                    P1 => 1,
+                    Frame => unreachable!(),
+                };
+
+                addr + (frames * FRAME_SIZE)
+            };
+            let contiguous_count =
+                (contiguous_end.address() - contiguous_start.address()) / FRAME_SIZE;
+
+            #[cfg(feature = "log-paging")]
+            trace!(
+                "got {} contiguous from {:?} -> {:?} (+1 {:?})",
+                contiguous_count,
+                contiguous_start,
+                contiguous_end,
+                level
+            );
 
             // keep going only if not done yet
             contiguous_count < n_to_find
@@ -642,7 +666,7 @@ impl OneTimeEntryRange {
 }
 
 /// (number of pt entries to do, new unwind value, new tables values)
-fn iter_all_pages(
+pub fn iter_all_pages(
     start: VirtualAddress,
     end: VirtualAddress,
 ) -> impl Iterator<Item = (u16, u16, [u16; 4])> {

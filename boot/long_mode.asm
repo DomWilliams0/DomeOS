@@ -8,7 +8,9 @@ global init_pml4
 section .data
 align 0x1000
 
-; ident map of first 12MB, and mirror it at the -2GB mark
+; ident map of first 32MB, and mirror it at the -2GB mark.
+; matches kernel::memory::KERNEL_IDENTITY_MAPPING.
+;
 ; tyvm https://github.com/eteran/os64/blob/master/arch/x86_64/boot.S
 init_pml4:
 	; +3 ===> present and R/W
@@ -19,17 +21,29 @@ init_pml4:
 init_pdp:
 	dq init_pd - KERNEL_VIRT + 3
 	times 509 dq 0
-	dq 0x0000000000000083 ; 1GB page (PRESENT | WRITEABLE | HUGE)
+	dq init_pd - KERNEL_VIRT + 3
 	dq 0
 
 init_pd:
-	dq 0x0000000000000083 ; 0MB  - 2MB
-	dq 0x0000000000200083 ; 2MB  - 4MB
-	dq 0x0000000000400083 ; 4MB  - 6MB
-	dq 0x0000000000800083 ; 6MB  - 8MB
-	dq 0x0000000000a00083 ; 8MB  - 10MB
-	dq 0x0000000000c00083 ; 10MB - 12MB
-	times 510 dq 0
+	dq 0x0000000000000083 ; 0MB - 2MB
+	dq 0x0000000000200083 ; 2MB - 4MB
+	dq 0x0000000000400083 ; 4MB - 6MB
+	dq 0x0000000000600083 ; 6MB - 8MB
+	dq 0x0000000000800083 ; 8MB - 10MB
+	dq 0x0000000000a00083 ; ...
+	dq 0x0000000000c00083
+	dq 0x0000000000e00083
+
+	dq 0x0000000001000083
+	dq 0x0000000001200083
+	dq 0x0000000001400083
+	dq 0x0000000001600083
+	dq 0x0000000001800083
+	dq 0x0000000001a00083
+	dq 0x0000000001c00083
+	dq 0x0000000001e00083 ; 30MB - 32MB
+
+	times 496 dq 0
 
 
 section .boot.text

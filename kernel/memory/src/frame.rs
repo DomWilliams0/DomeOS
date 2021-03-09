@@ -34,4 +34,11 @@ impl PhysicalFrame {
             core::intrinsics::volatile_set_memory(ptr, 0, FRAME_SIZE as usize);
         }
     }
+    /// # Safety
+    /// Must ensure it is writeable
+    pub unsafe fn zero_in_place(&self) {
+        let ptr = (self.0).0 as *mut u8;
+
+        core::intrinsics::volatile_set_memory(ptr, 0, FRAME_SIZE as usize);
+    }
 }

@@ -1,18 +1,20 @@
 use crate::memory::phys::dumb::DumbFrameAllocator;
 use crate::memory::phys::physical_size::kernel_size;
+use crate::memory::KERNEL_IDENTITY_MAPPING;
 use crate::multiboot::{multiboot_memory_map_t, MultibootMemoryMap};
 use common::InitializedGlobal;
 use common::*;
 use enumflags2::BitFlags;
-use memory::{MemoryError, PhysicalFrame};
+use memory::{MemoryError, PhysicalFrame, VIRT_KERNEL_SIZE};
 
 #[derive(BitFlags, Debug, Copy, Clone)]
 #[repr(u16)]
 pub enum FrameFlags {
     /// Will come from below the first 1MB
     Low = 1 << 0,
-    // /// Will come from the first identity mapped 1GB after the kernel
-    // PreMapped = 1 << 1,
+
+    /// Must already be writeable upon allocation, i.e. from the kernel identity map
+    PreMapped = 1 << 1,
 }
 
 /// Allocates physical pages
@@ -30,9 +32,17 @@ pub fn init_frame_allocator(mmap: MultibootMemoryMap) {
     let size = kernel_size();
     debug!("kernel is {} ({:#x}) bytes", size, size);
     assert!(
-        size < 12 * 1024 * 1024,
-        "kernel is bigger than 12MB, initial identity mapping is too small!"
+        size < KERNEL_IDENTITY_MAPPING,
+        "kernel is bigger than its identity mapping! bump KERNEL_IDENTITY_MAPPING"
     );
+
+    #[allow(clippy::assertions_on_constants)]
+    {
+        assert!(
+            KERNEL_IDENTITY_MAPPING < VIRT_KERNEL_SIZE,
+            "kernel identity map is bigger than upper limit!"
+        );
+    }
 
     let allocator = DumbFrameAllocator::new(mmap);
     unsafe {
@@ -47,6 +57,7 @@ pub fn frame_allocator() -> &'static mut impl FrameAllocator {
 mod dumb {
     use crate::memory::phys::physical_size::kernel_end;
     use crate::memory::phys::{FrameAllocator, FrameFlags};
+    use crate::memory::KERNEL_IDENTITY_MAPPING;
     use crate::multiboot::{multiboot_memory_map_t, MemoryRegionType, MultibootMemoryMap};
     use common::*;
     use enumflags2::BitFlags;
@@ -56,6 +67,7 @@ mod dumb {
         frames: Frames,
     }
 
+    #[derive(Clone)]
     struct Frames {
         region_idx: usize,
         frame_idx: u64,
@@ -122,8 +134,29 @@ mod dumb {
                 // return Err(KernelError::NotImplemented);
             }
 
-            let next = self.frames.next();
-            next.ok_or(MemoryError::NoFrame)
+            let frame = if flags.contains(FrameFlags::PreMapped) {
+                // need to peek ahead to see if next frame is premapped
+
+                // clone iter temporarily
+                let mut peeked = self.frames.clone();
+
+                match peeked.next() {
+                    Some(frame) if frame.address().address() >= KERNEL_IDENTITY_MAPPING => {
+                        // frame not available, don't advance allocator iterator
+                        return Err(MemoryError::NoPremappedFrame);
+                    }
+                    result => {
+                        // some other result, advance allocator iterator
+                        debug_assert!(!core::mem::needs_drop::<Frames>());
+                        self.frames = peeked;
+                        result
+                    }
+                }
+            } else {
+                self.frames.next()
+            };
+
+            frame.ok_or(MemoryError::NoFrame)
         }
 
         fn free(&mut self, _frame: PhysicalFrame) -> Result<(), MemoryError> {

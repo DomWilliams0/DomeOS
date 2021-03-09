@@ -2,12 +2,13 @@ use crate::hang;
 use common::*;
 use core::fmt::{Display, Formatter};
 use core::panic::PanicInfo;
-use memory::{kilobytes, megabytes};
+use memory::megabytes;
 
 static mut PANICKED: bool = false;
 
 // linker map is packed by helpers/ld-link-map then patched into this array after build by
 // helpers/patcher
+// TODO feature gate to avoid the bloat
 const PACKED_SYMBOLS_COUNT: usize = megabytes(2) as usize / core::mem::size_of::<u32>();
 const PACKED_SYMBOLS_MARKER: u32 = 0xbeef_face;
 static PACKED_SYMBOLS: [u32; PACKED_SYMBOLS_COUNT] = [PACKED_SYMBOLS_MARKER; PACKED_SYMBOLS_COUNT];

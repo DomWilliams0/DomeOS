@@ -2,7 +2,9 @@
 #![feature(core_intrinsics)]
 
 pub use address::{round_down_to, round_up_to, PhysicalAddress, VirtualAddress};
-pub use address_space::{MapFlags, MapTarget, MappedSlice, MemoryProvider, RawAddressSpace};
+pub use address_space::{
+    iter_all_pages, MapFlags, MapTarget, MappedSlice, MemoryProvider, Pml4Guard, RawAddressSpace,
+};
 pub use constants::*;
 pub use custom_entry::{CustomPageEntry, DemandMapping};
 pub use entry::{CommonEntry, PageTableBits, PageTableFlag};
