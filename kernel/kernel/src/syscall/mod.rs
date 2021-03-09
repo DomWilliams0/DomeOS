@@ -61,7 +61,6 @@ unsafe extern "C" fn tramp_validate_log() -> ! {
         "mov rsp, gs:{gs_stack_offset}",
 
         // preserve values
-        // TODO r11 for user flags too
         "push rcx", // user rip
         "push r10", // user rsp
 

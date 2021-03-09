@@ -13,7 +13,7 @@ use memory::{round_up_to, MapFlags, MapTarget, VirtualAddress, FRAME_SIZE};
 use pe::{Address, Pe, PeError};
 
 // temporary
-const NOP_EXE: &[u8] = include_bytes!("../../../../userspace/syscall.exe");
+const NOP_EXE: &[u8] = include_bytes!("../../../../userspace/syscall-c.exe");
 
 // TODO need to configure via args:
 //  * user vs kernel

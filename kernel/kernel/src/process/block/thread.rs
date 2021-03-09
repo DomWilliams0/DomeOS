@@ -104,6 +104,9 @@ impl ThreadRef {
                 state: ThreadState {
                     rsp: user_stack.address(),
                     rip: entry_point.address(),
+                    // TODO temporary - store PID in rdi initially. pass properly with correct calling convention
+                    //  (e.g. stdcall for win PEs) via crt0
+                    rdi: *process.pid(),
                     ..ThreadState::default()
                 },
             }),

@@ -1,7 +1,7 @@
 use common::Deref;
 use core::fmt::{Debug, Formatter};
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Deref)]
 #[repr(transparent)]
 pub struct Pid(u64);
 
