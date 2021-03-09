@@ -103,7 +103,7 @@ impl<A: StackAllocation> Stacks<A> {
             return Err(MemoryError::AlreadyMapped(slab_bottom.address()));
         }
 
-        let slab_top = slab_bottom + A::STACK_GROWTH_INCREMENT - 8;
+        let slab_top = slab_bottom + A::STACK_GROWTH_INCREMENT - 16;
 
         let map_flags = Self::map_flags();
         if map_flags.contains(MapFlags::User) {
