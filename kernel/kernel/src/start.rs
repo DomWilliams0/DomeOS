@@ -30,6 +30,13 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
 
     // now we have a heap we can start using boxed error types
 
+    unsafe {
+        if let Err(err) = crate::acpi::init() {
+            error!("acpi error: {}", err);
+        }
+        hang(); // TODO temporary
+    }
+
     // finally enable interrupts now that the higher half mappings are in place, so the isrs are
     // actually mapped
     enable_interrupts();
@@ -52,16 +59,7 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     crate::descriptor_tables::tss().set_privilege_stack(0, interrupt_stack);
 
     // begin testing
-    let process = crate::process::experiment_new_process().expect("failed");
-    debug!("process created");
-
-    let thread = {
-        let inner = process.inner_locked();
-        let thread = inner.threads().next().expect("no main thread");
-        thread.clone()
-    };
-
-    unsafe { thread.switch_to() }
+    hang();
 }
 
 fn hang() -> ! {

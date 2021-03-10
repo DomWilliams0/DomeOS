@@ -20,6 +20,7 @@ use common::*;
 
 use crate::irq::disable_interrupts;
 
+mod acpi;
 mod clock;
 mod cpu;
 mod descriptor_tables;

@@ -119,6 +119,10 @@ impl VirtualAddress {
         self.0 as *mut T
     }
 
+    pub fn as_const_ptr<T>(self) -> *const T {
+        self.0 as *const T
+    }
+
     /// Adds physical identity base
     pub fn from_physical(addr: PhysicalAddress) -> VirtualAddress {
         if cfg!(test) {
