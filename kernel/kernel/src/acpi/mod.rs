@@ -1,9 +1,10 @@
 use crate::acpi::rsdp::Rsdp;
-use crate::acpi::sdts::{Fadt, FadtRevision1, FadtRevision2};
 use common::*;
 
 mod rsdp;
+mod rsdt;
 mod sdts;
+mod util;
 
 #[derive(Display, Debug)]
 pub enum AcpiError {
@@ -26,6 +27,13 @@ pub enum AcpiError {
         actual: usize,
     },
 
+    /// Description table with signature {signature:?} expected to be revision {expected} is actually {actual}
+    RevisionMismatch {
+        signature: &'static str,
+        expected: u8,
+        actual: u8,
+    },
+
     /// No support for 8042 PS/2 controller
     NoPs2Controller,
 }
@@ -34,7 +42,11 @@ pub enum AcpiError {
 /// Physical identity map must be initialized
 pub unsafe fn init() -> Result<(), AcpiError> {
     let rsdp = Rsdp::find_and_validate()?;
-    let rsdt = rsdp.rsdt()?;
+    let rsdt = rsdp.get_rsdt()?;
+
+    for (i, sdt) in rsdt.iter().enumerate() {
+        trace!("{}: {:?}", i, sdt);
+    }
 
     // check for ps/2
     let fadt = rsdt.lookup_fadt()?;

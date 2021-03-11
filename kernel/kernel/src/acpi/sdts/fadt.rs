@@ -1,11 +1,11 @@
 use crate::acpi::rsdp::AcpiSdtHeader;
 use crate::acpi::sdts::DescriptionTable;
-use bit_field::BitField;
 
 pub trait Fadt {
     fn has_8042_ps2_controller(&self) -> bool;
 }
 
+/// ACPI 1.0 (used by qemu and bochs)
 #[repr(C, packed)]
 pub struct FadtRevision1 {
     header: AcpiSdtHeader,
@@ -50,8 +50,9 @@ pub struct FadtRevision1 {
     flags: u32,
 }
 
+/// ACPI 2.0 (used by my shitty physical test laptop)
 #[repr(C, packed)]
-pub struct FadtRevision2 {
+pub struct FadtRevision3 {
     header: AcpiSdtHeader,
     firmware_ctrl: u32,
     dsdt: u32,
@@ -127,10 +128,20 @@ impl Fadt for FadtRevision1 {
     }
 }
 
-impl Fadt for FadtRevision2 {
+impl Fadt for FadtRevision3 {
     fn has_8042_ps2_controller(&self) -> bool {
-        // might be unaligned
-        unsafe { self.boot_architecture_flags.get_bit(1) }
+        let bit = (self.boot_architecture_flags & 0b10) != 0;
+
+        if cfg!(any(target_arch = "x86", target_arch = "x86_64")) {
+            // https://lkml.org/lkml/2015/10/17/114
+            if !bit {
+                common::warn!("8042 bit not set but ignoring it on x86")
+            }
+
+            true
+        } else {
+            bit
+        }
     }
 }
 
@@ -142,6 +153,10 @@ mod tests {
     fn size_check() {
         assert_eq!(core::mem::size_of::<GenericAddressStructure>(), 12);
         assert_eq!(memoffset::offset_of!(FadtRevision1, flags), 112);
-        assert_eq!(memoffset::offset_of!(FadtRevision2, flags), 112);
+        assert_eq!(memoffset::offset_of!(FadtRevision3, flags), 112);
+        assert_eq!(
+            memoffset::offset_of!(FadtRevision3, boot_architecture_flags),
+            109
+        );
     }
 }

@@ -1,11 +1,20 @@
-use crate::acpi::sdts::{DescriptionTable, Fadt, FadtRevision1, FadtRevision2};
-use crate::acpi::AcpiError;
-use common::*;
 use core::fmt::{Debug, Formatter};
-use memory::{PhysicalAddress, VirtualAddress};
+
+use common::*;
+
+use crate::acpi::rsdt::{Rsdt, RsdtType, RsdtWrapper};
+
+use crate::acpi::util::{resolve_phys, validate_checksum};
+use crate::acpi::AcpiError;
+
+pub trait Rsdp: Debug {
+    fn rsdp(&self) -> &RsdpOnePointOh;
+    fn validate_checksum(&self) -> bool;
+    fn rsdt(&self) -> RsdtWrapper;
+}
 
 #[repr(C, packed)]
-pub struct Rsdp {
+pub struct RsdpOnePointOh {
     signature: [u8; 8],
     checksum: u8,
     oem_id: [u8; 6],
@@ -13,62 +22,53 @@ pub struct Rsdp {
     rsdt_addr: u32,
 }
 
-// #[repr(C, packed)]
-// struct RsdpTwoPointOh {
-//     first: Rsdp,
-//     length: u32,
-//     xsdt_addr: u64,
-//     extended_checksum: u8,
-//     reserved: [u8; 3],
-// }
+#[repr(C, packed)]
+struct RsdpTwoPointOh {
+    first: RsdpOnePointOh,
+    length: u32,
+    xsdt_addr: u64,
+    extended_checksum: u8,
+    reserved: [u8; 3],
+}
 
 #[repr(C)]
 pub struct AcpiSdtHeader {
-    signature: [u8; 4],
-    length: u32,
-    revision: u8,
-    checksum: u8,
-    oem_id: [u8; 6],
-    oem_table_id: [u8; 8],
-    oem_revision: u32,
-    creator_id: u32,
-    creator_revision: u32,
+    pub signature: [u8; 4],
+    pub length: u32,
+    pub revision: u8,
+    pub checksum: u8,
+    pub oem_id: [u8; 6],
+    pub oem_table_id: [u8; 8],
+    pub oem_revision: u32,
+    pub creator_id: u32,
+    pub creator_revision: u32,
 }
 
-#[repr(C)]
-pub struct Rsdt {
-    header: AcpiSdtHeader,
-    others_ptr: u32,
-}
-
-impl Rsdp {
+impl dyn Rsdp {
     /// # Safety
     /// Physical identity map must be initialized
     pub unsafe fn find_and_validate() -> Result<&'static Self, AcpiError> {
         let rsdp = Self::find().ok_or(AcpiError::RsdpNotFound)?;
         trace!("RSDP: {:?}", rsdp);
 
-        if !validate_checksum(rsdp, core::mem::size_of::<Rsdp>()) {
-            return Err(AcpiError::InvalidChecksum("RSDP"));
-        }
+        let rsdp = match rsdp.revision {
+            0 => rsdp as &dyn Rsdp,
+            2 => &*(rsdp as *const _ as *const RsdpTwoPointOh),
+            _ => return Err(AcpiError::UnsupportedVersion(rsdp.revision)),
+        };
 
-        if rsdp.revision != 0 {
-            return Err(AcpiError::UnsupportedVersion(rsdp.revision));
+        if !rsdp.validate_checksum() {
+            return Err(AcpiError::InvalidChecksum("RSDP"));
         }
 
         Ok(rsdp)
     }
 
-    pub fn rsdt(&self) -> Result<&Rsdt, AcpiError> {
-        let rsdt = {
-            let ptr = resolve_phys(self.rsdt_addr as *const Rsdt);
+    pub fn get_rsdt(&self) -> Result<RsdtWrapper, AcpiError> {
+        let rsdt = Rsdp::rsdt(self);
+        trace!("RSDT: {:?}", rsdt.header);
 
-            // safety: rsdp checksum validated
-            unsafe { &*ptr }
-        };
-        trace!("RSDT: {:?}", rsdt);
-
-        if !rsdt.validate_checksum() {
+        if !validate_checksum(*rsdt, rsdt.header.length as usize) {
             return Err(AcpiError::InvalidChecksum("RSDT"));
         }
 
@@ -77,7 +77,7 @@ impl Rsdp {
 
     /// # Safety
     /// Physical identity map must be initialized
-    unsafe fn find() -> Option<&'static Rsdp> {
+    unsafe fn find() -> Option<&'static RsdpOnePointOh> {
         // TODO look in multiboot
         let physical_search_regions = [0x40e..0x80e, 0xe0000..0xfffff];
 
@@ -91,77 +91,49 @@ impl Rsdp {
             })
             .find_map(|ptr| {
                 let sig = &*ptr;
-                (sig == b"RSD PTR ").then(|| &*(ptr as *const Rsdp))
+                (sig == b"RSD PTR ").then(|| &*(ptr as *const RsdpOnePointOh))
             })
     }
 }
 
-impl Rsdt {
+impl Rsdp for RsdpOnePointOh {
+    fn rsdp(&self) -> &RsdpOnePointOh {
+        self
+    }
+
     fn validate_checksum(&self) -> bool {
-        validate_checksum(self, self.header.length as usize)
+        validate_checksum(self, core::mem::size_of::<RsdpOnePointOh>())
     }
 
-    fn iter(&self) -> impl Iterator<Item = &AcpiSdtHeader> + '_ {
-        let n = (self.header.length as usize - core::mem::size_of::<AcpiSdtHeader>()) / 4;
-        unsafe {
-            core::slice::from_raw_parts((&self.others_ptr) as *const u32, n)
-                .iter()
-                .map(|ptr| {
-                    let ptr = (*ptr) as *const AcpiSdtHeader;
-                    &*resolve_phys(ptr)
-                })
-        }
+    fn rsdt(&self) -> RsdtWrapper {
+        // safety: rsdp checksum validated
+        unsafe { RsdtWrapper::new(self.rsdt_addr as *const Rsdt, RsdtType::Rsdt) }
+    }
+}
+impl Rsdp for RsdpTwoPointOh {
+    fn rsdp(&self) -> &RsdpOnePointOh {
+        &self.first
     }
 
-    pub fn lookup<T: DescriptionTable>(&self) -> Result<&T, AcpiError> {
-        let header = self
-            .iter()
-            .find(|h| h.signature == *T::SIGNATURE.as_bytes())
-            .ok_or(AcpiError::NoSuchTable(T::SIGNATURE))?;
+    fn validate_checksum(&self) -> bool {
+        validate_checksum(self, core::mem::size_of::<RsdpOnePointOh>())
+            && validate_checksum(self, core::mem::size_of::<RsdpTwoPointOh>())
+    }
 
-        if !validate_checksum(header, header.length as usize) {
-            return Err(AcpiError::InvalidChecksum(T::SIGNATURE));
-        }
-
-        trace!("{:?}", header);
-
-        let expected_size = core::mem::size_of::<T>();
-        let actual_size = header.length as usize;
-        if expected_size != actual_size {
-            Err(AcpiError::LengthMismatch {
-                signature: T::SIGNATURE,
-                expected: expected_size,
-                actual: actual_size,
-            })
+    fn rsdt(&self) -> RsdtWrapper {
+        let ptr = if self.xsdt_addr == 0 {
+            // fallback to 32 bit addr if zero
+            self.first.rsdt_addr as u64
         } else {
-            Ok(unsafe { &*(header as *const _ as *const T) })
-        }
-    }
+            self.xsdt_addr
+        };
 
-    pub fn lookup_fadt(&self) -> Result<&dyn Fadt, AcpiError> {
-        if let Ok(fadt) = self.lookup::<FadtRevision1>() {
-            Ok(fadt as &dyn Fadt)
-        } else {
-            self.lookup::<FadtRevision2>().map(|fadt| fadt as &dyn Fadt)
-        }
+        // safety: rsdp checksum validated
+        unsafe { RsdtWrapper::new(ptr as *const Rsdt, RsdtType::Xsdt) }
     }
 }
 
-fn validate_checksum<T>(val: &T, len: usize) -> bool {
-    let as_bytes = unsafe { core::slice::from_raw_parts(val as *const T as *const u8, len) };
-
-    let sum = as_bytes
-        .iter()
-        .fold(0_u8, |acc, val| acc.wrapping_add(*val));
-
-    (sum & 0xf) == 0
-}
-
-fn resolve_phys<T>(ptr: *const T) -> *const T {
-    VirtualAddress::from_physical(PhysicalAddress(ptr as u64)).as_const_ptr()
-}
-
-impl Debug for Rsdp {
+impl Debug for RsdpOnePointOh {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "Rsdp(checksum={:#x}, oem_id=", self.checksum)?;
 
@@ -175,6 +147,19 @@ impl Debug for Rsdp {
             f,
             ", revision={}, rsdt_addr={:#x})",
             self.revision, rsdt_addr
+        )
+    }
+}
+
+impl Debug for RsdpTwoPointOh {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        let len = self.length;
+        let xsdt_addr = self.xsdt_addr;
+
+        write!(
+            f,
+            "Rsdp2({:?}, length={:?}, xsdt_addr={:#x})",
+            self.first, len, xsdt_addr
         )
     }
 }
@@ -214,11 +199,6 @@ impl Debug for AcpiSdtHeader {
     }
 }
 
-impl Debug for Rsdt {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Rsdt({:?}, others={:#x})", self.header, self.others_ptr)
-    }
-}
 #[cfg(test)]
 mod tests {
     use super::*;
