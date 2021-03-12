@@ -32,6 +32,7 @@ mod memory;
 mod multiboot;
 mod panic;
 mod process;
+mod ps2;
 mod serial;
 mod spinlock;
 mod start;

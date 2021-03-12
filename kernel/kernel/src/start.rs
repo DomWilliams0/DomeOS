@@ -1,5 +1,6 @@
 use common::*;
 
+use crate::acpi::AcpiError;
 use crate::cpu::CpuState;
 use crate::descriptor_tables::{SEL_KERNEL_CODE, SEL_USER_BASE};
 use crate::io::{Efer, GsBase, KernelGsBase, LStar, Msr, Star};
@@ -8,6 +9,7 @@ use crate::logging::LogMode;
 use crate::memory::{KernelInterruptStacks, Stacks};
 use crate::multiboot;
 use crate::multiboot::Multiboot;
+use crate::ps2::Ps2Controller;
 use crate::vga::{self, Color};
 use crate::{clock, descriptor_tables, logging};
 use memory::VirtualAddress;
@@ -31,10 +33,27 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     // now we have a heap we can start using boxed error types
 
     unsafe {
-        if let Err(err) = crate::acpi::init() {
-            error!("acpi error: {}", err);
+        let init_ps2 = match crate::acpi::init() {
+            Ok(_) => true,
+            Err(AcpiError::NoPs2Controller) => false,
+            Err(err) => {
+                error!("acpi error: {}", err);
+                hang();
+            }
+        };
+
+        if init_ps2 {
+            let ps2_controller = match Ps2Controller::initialise() {
+                Ok(ps2) => ps2,
+                Err(err) => panic!("failed to init PS/2: {}", err),
+            };
         }
-        hang(); // TODO temporary
+
+        // temporary, hang while still accepting interrupts
+        enable_interrupts();
+        loop {
+            asm!("hlt");
+        }
     }
 
     // finally enable interrupts now that the higher half mappings are in place, so the isrs are

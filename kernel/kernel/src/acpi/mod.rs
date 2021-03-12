@@ -6,7 +6,7 @@ mod rsdt;
 mod sdts;
 mod util;
 
-#[derive(Display, Debug)]
+#[derive(Display)]
 pub enum AcpiError {
     /// RSDP not found
     RsdpNotFound,

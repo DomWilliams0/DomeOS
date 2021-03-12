@@ -42,6 +42,10 @@ impl Port {
         asm!("in al, dx", out("al") ret, in("dx") self.0, options(nomem, nostack));
         ret
     }
+
+    pub const fn id(&self) -> u16 {
+        self.0
+    }
 }
 
 impl Add<u16> for Port {

@@ -9,6 +9,8 @@ members = [
     # build helpers
     "helpers/ld-link-map",
     "helpers/patcher",
+    # drivers
+    "drivers/helpers/ps2",
 ]
 
 default-members = ["kernel"]
