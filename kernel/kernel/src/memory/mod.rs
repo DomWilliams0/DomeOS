@@ -7,7 +7,7 @@ mod stack;
 pub use address_space::{AddressSpace, AddressSpaceRef};
 pub use init::init;
 use memory::megabytes;
-pub use phys::{frame_allocator, FrameAllocator, FrameFlags};
+pub use phys::{frame_allocator, FrameAllocator};
 pub use stack::{
     KernelInterruptStacks, ProcessKernelStacks, ProcessUserStacks, StackGrowth, Stacks,
 };

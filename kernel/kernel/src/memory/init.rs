@@ -1,8 +1,7 @@
-use crate::memory::{frame_allocator, heap, phys, AddressSpace, FrameAllocator, FrameFlags};
+use crate::memory::{frame_allocator, heap, phys, AddressSpace, FrameAllocator};
 use crate::multiboot::{MemoryRegionType, Multiboot, MultibootMemoryMap};
 use crate::vga;
 use common::*;
-use enumflags2::BitFlags;
 use memory::{
     gigabytes, iter_all_pages, megabytes, round_up_to, MemoryError, PageTableHierarchy,
     PhysicalAddress, VirtualAddress, P4, PAGE_TABLE_ENTRY_COUNT, VIRT_PHYSICAL_BASE,
@@ -82,14 +81,12 @@ fn init_physical_identity_mapping(
     const KEEP_LOOPING: u16 = 4;
     let mut unroll = KEEP_LOOPING;
 
-    // ensure all allocated frames are already writeable
-    let frame_flags = BitFlags::from(FrameFlags::PreMapped);
-
     let p4 = p4.table_mut();
     'outer: while unroll > 0 {
         let p4_entry = p4.entry_physical_mut(tables[0]);
 
-        let p3_frame = frame_allocator().allocate(frame_flags)?;
+        // ensure all allocated frames are already writeable with allocate_premapped
+        let p3_frame = frame_allocator().allocate_premapped()?;
         unsafe {
             // safety: frame allocated with PreMapped
             p3_frame.zero_in_place();
@@ -107,7 +104,7 @@ fn init_physical_identity_mapping(
             let p3_table = p3.table_mut().expect("p3 is not huge");
             let p3_entry = p3_table.entry_physical_mut(tables[1]);
 
-            let p2_frame = frame_allocator().allocate(frame_flags)?;
+            let p2_frame = frame_allocator().allocate_premapped()?;
             unsafe {
                 // safety: frame allocated with PreMapped
                 p2_frame.zero_in_place();

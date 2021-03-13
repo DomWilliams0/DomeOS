@@ -4,22 +4,17 @@ use crate::memory::KERNEL_IDENTITY_MAPPING;
 use crate::multiboot::{multiboot_memory_map_t, MultibootMemoryMap};
 use common::InitializedGlobal;
 use common::*;
-use enumflags2::BitFlags;
 use memory::{MemoryError, PhysicalFrame, VIRT_KERNEL_SIZE};
-
-#[derive(BitFlags, Debug, Copy, Clone)]
-#[repr(u16)]
-pub enum FrameFlags {
-    /// Will come from below the first 1MB
-    Low = 1 << 0,
-
-    /// Must already be writeable upon allocation, i.e. from the kernel identity map
-    PreMapped = 1 << 1,
-}
 
 /// Allocates physical pages
 pub trait FrameAllocator {
-    fn allocate(&mut self, flags: BitFlags<FrameFlags>) -> Result<PhysicalFrame, MemoryError>;
+    fn allocate_any(&mut self) -> Result<PhysicalFrame, MemoryError>;
+
+    /// Must already be writeable upon allocation, i.e. from the kernel identity map
+    fn allocate_premapped(&mut self) -> Result<PhysicalFrame, MemoryError>;
+
+    /// Must come from below the first 4GB
+    fn allocate_low(&mut self) -> Result<PhysicalFrame, MemoryError>;
 
     fn free(&mut self, frame: PhysicalFrame) -> Result<(), MemoryError>;
 
@@ -56,11 +51,10 @@ pub fn frame_allocator() -> &'static mut impl FrameAllocator {
 
 mod dumb {
     use crate::memory::phys::physical_size::kernel_end;
-    use crate::memory::phys::{FrameAllocator, FrameFlags};
+    use crate::memory::phys::FrameAllocator;
     use crate::memory::KERNEL_IDENTITY_MAPPING;
     use crate::multiboot::{multiboot_memory_map_t, MemoryRegionType, MultibootMemoryMap};
     use common::*;
-    use enumflags2::BitFlags;
     use memory::{MemoryError, PhysicalAddress, PhysicalFrame, FRAME_SIZE};
 
     pub struct DumbFrameAllocator {
@@ -127,36 +121,33 @@ mod dumb {
     }
 
     impl FrameAllocator for DumbFrameAllocator {
-        fn allocate(&mut self, flags: BitFlags<FrameFlags>) -> Result<PhysicalFrame, MemoryError> {
-            // TODO separate allocator for low memory
-            if flags.contains(FrameFlags::Low) {
-                todo!()
-                // return Err(KernelError::NotImplemented);
-            }
-
-            let frame = if flags.contains(FrameFlags::PreMapped) {
-                // need to peek ahead to see if next frame is premapped
-
-                // clone iter temporarily
-                let mut peeked = self.frames.clone();
-
-                match peeked.next() {
-                    Some(frame) if frame.address().address() >= KERNEL_IDENTITY_MAPPING => {
-                        // frame not available, don't advance allocator iterator
-                        return Err(MemoryError::NoPremappedFrame);
-                    }
-                    result => {
-                        // some other result, advance allocator iterator
-                        debug_assert!(!core::mem::needs_drop::<Frames>());
-                        self.frames = peeked;
-                        result
-                    }
-                }
-            } else {
-                self.frames.next()
-            };
-
+        fn allocate_any(&mut self) -> Result<PhysicalFrame, MemoryError> {
+            let frame = self.frames.next();
             frame.ok_or(MemoryError::NoFrame)
+        }
+
+        fn allocate_premapped(&mut self) -> Result<PhysicalFrame, MemoryError> {
+            // need to peek ahead to see if next frame is premapped
+
+            // clone iter temporarily
+            let mut peeked = self.frames.clone();
+
+            match peeked.next() {
+                Some(frame) if frame.address().address() >= KERNEL_IDENTITY_MAPPING => {
+                    // frame not available, don't advance allocator iterator
+                    Err(MemoryError::NoPremappedFrame)
+                }
+                result => {
+                    // some other result, advance allocator iterator
+                    debug_assert!(!core::mem::needs_drop::<Frames>());
+                    self.frames = peeked;
+                    result.ok_or(MemoryError::NoFrame)
+                }
+            }
+        }
+
+        fn allocate_low(&mut self) -> Result<PhysicalFrame, MemoryError> {
+            unimplemented!()
         }
 
         fn free(&mut self, _frame: PhysicalFrame) -> Result<(), MemoryError> {

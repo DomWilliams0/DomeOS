@@ -66,7 +66,7 @@ impl PageFaultException {
                 // TODO reuse same physical page and CoW
                 // TODO what do if frame allocation fails?
                 let frame = frame_allocator()
-                    .allocate(BitFlags::empty())
+                    .allocate_any()
                     .expect("failed to allocate frame");
 
                 // rewrite mapping

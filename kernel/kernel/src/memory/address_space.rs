@@ -2,7 +2,6 @@ use crate::memory::phys::{frame_allocator, FrameAllocator};
 
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
-use enumflags2::BitFlags;
 pub use memory::{
     MemoryError, MemoryProvider, PageTableHierarchy, PhysicalFrame, RawAddressSpace, P1, P2, P4,
 };
@@ -19,7 +18,7 @@ pub struct AddressSpaceRef<'p: 'r, 'r>(AddressSpace<'p>, PhantomData<&'r ()>);
 
 impl MemoryProvider for FrameProvider {
     fn new_frame(&mut self) -> Result<PhysicalFrame, MemoryError> {
-        frame_allocator().allocate(BitFlags::empty())
+        frame_allocator().allocate_any()
     }
 }
 
