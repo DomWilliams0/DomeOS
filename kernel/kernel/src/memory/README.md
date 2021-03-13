@@ -11,6 +11,7 @@ ffff_8000_0000_0000 -> ffff_8001_0000_0000: 8MB isr/irq kernel stacks x 512 core
 ffff_8001_0000_0000 -> ffff_8002_0000_0000: 128KB x 32768 kernel stacks for threads per process
 ffff_9000_0000_0000 -> ffff_d000_0000_0000: 64TB physical memory mapping from 0
 ffff_d000_0000_0000 -> ffff_d004_0000_0000: 16GB kernel heap
+ffff_d004_0000_0000 -> ffff_d005_0000_0000: 4GB uncacheable for mmapped IO
 
 ...
 

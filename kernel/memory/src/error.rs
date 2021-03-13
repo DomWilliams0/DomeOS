@@ -12,6 +12,9 @@ pub enum MemoryError {
     /// No premapped physical frames available
     NoPremappedFrame,
 
+    /// No low physical frames available
+    NoLowFrame,
+
     /// No contiguous region of virtual memory of {0:#x} pages available from addr {1:#?}
     NoContiguousVirtualRegion(u64, u64 /* pages */),
 
@@ -38,4 +41,7 @@ pub enum MemoryError {
 
     /// Heap cannot grow anymore
     NoMoreHeap,
+
+    /// Mmapped IO region cannot grow anymore
+    NoMoreIo,
 }

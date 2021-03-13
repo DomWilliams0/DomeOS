@@ -42,11 +42,16 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
             }
         };
 
-        if init_ps2 {
-            let ps2_controller = match Ps2Controller::initialise() {
-                Ok(ps2) => ps2,
-                Err(err) => panic!("failed to init PS/2: {}", err),
-            };
+        // if init_ps2 {
+        //     let ps2_controller = match Ps2Controller::initialise() {
+        //         Ok(ps2) => ps2,
+        //         Err(err) => panic!("failed to init PS/2: {}", err),
+        //     };
+        // }
+
+        if let Err(err) = crate::apic::init() {
+            error!("apic error: {}", err);
+            hang();
         }
 
         // temporary, hang while still accepting interrupts

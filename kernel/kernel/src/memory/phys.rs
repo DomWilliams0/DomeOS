@@ -19,6 +19,24 @@ pub trait FrameAllocator {
     fn free(&mut self, frame: PhysicalFrame) -> Result<(), MemoryError>;
 
     fn relocate_multiboot(&mut self, mbi: &'static multiboot_memory_map_t);
+
+    fn as_bomb<F>(&mut self, f: F) -> Result<FrameFreeBomb<'_, Self>, MemoryError>
+    where
+        F: FnOnce(&mut Self) -> Result<PhysicalFrame, MemoryError>,
+        Self: Sized,
+    {
+        f(self).map(move |frame| FrameFreeBomb {
+            allocator: self,
+            frame,
+            defused: false,
+        })
+    }
+}
+
+pub struct FrameFreeBomb<'a, A: FrameAllocator> {
+    allocator: &'a mut A,
+    frame: PhysicalFrame,
+    defused: bool,
 }
 
 static mut FRAME_ALLOCATOR: InitializedGlobal<DumbFrameAllocator> = InitializedGlobal::uninit();
@@ -49,13 +67,38 @@ pub fn frame_allocator() -> &'static mut impl FrameAllocator {
     unsafe { FRAME_ALLOCATOR.get() }
 }
 
+impl<'a, A: FrameAllocator> FrameFreeBomb<'a, A> {
+    pub fn frame(&self) -> PhysicalFrame {
+        self.frame
+    }
+
+    pub fn defuse(self) -> PhysicalFrame {
+        // drop allocator reference manually
+        // safety: forgetting self afterwards
+        unsafe {
+            core::ptr::drop_in_place(self.allocator as *mut A);
+        }
+
+        let frame = self.frame;
+        core::mem::forget(self); // suppress destructor
+        frame
+    }
+}
+
+impl<'a, A: FrameAllocator> Drop for FrameFreeBomb<'a, A> {
+    fn drop(&mut self) {
+        // boom! free the page and ignore any result
+        let _ = self.allocator.free(self.frame);
+    }
+}
+
 mod dumb {
     use crate::memory::phys::physical_size::kernel_end;
     use crate::memory::phys::FrameAllocator;
     use crate::memory::KERNEL_IDENTITY_MAPPING;
     use crate::multiboot::{multiboot_memory_map_t, MemoryRegionType, MultibootMemoryMap};
     use common::*;
-    use memory::{MemoryError, PhysicalAddress, PhysicalFrame, FRAME_SIZE};
+    use memory::{gigabytes, MemoryError, PhysicalAddress, PhysicalFrame, FRAME_SIZE};
 
     pub struct DumbFrameAllocator {
         frames: Frames,
@@ -147,11 +190,29 @@ mod dumb {
         }
 
         fn allocate_low(&mut self) -> Result<PhysicalFrame, MemoryError> {
-            unimplemented!()
+            // TODO use a separate allocator, this is fragile
+            // need to peek ahead to see if next frame is valid
+
+            // clone iter temporarily
+            let mut peeked = self.frames.clone();
+
+            match peeked.next() {
+                Some(frame) if frame.address().address() >= gigabytes(4) => {
+                    // frame not available, don't advance allocator iterator
+                    Err(MemoryError::NoLowFrame)
+                }
+                result => {
+                    // some other result, advance allocator iterator
+                    debug_assert!(!core::mem::needs_drop::<Frames>());
+                    self.frames = peeked;
+                    result.ok_or(MemoryError::NoFrame)
+                }
+            }
         }
 
         fn free(&mut self, _frame: PhysicalFrame) -> Result<(), MemoryError> {
-            unimplemented!()
+            // TODO actually free the page
+            Ok(())
         }
 
         fn relocate_multiboot(&mut self, mmap: &'static multiboot_memory_map_t) {

@@ -22,6 +22,7 @@ declare_region!(0xffff_8000_0000_0000 => 0xffff_8001_0000_0000; gigabytes(4), KE
 declare_region!(0xffff_8001_0000_0000 => 0xffff_8002_0000_0000; gigabytes(4), PROCESS_KERNEL_STACKS);
 declare_region!(0xffff_9000_0000_0000 => 0xffff_d000_0000_0000; terabytes(64), VIRT_PHYSICAL);
 declare_region!(0xffff_d000_0000_0000 => 0xffff_d004_0000_0000; gigabytes(16), VIRT_KERNEL_HEAP);
+declare_region!(0xffff_d004_0000_0000 => 0xffff_d005_0000_0000; gigabytes(4), VIRT_IO_UNCACHEABLE);
 declare_region!(0xffff_ffff_8000_0000 => 0xffff_ffff_c000_0000; gigabytes(1), VIRT_KERNEL);
 
 pub const PHYS_KERNEL_BASE: u64 = 0x10_0000;

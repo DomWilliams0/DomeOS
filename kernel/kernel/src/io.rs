@@ -58,6 +58,7 @@ impl Add<u16> for Port {
 
 mod msrs {
     use crate::io::Msr;
+    use memory::PhysicalAddress;
     use modular_bitfield::prelude::*;
 
     /// The kernel's RIP SYSCALL entry for 64 bit software.
@@ -92,6 +93,28 @@ mod msrs {
 
     #[derive(Copy, Clone)]
     pub struct GsBase(u64);
+
+    #[bitfield]
+    #[derive(Copy, Clone)]
+    pub struct ApicBase {
+        #[skip]
+        _reserved0: B8,
+
+        /// Boot Strap CPU Core
+        #[skip(setters)]
+        pub bsc: bool,
+
+        #[skip]
+        _reserved1: B2,
+
+        pub enabled: bool,
+
+        // TODO depends on max physical address
+        base_addr: B40,
+
+        #[skip]
+        _reserved2: B12,
+    }
 
     impl Msr for Efer {
         const MSR: u32 = 0xC000_0080;
@@ -167,5 +190,29 @@ mod msrs {
         //     common::trace!("{} = {:#x}", Self::NAME, self.0);
         //     asm!("wrgsbase rax", in("rax") self.0,  options(nostack));
         // }
+    }
+
+    impl Msr for ApicBase {
+        const MSR: u32 = 0x0000_001B;
+        const NAME: &'static str = "APIC_BASE";
+
+        fn with_value(val: u64) -> Self {
+            Self::from_bytes(val.to_ne_bytes())
+        }
+
+        fn value(&self) -> u64 {
+            u64::from_ne_bytes(self.into_bytes())
+        }
+    }
+
+    impl ApicBase {
+        pub fn set_base_address(&mut self, addr: PhysicalAddress) {
+            debug_assert_eq!((addr.address() & 0xfff), 0);
+            self.set_base_addr(addr.address() >> 12);
+        }
+
+        pub fn base_address(&self) -> PhysicalAddress {
+            PhysicalAddress(self.base_addr() << 12)
+        }
     }
 }
