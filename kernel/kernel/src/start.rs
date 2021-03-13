@@ -3,8 +3,8 @@ use common::*;
 use crate::acpi::AcpiError;
 use crate::cpu::CpuState;
 use crate::descriptor_tables::{SEL_KERNEL_CODE, SEL_USER_BASE};
+use crate::interrupts::{disable_interrupts, enable_interrupts};
 use crate::io::{Efer, GsBase, KernelGsBase, LStar, Msr, Star};
-use crate::irq::{disable_interrupts, enable_interrupts};
 use crate::logging::LogMode;
 use crate::memory::{KernelInterruptStacks, Stacks};
 use crate::multiboot;
@@ -20,17 +20,21 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
     logging::set_log_mode(LogMode::SerialAndVga);
 
     descriptor_tables::init();
-    clock::init();
 
     let multiboot = Multiboot::new(multiboot);
 
-    // init memory and get ourselves a heap
+    // init physical identity mapping and get ourselves a heap
     if let Err(err) = crate::memory::init(multiboot) {
         error!("early memory setup failed: {}", err);
         hang();
     }
 
     // now we have a heap we can start using boxed error types
+
+    if let Err(err) = crate::interrupts::init() {
+        error!("apic error: {}", err);
+        hang();
+    }
 
     unsafe {
         let init_ps2 = match crate::acpi::init() {
@@ -48,11 +52,6 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
         //         Err(err) => panic!("failed to init PS/2: {}", err),
         //     };
         // }
-
-        if let Err(err) = crate::apic::init() {
-            error!("apic error: {}", err);
-            hang();
-        }
 
         // temporary, hang while still accepting interrupts
         enable_interrupts();

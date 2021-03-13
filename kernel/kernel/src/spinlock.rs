@@ -12,7 +12,7 @@ impl<T> SpinLock<T> {
             // avoid nested panics, we're already screwed
             if !crate::panic::is_panicking() {
                 assert!(
-                    !crate::irq::is_in_interrupt(),
+                    !crate::interrupts::is_in_interrupt(),
                     "shouldn't take a lock in an interrupt handler"
                 );
             }

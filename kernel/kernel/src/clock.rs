@@ -4,7 +4,6 @@ use core::time::Duration;
 use modular_bitfield::prelude::*;
 
 use crate::io::Port;
-use crate::irq;
 
 const PIT_CHANNEL0_DATA: Port = Port::new(0x40);
 // const PIT_CHANNEL2_DATA: Port = Port::new(0x42);
@@ -54,15 +53,15 @@ fn set_interval(hz: u64) {
         PIT_CHANNEL0_DATA.write_u8(divisor.shr(8) as u8); // hi
     }
 }
-extern "C" fn on_clock(_ctx: *const irq::InterruptContext) {
-    unsafe {
-        TICKS += 1;
-    };
-}
+// extern "C" fn on_clock(_ctx: *const irq::InterruptContext) {
+//     unsafe {
+//         TICKS += 1;
+//     };
+// }
 
 pub fn init() {
     set_interval(TICKS_PER_SECOND);
-    irq::register_handler(irq::Irq::Clock, on_clock);
+    // irq::register_handler(irq::Irq::Clock, on_clock);
 }
 
 pub fn since_boot() -> Duration {

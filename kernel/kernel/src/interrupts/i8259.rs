@@ -93,8 +93,8 @@ pub unsafe fn remap() {
     PIC_MASTER_DATA.write_u8(0x01);
     PIC_SLAVE_DATA.write_u8(0x01);
 
-    // keyboard and clock enabled only for now, the rest are masked out
-    PIC_MASTER_DATA.write_u8(0xFC);
+    // mask out all except clock
+    PIC_MASTER_DATA.write_u8(0xFE);
     PIC_SLAVE_DATA.write_u8(0xFF);
 
     // restore masks
@@ -102,6 +102,16 @@ pub unsafe fn remap() {
     PIC_SLAVE_DATA.write_u8(masks.1);
 }
 
+pub unsafe fn disable() {
+    // mask out clock
+    PIC_MASTER_DATA.write_u8(0xFF);
+
+    // disable both
+    PIC_MASTER_COMMAND.write_u8(0xFF);
+    PIC_SLAVE_COMMAND.write_u8(0xFF);
+}
+
+// TODO register clock at link time
 pub fn register_handler(irq: Irq, handler: IrqHandler) {
     info!("registering IRQ {:?} handler: {:?}", irq, handler);
     unsafe {
@@ -179,16 +189,6 @@ impl Drop for InterruptGuard {
             HANDLING_INTERRUPT = false
         }
     }
-}
-
-pub fn enable_interrupts() {
-    debug!("enabling interrupts");
-    unsafe { asm!("sti") };
-}
-
-pub fn disable_interrupts() {
-    debug!("disabling interrupts");
-    unsafe { asm!("cli") };
 }
 
 impl Debug for InterruptContext {

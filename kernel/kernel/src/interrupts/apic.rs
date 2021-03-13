@@ -160,6 +160,7 @@ pub fn init() -> Result<Apic, ApicError> {
 
     debug!("APIC base address = {:?}", apic_registers_frame.address());
 
+    // relocate
     unsafe {
         let mut msr = ApicBase::load();
         msr.set_enabled(true);
@@ -173,28 +174,45 @@ pub fn init() -> Result<Apic, ApicError> {
         base_virt: apic_registers_base,
     };
 
+    // enable LAPIC
+    //  * spurious vector = 0
+    //  * software enable = 1
+    //  * focus cpu core checking = 0
+    apic.write(ApicRegister::SpuriousIv, 1 << 8);
+
     trace!("APIC id={:#x}", apic.read(ApicRegister::ApicId));
     trace!("APIC vers={:#x}", apic.read(ApicRegister::ApicVersion));
-
-    // TODO disable 8259 pic
 
     Ok(apic)
 }
 
 impl Apic {
+    unsafe fn reg_ptr(&self, reg: ApicRegister) -> *mut u32 {
+        debug_assert_eq!(
+            self.base_phys,
+            ApicBase::load().base_address(),
+            "APIC base is wrong"
+        );
+
+        let base = self.base_virt;
+        let offset = reg as usize;
+
+        base.as_ptr::<u8>().add(offset) as *mut u32
+    }
+
     fn read(&self, reg: ApicRegister) -> u32 {
-        unsafe {
-            debug_assert_eq!(
-                self.base_phys,
-                ApicBase::load().base_address(),
-                "APIC base is wrong"
-            );
+        unsafe { self.reg_ptr(reg).read_volatile() }
+    }
 
-            let base = self.base_virt;
-            let offset = reg as usize;
+    fn write(&self, reg: ApicRegister, val: u32) {
+        unsafe { self.reg_ptr(reg).write_volatile(val) }
+    }
 
-            let ptr = base.as_const_ptr::<u8>().add(offset) as *const u32;
-            ptr.read_volatile()
-        }
+    /// TPR value (AMD64 Volume 2 16.6.4). Panics if either are >= 16.
+    /// 1 = lowest priority, 15 = highest. 0 allows all
+    pub fn set_threshold(&self, task_priority: u8, task_priority_subclass: u8) {
+        assert!(task_priority < 16 && task_priority_subclass < 16);
+        let value = (task_priority << 4) | task_priority_subclass; // mask not required with assert
+        self.write(ApicRegister::Tpr, value as u32);
     }
 }

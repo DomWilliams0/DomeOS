@@ -18,17 +18,17 @@ use core::ffi::c_void;
 
 use common::*;
 
-use crate::irq::disable_interrupts;
+use crate::interrupts::disable_interrupts;
 
 mod acpi;
-mod apic;
+#[deprecated(note = "use APIC for timer instead")]
 mod clock;
 mod cpu;
 mod cpuid;
 mod descriptor_tables;
 mod exception;
+mod interrupts;
 mod io;
-mod irq;
 mod logging;
 mod memory;
 mod multiboot;

@@ -1,5 +1,5 @@
+use crate::interrupts::InterruptContext;
 use crate::io::Port;
-use crate::irq::{InterruptContext, Irq};
 use common::*;
 use modular_bitfield::prelude::*;
 
@@ -168,7 +168,7 @@ impl Ps2Controller {
         // update config
         Command::WriteConfig(new_config).issue()?;
 
-        crate::irq::register_handler(Irq::Keyboard, on_key);
+        // TODO register irq
 
         Ok(Ps2Controller {})
     }

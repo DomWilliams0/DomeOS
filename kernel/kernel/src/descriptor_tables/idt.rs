@@ -4,7 +4,7 @@ use modular_bitfield::prelude::*;
 
 use crate::descriptor_tables::tss::IST_IDX_DOUBLE_FAULT;
 use crate::descriptor_tables::DescriptorTablePointer;
-use crate::irq;
+use crate::interrupts;
 use common::InitializedGlobal;
 use memory::VIRT_KERNEL_BASE;
 
@@ -210,8 +210,6 @@ impl InterruptDescriptorTable {
 
 pub fn init() {
     unsafe {
-        irq::remap();
-
         let idt = InterruptDescriptorTable::default();
         idt.load()
     }

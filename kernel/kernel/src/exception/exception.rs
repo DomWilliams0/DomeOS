@@ -4,7 +4,7 @@ use core::fmt::Debug;
 use common::*;
 
 use crate::exception::page_fault::PageFaultException;
-use crate::irq::InterruptContext;
+use crate::interrupts::InterruptContext;
 use enumflags2::BitFlags;
 use memory::VirtualAddress;
 
