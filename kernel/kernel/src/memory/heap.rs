@@ -5,7 +5,7 @@ use core::cell::RefCell;
 use core::ptr::{null_mut, NonNull};
 use memory::{
     gigabytes, kilobytes, round_up_to, MapFlags, MapTarget, MappedSlice, MemoryError,
-    VirtualAddress, FRAME_SIZE, VIRT_KERNEL_HEAP_BASE,
+    VirtualAddress, FRAME_SIZE, VIRT_KERNEL_HEAP_BASE, VIRT_KERNEL_HEAP_MAX,
 };
 
 #[cfg_attr(not(test), global_allocator)]
@@ -35,6 +35,10 @@ fn grow_heap(bytes: u64) -> Result<MappedSlice, MemoryError> {
         VirtualAddress::with_literal(VIRT_KERNEL_HEAP_BASE),
         frame_count as usize,
     )?;
+
+    if (start_addr + length).address() >= VIRT_KERNEL_HEAP_MAX {
+        return Err(MemoryError::NoMoreHeap);
+    }
 
     let mapped = space.map_range(start_addr, length, MapTarget::Any, MapFlags::Writeable)?;
     let start_addr = mapped.address();

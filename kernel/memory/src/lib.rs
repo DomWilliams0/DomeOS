@@ -1,5 +1,6 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(core_intrinsics)]
+#![allow(clippy::identity_op)]
 
 pub use address::{round_down_to, round_up_to, PhysicalAddress, VirtualAddress};
 pub use address_space::{

@@ -35,4 +35,7 @@ pub enum MemoryError {
 
     /// Invalid stack index {0}:{1} for {2}
     InvalidStack(u64, u64, &'static str),
+
+    /// Heap cannot grow anymore
+    NoMoreHeap,
 }
