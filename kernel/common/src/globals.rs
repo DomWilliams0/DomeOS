@@ -1,7 +1,8 @@
+use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
-pub type InitializedGlobal<T> = RawInitializedGlobal<T, DebugOnly>;
-pub type InitializedGlobalChecked<T> = RawInitializedGlobal<T, Always>;
+pub type InitializedGlobal<T> = RawInitializedGlobal<T, DebugOnly<T>>;
+pub type InitializedGlobalChecked<T> = RawInitializedGlobal<T, Always<T>>;
 
 pub struct RawInitializedGlobal<T, IF: InitFlag> {
     val: MaybeUninit<T>,
@@ -15,10 +16,10 @@ pub trait InitFlag {
 }
 
 #[derive(Default)]
-pub struct Always(bool);
+pub struct Always<T>(bool, PhantomData<T>);
 
 #[derive(Default)]
-pub struct DebugOnly(#[cfg(debug_assertions)] Always);
+pub struct DebugOnly<T>(#[cfg(debug_assertions)] Always<T>);
 
 impl<T, IF: InitFlag> RawInitializedGlobal<T, IF> {
     pub fn init(&mut self, val: T) {
@@ -34,23 +35,23 @@ impl<T, IF: InitFlag> RawInitializedGlobal<T, IF> {
         unsafe { self.val.assume_init_mut() }
     }
 }
-impl<T> RawInitializedGlobal<T, DebugOnly> {
+impl<T> RawInitializedGlobal<T, DebugOnly<T>> {
     pub const fn uninit() -> Self {
         Self {
             val: MaybeUninit::uninit(),
             init: DebugOnly(
                 #[cfg(debug_assertions)]
-                Always(false),
+                Always(false, PhantomData),
             ),
         }
     }
 }
 
-impl<T> RawInitializedGlobal<T, Always> {
+impl<T> RawInitializedGlobal<T, Always<T>> {
     pub const fn uninit() -> Self {
         Self {
             val: MaybeUninit::uninit(),
-            init: Always(false),
+            init: Always(false, PhantomData),
         }
     }
 
@@ -59,9 +60,13 @@ impl<T> RawInitializedGlobal<T, Always> {
     }
 }
 
-impl InitFlag for Always {
+impl<T> InitFlag for Always<T> {
     fn assert_init(&self) {
-        assert!(self.0);
+        assert!(
+            self.0,
+            "tried to access {} before it was initialized",
+            core::any::type_name::<T>()
+        );
     }
 
     fn init(&mut self) {
@@ -69,11 +74,15 @@ impl InitFlag for Always {
     }
 
     fn assert_uninit(&self) {
-        assert!(!self.0);
+        assert!(
+            !self.0,
+            "tried to initialize {} multiple times",
+            core::any::type_name::<T>()
+        );
     }
 }
 
-impl InitFlag for DebugOnly {
+impl<T> InitFlag for DebugOnly<T> {
     fn assert_init(&self) {
         #[cfg(debug_assertions)]
         self.0.assert_init();
