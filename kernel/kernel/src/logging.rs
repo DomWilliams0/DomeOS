@@ -51,6 +51,24 @@ pub fn init(log_level: LevelFilter) {
         // status change     1
         COM1.write(SerialRegister::ModemControl, 0x0B);
 
+        // enable interrupts
+        COM1.write(SerialRegister::InterruptEnable, 0x01);
+
+        // ensure working
+        // set in loopback mode, test the serial chip
+        COM1.write(SerialRegister::ModemControl, 0x1E);
+
+        // test serial chip (send byte 0xAE and check if serial returns same byte)
+        COM1.write(SerialRegister::Data, 0xAE);
+
+        // check if serial is faulty (i.e: not same byte as sent)
+        let resp = COM1.recv();
+        assert_eq!(resp, 0xAE); // invisible failure because we can't log anything at this point
+
+        // if serial is not faulty set it in normal operation mode
+        // (not-loopback with IRQs enabled and OUT#1 and OUT#2 bits enabled)
+        COM1.write(SerialRegister::ModemControl, 0x0F);
+
         // init logger
         let logger = SERIAL_LOGGER.assume_init_mut();
         *logger = LockedSerialLogger(SpinLock::new(()), log_level, LogMode::SerialOnly);

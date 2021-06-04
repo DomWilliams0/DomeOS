@@ -63,10 +63,22 @@ impl SerialPort {
         }
     }
 
+    pub unsafe fn recv(&mut self) -> u8 {
+        while !self.can_recv() {}
+        self.register(SerialRegister::Data).read_u8()
+    }
+
     unsafe fn can_send(&self) -> bool {
         self.register(SerialRegister::LineStatus)
             .read_u8()
             .bitand(0x20)
+            != 0
+    }
+
+    unsafe fn can_recv(&self) -> bool {
+        self.register(SerialRegister::LineStatus)
+            .read_u8()
+            .bitand(0x1)
             != 0
     }
 
