@@ -83,8 +83,8 @@ impl SerialPort {
     }
 
     unsafe fn puts(&mut self, s: &str) {
-        while !self.can_send() {}
         for c in s.bytes() {
+            while !self.can_send() {}
             self.write(SerialRegister::Data, c);
         }
     }
