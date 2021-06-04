@@ -1,5 +1,7 @@
+#[cfg(debug_assertions)]
+pub use i8259::is_in_interrupt;
 pub use i8259::remap as i8259_remap;
-pub use i8259::{is_in_interrupt, InterruptContext};
+pub use i8259::InterruptContext;
 pub use init::init;
 
 mod apic;

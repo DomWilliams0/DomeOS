@@ -19,7 +19,7 @@ pub trait InitFlag {
 pub struct Always<T>(bool, PhantomData<T>);
 
 #[derive(Default)]
-pub struct DebugOnly<T>(#[cfg(debug_assertions)] Always<T>);
+pub struct DebugOnly<T>(#[cfg(debug_assertions)] Always<T>, PhantomData<T>);
 
 impl<T, IF: InitFlag> RawInitializedGlobal<T, IF> {
     pub fn init(&mut self, val: T) {
@@ -42,6 +42,7 @@ impl<T> RawInitializedGlobal<T, DebugOnly<T>> {
             init: DebugOnly(
                 #[cfg(debug_assertions)]
                 Always(false, PhantomData),
+                PhantomData,
             ),
         }
     }
