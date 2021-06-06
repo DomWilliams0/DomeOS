@@ -23,6 +23,12 @@ pub enum Ps2Error {
 
     /// Timed out receiving from port {0:#x}
     RecvTimeout(u8),
+
+    /// Device #{0} did not respond to reset command
+    ResetTimedOut(u8),
+
+    /// Device #{0} failed reset (responded with {1:#x}
+    ResetFailed(u8, u8),
 }
 
 #[derive(Copy, Clone)]
@@ -98,7 +104,7 @@ extern "C" fn on_key(_: *const InterruptContext) {
 }
 
 impl Ps2Controller {
-    pub fn initialise() -> Result<Self, Ps2Error> {
+    pub fn init() -> Result<Self, Ps2Error> {
         // TODO ensure usb is enabled and legacy usb mode disabled
 
         // disable
@@ -154,14 +160,13 @@ impl Ps2Controller {
         let mut new_config = config;
         if enabled[0] {
             Command::EnableFirst.issue()?;
-            // just send reset and swallow answer if any
-            let _ = Command::ResetFirst.issue();
+            Command::reset_device(1)?;
             new_config.set_first_irq(true);
         }
 
         if enabled[1] {
             Command::EnableSecond.issue()?;
-            let _ = Command::ResetSecond.issue();
+            Command::reset_device(2)?;
             new_config.set_second_irq(false);
         }
 
@@ -232,19 +237,38 @@ impl Command {
         };
 
         unsafe {
+            // trace!("issue {:#x}", first);
             CMD_AND_STATUS_PORT.write_u8(first);
         }
 
         if let CommandByte::Double(_, second) = cmd {
             // send second byte
+            // trace!("issue {:#x}", second);
             try_send_byte(second)?;
         }
 
         if self.expects_response() {
             // read response
-            try_read_byte()
+            let resp = try_read_byte()?;
+            // trace!("recv  {:#x}", resp);
+            Ok(resp)
         } else {
             Ok(0)
+        }
+    }
+
+    /// 1 or 2
+    fn reset_device(device: u8) -> Result<(), Ps2Error> {
+        let cmd = match device {
+            1 => Command::ResetFirst,
+            2 => Command::ResetSecond,
+            _ => unreachable!(),
+        };
+
+        match cmd.issue() {
+            Ok(0xFA) => Ok(()),
+            Ok(n) => Err(Ps2Error::ResetFailed(device, n)),
+            Err(_) => Err(Ps2Error::ResetTimedOut(device)),
         }
     }
 }
@@ -255,7 +279,9 @@ impl Status {
         debug_assert_ne!(byte, 0);
 
         let status = Self::from_bytes([byte; 1]);
-        debug_assert!(status.system());
+
+        // this is sometimes set...
+        // debug_assert!(status.system(), "status bit should be cleared by firmware");
 
         status
     }

@@ -47,7 +47,7 @@ pub fn start(multiboot: &'static multiboot::multiboot_info) -> ! {
         };
 
         // if init_ps2 {
-        //     let ps2_controller = match Ps2Controller::initialise() {
+        //     let ps2_controller = match Ps2Controller::init() {
         //         Ok(ps2) => ps2,
         //         Err(err) => panic!("failed to init PS/2: {}", err),
         //     };
