@@ -47,9 +47,9 @@ enable_paging:
 	mov eax, (init_pml4 - KERNEL_VIRT)
 	mov cr3, eax
 
-	; pae (bit 5)
+	; pae (bit 5) and pge (bit 7)
 	mov eax, cr4
-	or eax, 1 << 5
+	or eax, 1 << 5 | 1 << 7
 	mov cr4, eax
 
 	; long bit and nx-enable bit in EFER

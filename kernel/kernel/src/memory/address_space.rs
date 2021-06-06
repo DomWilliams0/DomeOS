@@ -101,6 +101,11 @@ impl<'p> AddressSpace<'p> {
         }
     }
 
+    // TODO expose invlpg
+    pub fn invalidate_tlb() {
+        cr3::flush_tlb();
+    }
+
     pub fn log_hierarchy(&self) {
         let p4 = self.pml4();
         for (i, e) in p4.present_entries() {
@@ -182,5 +187,10 @@ mod cr3 {
         unsafe {
             asm!("mov cr3, {0}", in(reg) cr3);
         }
+    }
+
+    pub fn flush_tlb() {
+        // TODO inefficient
+        unsafe { asm!("mov {0}, cr3", "mov cr3, {0}", out(reg) _, options(nostack)) }
     }
 }

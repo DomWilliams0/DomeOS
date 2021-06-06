@@ -31,6 +31,9 @@ pub fn init(multiboot: Multiboot) -> Result<(), MemoryError> {
 }
 
 /// Setup huge physical identity mapping
+///
+/// TODO marking higher half pages as 'global' doesnt work in virtualbox
+///  "page fault on present page: PageFaultException { flags: (PAGE_PROTECTION_VIOLATION | CAUSED_BY_READ | RESERVED_WRITE), addr: v0xffff900000000000 },"
 fn init_physical_identity_mapping(
     p4: &mut P4,
     memory_map: &MultibootMemoryMap,
@@ -47,7 +50,7 @@ fn init_physical_identity_mapping(
     let phys_max = round_up_to(phys_max.address(), megabytes(2));
     let base = VirtualAddress::with_literal(VIRT_PHYSICAL_BASE);
     debug!(
-        "identity mapping {:.2}GB/{:.2}MB of physical memory from {:?}",
+        "identity mapping {:.2}GB ({:.2}MB) of physical memory from {:?}",
         phys_max as f32 / gigabytes(1) as f32,
         phys_max as f32 / megabytes(1) as f32,
         base
@@ -88,7 +91,7 @@ fn init_physical_identity_mapping(
         // ensure all allocated frames are already writeable with allocate_premapped
         let p3_frame = frame_allocator().allocate_premapped()?;
         unsafe {
-            // safety: frame allocated with PreMapped
+            // safety: frame is premapped
             p3_frame.zero_in_place();
         }
 
@@ -106,7 +109,7 @@ fn init_physical_identity_mapping(
 
             let p2_frame = frame_allocator().allocate_premapped()?;
             unsafe {
-                // safety: frame allocated with PreMapped
+                // safety: frame is premapped
                 p2_frame.zero_in_place();
             }
             p3_entry
