@@ -103,12 +103,8 @@ pub unsafe fn remap() {
 }
 
 pub unsafe fn disable() {
-    // mask out clock
+    PIC_SLAVE_DATA.write_u8(0xFF);
     PIC_MASTER_DATA.write_u8(0xFF);
-
-    // disable both
-    PIC_MASTER_COMMAND.write_u8(0xFF);
-    PIC_SLAVE_COMMAND.write_u8(0xFF);
 }
 
 // TODO register clock at link time
