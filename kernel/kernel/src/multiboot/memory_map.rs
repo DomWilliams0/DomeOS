@@ -4,7 +4,9 @@ use core::ops::Range;
 use crate::multiboot::memory_map::MemoryRegionType::{
     Acpi, Available, Defective, PreserveOnHibernation, Reserved,
 };
-use crate::multiboot::{multiboot_info, multiboot_memory_map_t, multiboot_mmap_entry};
+use crate::multiboot::{
+    multiboot_info, multiboot_memory_map_t, multiboot_mmap_entry, multiboot_uint32_t,
+};
 use common::Bit;
 use core::iter;
 use core::mem;
@@ -99,7 +101,7 @@ impl MultibootMemoryMap {
 
                 // advance by number of bytes in entry, NOT multiples of struct
                 current = unsafe {
-                    let bytes_offset = mmap.size as usize + mem::size_of_val(&mmap.size);
+                    let bytes_offset = mmap.size as usize + mem::size_of::<multiboot_uint32_t>();
                     let ptr = current as *mut u8;
                     ptr.add(bytes_offset) as *mut multiboot_memory_map_t
                 };

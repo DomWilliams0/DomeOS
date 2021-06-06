@@ -28,7 +28,6 @@ pub trait FrameAllocator {
         f(self).map(move |frame| FrameFreeBomb {
             allocator: self,
             frame,
-            defused: false,
         })
     }
 }
@@ -36,7 +35,6 @@ pub trait FrameAllocator {
 pub struct FrameFreeBomb<'a, A: FrameAllocator> {
     allocator: &'a mut A,
     frame: PhysicalFrame,
-    defused: bool,
 }
 
 static mut FRAME_ALLOCATOR: InitializedGlobal<DumbFrameAllocator> = InitializedGlobal::uninit();

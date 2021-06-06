@@ -1,7 +1,7 @@
 pub struct SpinLock<T>(spin::Mutex<T>);
 
 impl<T> SpinLock<T> {
-    pub fn new(val: T) -> Self {
+    pub const fn new(val: T) -> Self {
         Self(spin::Mutex::new(val))
     }
 

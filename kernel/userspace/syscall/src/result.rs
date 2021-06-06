@@ -57,7 +57,7 @@ impl SyscallResult {
         Self(unsafe { core::mem::transmute::<i64, u64>(negative) })
     }
 
-    pub const fn to_u64(&self) -> u64 {
+    pub const fn to_u64(self) -> u64 {
         self.0
     }
 }
