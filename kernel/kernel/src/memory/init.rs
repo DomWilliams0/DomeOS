@@ -152,6 +152,8 @@ fn init_physical_identity_mapping(
         }
     }
 
+    AddressSpace::invalidate_tlb();
+
     Ok(())
 }
 
